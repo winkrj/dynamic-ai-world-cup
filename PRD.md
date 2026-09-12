@@ -1,0 +1,49 @@
+# Dynamic AI World Cup — PRD 구현 기준 v1.0
+
+상태: 최신 확정 결정의 복원본. 원문 보존 여부와 우선순위는 `docs/SOURCE_PROVENANCE.md` 참조.
+
+## 목적
+
+자연어로 고민을 입력하면 고를 만한 후보군을 만들고, 제한시간 A/B 선택으로 하나의 결정을 끝낸다. 줄이는 것은 추천 목록을 읽고 비교하는 비용이다. **Candidate Quality가 최우선**이며 잘못된 후보군을 게임 UX로 보완했다고 보지 않는다.
+
+Primary: 혼자 빠르게 결정하고 싶은 사용자. 함께 화면을 보거나 방송에서 토론할 수 있지만 MVP에 실시간 다인 투표는 없다. 대표 검증 도메인은 안정적인 취미 선택과 최신 사실 확인이 필요한 서울 놀거리다. 제품 입력을 이 두 카테고리로 제한하지 않는다.
+
+## 핵심 흐름
+
+자연어 고민 → 8/16/32강 → Candidate Engine → 후보 전체 미리보기 → 선택적으로 전체 재생성 1회 → 이대로 시작 / bracket freeze → 대진별 7초 A/B → Champion → 같은 immutable bracket 공유.
+
+Candidate Engine의 논리 순서:
+
+1. Context / Constraint 추출
+2. Candidate Unit 정의
+3. Historical Preference 반영
+4. Diversity / Coverage Plan
+5. Structured Generation
+6. Selective Grounding
+7. Candidate Set Validation
+8. 실패한 경우에만 Repair 후 재검증
+
+단계 수가 LLM 호출 수는 아니다. 초기 목표는 구조화 생성 1회 + 필요한 검색 + 실패 시 Repair 1회다. 후보 검증을 통과해도 **사용자의 시작 전까지 freeze하지 않는다**.
+
+## 필수 제품 규칙
+
+- 8/16/32개를 정확하게 준비한다. 실패했다고 32→16으로 자동 축소하지 않는다.
+- Hard Constraint 위반·판정 불가, 중복, 서로 다른 비교 단위, 필요한 근거 미확인 후보셋은 노출하지 않는다.
+- 과거 선호는 다양성을 유지하는 가중치 이동이다. 현재 명시 조건이 항상 우선한다.
+- 전체 후보를 시작 전에 볼 수 있다. 개별 후보 편집/교체는 없다. 전체 재생성은 성공한 교체 기준 1회다.
+- 시작 이후 후보·초기 배치·게임 규칙은 immutable이다. Undo, 돌아가서 교체, 플레이 중 재생성은 없다.
+- 카드 두 개와 진입 연출이 준비되면 7초. 시간 초과 시 두 후보를 같은 확률로 랜덤 선택한다.
+- 결승도 시간·정보·상호작용이 동일하다. N강은 N−1번 선택으로 끝난다.
+- 직접 선택과 `TIMEOUT_RANDOM`을 구분한다. 후자는 선호 집계에서 제외한다.
+- 공유받은 사람은 AI 호출 없이 동일 후보·초기 순서·규칙으로 새 세션을 진행한다. 결과와 선택 기록은 세션별로 독립적이다.
+- 로그인·취향 설정 없이 첫 플레이를 할 수 있다.
+
+## 범위
+
+MVP: 자연어 입력, 강수, 생성/검증/Repair, 익명 historical preference, 미리보기/재생성, 타이머/애니메이션, 결과/공유, pairwise 기록, 실제 candidate eval.
+
+MVP 밖: 계정, 친구, 피드/댓글, 실시간 그룹방/투표, 예약/결제, 지도 탐색, 관리자 화면, vector DB, fine-tuning, 복잡한 ranking 모델, 전체 사용자 개인화 모델.
+
+## 성공 판정
+
+먼저 hard gate를 통과하고 Relevance / Diversity / Coverage / Tournament Playability / Context Fit을 평가한다. 기존 내부 rubric은 1–5점 평균 ≥4.0, 어느 축도 3점 미만 없음이다. 이는 목표이지 달성 수치가 아니다. 설명 없이 첫 입력→첫 선택→완주가 가능한지, 실제로 고를 만한 후보인지, 재생성 이유와 재사용 의향을 사용자 테스트로 확인한다.

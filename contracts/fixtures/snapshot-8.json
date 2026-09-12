@@ -1,0 +1,88 @@
+{
+  "snapshotId": "fixture-snapshot-8",
+  "schemaVersion": 1,
+  "title": "새로 시작할 취미 월드컵",
+  "size": 8,
+  "candidates": [
+    {
+      "id": "hobby-1",
+      "name": "드로잉",
+      "tags": [
+        "집에서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-2",
+      "name": "뜨개질",
+      "tags": [
+        "혼자서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-3",
+      "name": "캘리그래피",
+      "tags": [
+        "집에서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-4",
+      "name": "종이접기",
+      "tags": [
+        "혼자서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-5",
+      "name": "글쓰기",
+      "tags": [
+        "집에서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-6",
+      "name": "기타 연주",
+      "tags": [
+        "혼자서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-7",
+      "name": "식물 키우기",
+      "tags": [
+        "집에서"
+      ],
+      "imageUrl": null
+    },
+    {
+      "id": "hobby-8",
+      "name": "체스",
+      "tags": [
+        "혼자서"
+      ],
+      "imageUrl": null
+    }
+  ],
+  "initialOrder": [
+    "hobby-1",
+    "hobby-2",
+    "hobby-3",
+    "hobby-4",
+    "hobby-5",
+    "hobby-6",
+    "hobby-7",
+    "hobby-8"
+  ],
+  "rules": {
+    "matchDurationMs": 7000,
+    "timeoutMode": "UNIFORM_RANDOM",
+    "undoAllowed": false
+  },
+  "frozenAt": "2026-09-12T00:00:00Z"
+}

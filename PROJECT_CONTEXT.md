@@ -1,0 +1,29 @@
+# 프로젝트 컨텍스트
+
+갱신일: 2026-09-12.
+
+목적: 좋은 후보군과 빠른 A/B 선택으로 결정 비용을 줄이는 Dynamic AI World Cup. Candidate Quality가 우선이다.
+
+## 현재 구조와 상태
+
+- 단일 저장소, `frontend` React/TypeScript/Vite, `backend` Java 21/Spring Boot 4.1.1. DB는 PostgreSQL 17로 설계했으며 아직 연결하지 않았다.
+- 큰 역할 A=플레이 경험, B=후보 품질과 서버. 제품 화면 작업과 서버 작업을 두 역할 안에서 계속 진행한다.
+- `contracts/openapi.json` v1.0.0, 공유 fixture, 자동생성 TS, Java preview 직렬화 비교 테스트.
+- CE-001 구현: fixed plan, candidate count/duplicate/unit/coverage, hard assessment, grounded evidence validity, independent semantic-review gate. 검증 통과 타입만 preview mapper에 넘긴다.
+- 실제 HTTP 구현: `/api/v1/health`만. 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다.
+- 실제 provider/search/DB/게임/공유 기능은 미구현. synthetic fixture를 사용자에게 동적 생성 결과로 표시하지 않는다.
+
+## 검증
+
+CE-001 완료. `./scripts/verify.sh` 통과: 공용 fixture 5개와 생성 타입, TS/production build, Java 42개 테스트(실패/오류 0), bootJar. 독립 Reviewer 2회 중 최초 Medium 1/Low 1을 수정했고 최종 Critical 0 / High 0, 남은 finding 없음. 초기 화면은 360px/1280px에서 가로 넘침과 console error가 없음을 확인했다. 상세는 `docs/VERIFICATION.md`다.
+
+GitHub: https://github.com/winkrj/dynamic-ai-world-cup (private, winkrj). 현재 시스템 기본 Node는 23이므로 실제 검증에는 별도로 받은 임시 Node 24.21.0을 사용했다. 팀원은 `.nvmrc`에 맞는 Node 24를 준비한다. 전역 Node 설정은 변경하지 않았다.
+
+## 다음 작업
+
+- A: `feat/play/fe-001-preview`에서 입력·강수·미리보기. fixture를 기준으로 서버와 독립 개발.
+- B: `feat/engine/ce-002-generation`에서 실제 plan/생성/grounding/독립 assessment/Repair adapter와 eval.
+- 모델/검색 제공자와 API 자격정보는 CE-002 실행 전 선택한다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
+- GitHub collaborator 초대는 역할별 실제 계정이 정해진 뒤 한다. 현 단계에서 팀원 초대/branch protection을 완료했다고 주장하지 않는다.
+
+핵심 동시성/게임 정책과 기술 선택은 `TECH_DESIGN.md`, 결정 변경은 `DECISIONS.md`, source 한계는 `docs/SOURCE_PROVENANCE.md`에 남긴다.

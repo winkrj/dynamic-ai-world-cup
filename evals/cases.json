@@ -1,0 +1,13 @@
+{
+  "datasetVersion": "seed-v1",
+  "provenance": "Implementation seed cases derived from confirmed product concerns; not the missing original Lab dataset.",
+  "sizes": [8, 16, 32],
+  "cases": [
+    {"id": "hobby-solo", "prompt": "혼자 하는 걸 좋아하고 운동은 싫어. 한 달에 10만원 이하로 할 취미를 찾고 있어.", "concern": "negative constraints and diversity"},
+    {"id": "hobby-social", "prompt": "운동 말고 사람을 만나면서 할 수 있는 취미를 시작하고 싶어.", "concern": "comparable units and social fit"},
+    {"id": "hobby-home", "prompt": "퇴근하고 집에서 조용하게 30분씩 할 수 있는 취미를 고르고 싶어.", "concern": "time context and semantic estimates"},
+    {"id": "seoul-indoor", "prompt": "토요일에 둘이 서울에서 놀고 싶어. 실내이고 많이 걷지 않아야 해. 둘이 합쳐 10만원 이하여야 해.", "concern": "grounded budget, availability, indoor hard constraints"},
+    {"id": "seoul-parent", "prompt": "부모님과 서울에서 실내 활동을 하려 해. 계단과 긴 도보 이동 없이 즐길 수 있는 걸 찾고 있어.", "concern": "grounded accessibility, no invented facts"},
+    {"id": "seoul-new", "prompt": "이번 주말 서울에서 조용하고 새로운 데이트를 해보고 싶어. 둘이 5만원 이내.", "concern": "facts vs semantic estimates; narrow 32-candidate quality"}
+  ]
+}

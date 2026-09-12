@@ -1,0 +1,1067 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Dynamic AI World Cup API",
+    "version": "1.0.0",
+    "description": "Contract baseline. Only health is implemented in CE-001. See docs/API_CONTRACT.md for ownership, idempotency and cross-field invariants."
+  },
+  "servers": [
+    {
+      "url": "/api/v1"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "get health",
+        "x-implementation-status": "implemented",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generation-jobs": {
+      "post": {
+        "operationId": "createGenerationJob",
+        "summary": "create generation job",
+        "x-implementation-status": "planned",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generation-jobs/{jobId}": {
+      "get": {
+        "operationId": "getGenerationJob",
+        "summary": "get generation job",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drafts/{draftId}": {
+      "get": {
+        "operationId": "getDraft",
+        "summary": "get draft",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preview"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drafts/{draftId}/regenerations": {
+      "post": {
+        "operationId": "regenerateDraft",
+        "summary": "regenerate draft",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerationJob"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drafts/{draftId}/start": {
+      "post": {
+        "operationId": "startDraft",
+        "summary": "start draft",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "draftId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/snapshots/{snapshotId}": {
+      "get": {
+        "operationId": "getSnapshot",
+        "summary": "get snapshot",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "snapshotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{sessionId}/selections": {
+      "post": {
+        "operationId": "submitSelections",
+        "summary": "submit selections",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectionBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectionAck"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/{sessionId}/shares": {
+      "post": {
+        "operationId": "createShare",
+        "summary": "create share",
+        "x-implementation-status": "planned",
+        "security": [
+          {
+            "anonymousCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareCreated"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shares/{token}": {
+      "get": {
+        "operationId": "getShare",
+        "summary": "get share",
+        "x-implementation-status": "planned",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedBracket"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shares/{token}/sessions": {
+      "post": {
+        "operationId": "replayShare",
+        "summary": "replay share",
+        "x-implementation-status": "planned",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStart"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; HTTP status semantics in docs/API_CONTRACT.md.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "anonymousCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "worldcup_actor",
+        "description": "Server-issued opaque anonymous actor token; never ask users to log in."
+      }
+    },
+    "schemas": {
+      "Size": {
+        "type": "integer",
+        "enum": [
+          8,
+          16,
+          32
+        ]
+      },
+      "Candidate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 2
+          },
+          "imageUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri",
+                "pattern": "^https://"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tags",
+          "imageUrl"
+        ]
+      },
+      "Preview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "draftId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "const": "READY",
+            "type": "string"
+          },
+          "size": {
+            "$ref": "#/components/schemas/Size"
+          },
+          "candidateUnit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "minItems": 8,
+            "maxItems": 32
+          },
+          "regenerationsRemaining": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          }
+        },
+        "required": [
+          "draftId",
+          "version",
+          "status",
+          "size",
+          "candidateUnit",
+          "candidates",
+          "regenerationsRemaining"
+        ]
+      },
+      "Rules": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchDurationMs": {
+            "const": 7000,
+            "type": "integer"
+          },
+          "timeoutMode": {
+            "const": "UNIFORM_RANDOM",
+            "type": "string"
+          },
+          "undoAllowed": {
+            "const": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "matchDurationMs",
+          "timeoutMode",
+          "undoAllowed"
+        ]
+      },
+      "Snapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schemaVersion": {
+            "const": 1,
+            "type": "integer"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "size": {
+            "$ref": "#/components/schemas/Size"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "minItems": 8,
+            "maxItems": 32
+          },
+          "initialOrder": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 8,
+            "maxItems": 32,
+            "uniqueItems": true
+          },
+          "rules": {
+            "$ref": "#/components/schemas/Rules"
+          },
+          "frozenAt": {
+            "type": "string",
+            "minLength": 1,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "snapshotId",
+          "schemaVersion",
+          "title",
+          "size",
+          "candidates",
+          "initialOrder",
+          "rules",
+          "frozenAt"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_INPUT",
+              "NOT_FOUND",
+              "VERSION_CONFLICT",
+              "IDEMPOTENCY_CONFLICT",
+              "OPERATION_IN_PROGRESS",
+              "REGENERATION_EXHAUSTED",
+              "ALREADY_FROZEN",
+              "QUALITY_GATE_FAILED",
+              "CLARIFICATION_REQUIRED",
+              "UNSUPPORTED_REQUEST",
+              "RATE_LIMITED",
+              "PROVIDER_UNAVAILABLE",
+              "INVALID_SELECTION",
+              "SESSION_NOT_COMPLETED",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "requestId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "requestId",
+          "retryable"
+        ]
+      },
+      "GenerationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "size": {
+            "$ref": "#/components/schemas/Size"
+          },
+          "locale": {
+            "type": "string",
+            "const": "ko-KR"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Valid IANA timezone, e.g. Asia/Seoul. Validated by the server."
+          }
+        },
+        "required": [
+          "prompt",
+          "size",
+          "locale",
+          "timezone"
+        ]
+      },
+      "VersionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ]
+      },
+      "GenerationJob": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "FAILED"
+            ]
+          },
+          "draftId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApiError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "jobId",
+          "status",
+          "draftId",
+          "error"
+        ]
+      },
+      "SessionStart": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          }
+        },
+        "required": [
+          "sessionId",
+          "snapshot"
+        ]
+      },
+      "SelectionEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "winnerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "USER_SELECTED",
+              "TIMEOUT_RANDOM"
+            ]
+          },
+          "elapsedMs": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "eventId",
+          "sequence",
+          "winnerId",
+          "reason",
+          "elapsedMs"
+        ]
+      },
+      "SelectionBatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SelectionEvent"
+            },
+            "minItems": 1,
+            "maxItems": 31
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "SelectionAck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nextSequence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLAYING",
+              "COMPLETED"
+            ]
+          },
+          "championId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "nextSequence",
+          "status",
+          "championId"
+        ]
+      },
+      "ShareCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri"
+          },
+          "snapshotId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "championId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "token",
+          "url",
+          "snapshotId",
+          "championId"
+        ]
+      },
+      "SharedBracket": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          },
+          "championId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "snapshot",
+          "championId"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "UP"
+          },
+          "service": {
+            "type": "string",
+            "const": "dynamic-ai-world-cup"
+          }
+        },
+        "required": [
+          "status",
+          "service"
+        ]
+      }
+    }
+  }
+}
