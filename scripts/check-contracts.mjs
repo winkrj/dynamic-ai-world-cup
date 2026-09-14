@@ -34,3 +34,20 @@ for (const [file, schema] of cases) {
   }
 }
 console.log(`Contract v${spec.info.version}: generated types and ${cases.length} fixtures verified.`);
+
+if (process.argv.includes('--http')) {
+  const samples = JSON.parse(await readFile(new URL('backend/build/contract-http-samples.json', root), 'utf8'));
+  const expected = ['GenerationJob', 'Preview', 'Snapshot', 'SessionStart', 'SelectionAck', 'ShareCreated', 'SharedBracket', 'ApiError'];
+  for (const schema of expected) assert(samples.some(sample => sample.schema === schema), `Missing real HTTP sample: ${schema}`);
+  for (const { schema, value } of samples) {
+    const validate = ajv.getSchema(`https://worldcup.local/contract#/components/schemas/${schema}`);
+    assert(validate(value), `HTTP ${schema}: ${JSON.stringify(validate.errors)}`);
+    const snapshot = schema === 'Snapshot' ? value : value.snapshot;
+    if (snapshot) {
+      assert.equal(snapshot.candidates.length, snapshot.size);
+      assert.deepEqual([...snapshot.initialOrder].sort(), snapshot.candidates.map(candidate => candidate.id).sort());
+    }
+    if (schema === 'Preview') assert.equal(value.candidates.length, value.size);
+  }
+  console.log(`Actual HTTP responses: ${samples.length} samples across ${expected.length} schemas verified.`);
+}

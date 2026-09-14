@@ -6,12 +6,13 @@
 
 ## 현재 구조와 상태
 
-- 단일 저장소, `frontend` React/TypeScript/Vite, `backend` Java 21/Spring Boot 4.1.1. DB는 PostgreSQL 17로 설계했으며 아직 연결하지 않았다.
+- 단일 저장소, `frontend` React/TypeScript/Vite, `backend` Java 21/Spring Boot 4.1.1. PostgreSQL 17/JDBC/Flyway 구현. 로컬 compose와 격리된 Testcontainers DB 검증을 사용한다.
 - 큰 역할 A=플레이 경험, B=후보 품질과 서버. 제품 화면 작업과 서버 작업을 두 역할 안에서 계속 진행한다.
 - `contracts/openapi.json` v1.0.0, 공유 fixture, 자동생성 TS, Java preview 직렬화 비교 테스트.
 - CE-001 구현: fixed plan, candidate count/duplicate/unit/coverage, hard assessment, grounded evidence validity, independent semantic-review gate. 검증 통과 타입만 preview mapper에 넘긴다.
-- 실제 HTTP 구현: `/api/v1/health`만. 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다.
-- 실제 provider/search/DB/게임/공유 기능은 미구현. synthetic fixture를 사용자에게 동적 생성 결과로 표시하지 않는다.
+- 실제 HTTP 구현: health, 익명 생성 job/preview/전체 재생성, freeze/snapshot, 선택 batch, 공유/새 세션 API. cookie 소유권, idempotency, rate limit, worker lease/복구, 보존 정리 포함.
+- 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다. 실제 provider/search, 게임/공유 화면과 배포는 미구현이다.
+- `CandidateEngine` port로 엔진과 서버를 분리했다. dev의 합성 데이터는 개발용 표시, 기본/운영 미연결 엔진은 실패 처리한다. 개인화는 직접 선택 기록 최대 50건을 읽는 경계까지이며 실제 가중치 품질은 CE-003에서 평가한다.
 
 ## 검증
 
@@ -20,6 +21,8 @@ CE-001 완료. `./scripts/verify.sh` 통과: 공용 fixture 5개와 생성 타�
 GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09-14 사용자 승인으로 공개 전환했으며 인증 없이 저장소와 브랜치 조회를 확인했다. 링크만으로 clone하고 개발을 시작할 수 있다. 원본 쓰기 권한이 없는 참여자는 Fork → 개발 → PR을 사용한다. 구체적인 합류 순서는 README와 `docs/COLLABORATION.md`에 있다.
 
 초기 검증 당시 시스템 기본 Node는 23이므로 별도로 받은 임시 Node 24.21.0을 사용했다. 팀원은 `.nvmrc`에 맞는 Node 24를 준비한다. 전역 Node 설정은 변경하지 않았다.
+
+2026-09-14 API Goal 브랜치 `feat/server/backend-api`: 구현·최종 verify·독립 review 완료. Java 78개, 실제 HTTP 응답 102개/8개 schema, 기존 fixture 5개, 웹 build, bootJar 통과. 리뷰 1회차 Medium 2개를 수정했고 2회차 Critical 0 / High 0 / 남은 finding 0. 실제 dev 서버의 자동 worker·8강 기록·공유 replay도 확인했다. 아직 main에 병합한 상태는 아니며 실제 엔진/프론트 완성·배포 완료를 의미하지 않는다. 상세는 `docs/VERIFICATION.md`다.
 
 ## 다음 작업
 

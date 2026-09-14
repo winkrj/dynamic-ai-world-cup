@@ -7,3 +7,13 @@ Java 21 records와 순수 Java domain부터 시작한다. LLM/검색 adapter는 
 HTTP DTO는 contracts와 맞춰 테스트하고 내부 plan/evidence를 그대로 반환하지 않는다. DB transaction과 unique constraint로 idempotency/regen/freeze를 보장한다. snapshot은 master candidate 참조가 아니라 display copy로 저장한다.
 
 `./gradlew test bootJar`와 관련 API/DB 통합 테스트를 실행한다. 실제 provider 검증 전 모델 성능/latency/비용 성공 수치를 만들지 않는다. 유료 provider key는 환경에서만 주입하고 fixture/로그/프론트에 넣지 않는다.
+
+## 서버 구현 이후의 경계
+
+`docs/BACKEND_DESIGN.md`의 DDD/Google API 적용 기준을 따른다. HTTP 경로/DTO를 스타일 취향으로 바꾸지 말고 계약 영향부터 확인한다. 도메인에는 HTTP/JDBC를 넣지 않으며 transaction은 application service, SQL은 infrastructure repository에 둔다.
+
+엔진 작업은 `CandidateEngine` port 뒤에서 수행한다. `Context`의 deadline/attempt를 지키고, 실제 output은 독립 검증을 통과한 ValidatedSet이어야 한다. `DevelopmentCandidateEngine`은 dev 합성 데이터 전용이다. 일반 profile의 미연결 엔진 실패를 임시 성공으로 바꾸지 않는다.
+
+DB schema 변경은 새 Flyway migration으로 추가한다. 이미 배포/공유된 migration을 편집하거나 snapshot UPDATE/DELETE trigger를 해제하지 않는다. tests는 PostgresSupport가 만든 격리 DB만 초기화한다. 개발자 DB를 test 대상이나 cleanup 대상으로 쓰지 않는다.
+
+전체 검증에는 실행 중인 Docker가 필요하다. `WorldcupHttpTest`의 실제 응답 샘플을 `scripts/check-contracts.mjs --http`가 schema 검사한다. 새로운 endpoint/DTO는 HTTP 테스트와 이 검사에 추가한다. 스케줄러/동시성/보존 정책을 변경하면 해당 DB 테스트도 함께 실행한다.

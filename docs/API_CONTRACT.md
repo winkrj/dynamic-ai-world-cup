@@ -1,6 +1,6 @@
 # API contract v1.0
 
-`contracts/openapi.json`이 DTO source of truth다. 모든 제품 endpoint는 계약만 확정됐으며 초기 실행 서버에서 구현된 것은 health뿐이다. 없는 기능에 임시 성공을 반환하지 않는다.
+`contracts/openapi.json`이 DTO source of truth다. 아래 endpoint의 서버·저장 경로를 구현했다. 실제 AI 엔진은 미연결이며 개발용 합성 provider 또는 기본 fail-closed provider로 동작한다. 구현/검증 경계는 `BACKEND_DESIGN.md`와 `VERIFICATION.md`를 함께 읽는다.
 
 ## 공통
 
@@ -9,6 +9,9 @@
 - 모든 mutation의 `Idempotency-Key`는 operation별 UUID 권장. 서버는 `(actor,route,key)`에 body hash와 응답을 저장한다. 동일 body 재전송=같은 결과, 다른 body=409 `IDEMPOTENCY_CONFLICT`. pending은 202 operation 또는 409 `OPERATION_IN_PROGRESS`로 수렴한다.
 - `expectedVersion` stale은 409. 존재하지 않거나 소유하지 않은 private resource는 404. 잘못된 입력 400, 의미/품질 실패 422, rate limit 429, 의존 장애 503.
 - 오류 `{code,message,requestId,retryable}`. 클라이언트는 `code`로 분기하며 message에 의존하지 않는다. 외부 provider 원문 오류를 공개하지 않는다.
+- JSON의 알 수 없는 필드, 문자열→숫자/소수→정수 변환, 필수 필드 누락/null은 거절한다. 본문 최대 64 KiB, body가 있으면 application/json. 너무 큰 본문 413, 지원하지 않는 content type 415, 지원하지 않는 HTTP method 405도 같은 오류 형식이다.
+- mutation은 Idempotency-Key 필수이며 브라우저 Origin은 설정된 PUBLIC_ORIGIN과 정확히 같아야 한다. 임의 CORS를 열지 않는다. Origin이 없는 비브라우저 클라이언트는 사용할 수 있다. 요청 ID는 응답 X-Request-Id에도 있다.
+- 202 생성 응답은 Location(조회 경로), Retry-After: 1을 포함한다. rate limit은 actor/IP 각각 5회/최근 10분이며 429와 Retry-After: 600을 반환한다.
 
 | 경로 | 의미 |
 | --- | --- |
@@ -25,7 +28,9 @@
 
 ## 상태/재시도 상세
 
-regeneration 실행 중 preview GET은 409 OPERATION_IN_PROGRESS, 클라이언트는 이미 읽은 preview를 보존하고 시작 버튼을 잠근다. 교체 성공 후 GET으로 version 2를 받는다. 복수 요청의 회수 제한은 DB row lock/condition으로 보장한다. 실패 job 재시도 방식은 동일 operation에 귀속하며 같은 사용자 regen 요청을 여러 성공 교체로 만들 수 없다.
+regeneration 실행 중 preview GET은 409 OPERATION_IN_PROGRESS, 클라이언트는 이미 읽은 preview를 보존하고 시작 버튼을 잠근다. 교체 성공 후 GET으로 version 2를 받는다. 복수 요청의 회수 제한은 DB row lock/condition으로 보장한다. worker의 제한된 복구 재시도는 동일 job에 귀속한다. terminal FAILED 후 동일 key 재전송은 원래 접수 응답을 반환하므로 같은 job을 조회한다. 다시 생성하고 싶으면 새 key로 새 요청을 보낸다. 실패한 regeneration은 성공 회수를 소모하지 않는다.
+
+idempotency 보존은 24시간이며 cookie를 수신한 동일 actor 기준이다. 최초 cookie 수신 전 네트워크 유실은 새 actor로 재시도될 수 있다. GET draft는 FROZEN 이후 409 ALREADY_FROZEN이며, 이미 시작한 화면은 start 응답/GET snapshot을 사용한다. 완료 job/draft는 24시간, session/이력은 30일 후 주기 정리되며 공개 snapshot/share는 유지한다.
 
 start 재시도는 같은 snapshot/session을 반환한다. 같은 draft의 다른 key start도 이미 만들어진 동일 owner session을 반환하며 추가 session 생성은 share replay 경로로만 한다. start와 regen 경합은 둘 중 하나만 성공한다.
 
@@ -36,3 +41,22 @@ schemaVersion/size/rules/candidates/initialOrder/frozenAt이 snapshot의 불변 
 ## 변경 절차
 
 contract JSON → fixture → TS 생성 타입 → Java contract test → verify 순서로 갱신. A/B 양쪽 영향 확인 후 병합한다. 실제 endpoint 구현이 추가되면 OpenAPI의 `x-implementation-status`와 이 문서의 구현 현황을 함께 갱신한다.
+
+## 로컬 API 연동
+
+README대로 dev 서버를 실행한 뒤 같은 cookie를 유지한다. 아래 cookie 파일은 로컬 테스트용 익명 token이므로 commit하지 않는다. 생성 응답의 jobId를 조회해 READY가 된 뒤 draftId를 읽는다.
+
+```sh
+curl -i -c /tmp/worldcup-dev.cookies http://localhost:8080/api/v1/generation-jobs \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: local-generation-001' \
+  -d '{"prompt":"퇴근 후 취미를 고르고 싶어","size":8,"locale":"ko-KR","timezone":"Asia/Seoul"}'
+
+curl -b /tmp/worldcup-dev.cookies http://localhost:8080/api/v1/generation-jobs/JOB_ID
+curl -b /tmp/worldcup-dev.cookies http://localhost:8080/api/v1/drafts/DRAFT_ID
+curl -b /tmp/worldcup-dev.cookies http://localhost:8080/api/v1/drafts/DRAFT_ID/start \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: local-start-001' \
+  -d '{"expectedVersion":1}'
+```
+
+브라우저는 동일 origin의 `/api/v1`을 사용하고 cookie를 유지한다. 매 사용자 동작마다 새 key를 만들되 네트워크 재전송에는 같은 key/body를 사용한다. 공유 생성/재플레이 POST에는 본문을 보내지 않는다. 공유 URL은 프론트의 `/shares/{token}` 화면을 가리키며 해당 화면 구현과 배포는 별도다.
