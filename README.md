@@ -17,16 +17,26 @@
 
 두 영역은 [API 계약](contracts/openapi.json)과 공용 fixture로 연결한다. [역할·브랜치·AI 작업 경계](docs/COLLABORATION.md)를 기준으로 각자 개발한다.
 
+처음 맡을 작업은 A가 **FE-001 입력·강수·전체 미리보기**, B가 **CE-002 후보 생성 pipeline**이다. [작업 순서와 완료 기준](docs/TICKETS.md)을 읽고 담당 영역의 `AGENTS.md`를 AI에 함께 제공한다.
+
 ## 실행
 
-Node 24 LTS와 Java 21이 필요하다. Gradle은 저장소의 wrapper를 사용한다.
+공개 저장소이므로 별도 초대 없이 내려받고 개발을 시작할 수 있다. 아래는 A의 시작 예시다. B는 브랜치 이름을 `feat/engine/ce-002-generation`으로 바꾼다. 최신 `main`에서 자신의 작업 브랜치를 만든다.
+
+```sh
+git clone https://github.com/winkrj/dynamic-ai-world-cup.git
+cd dynamic-ai-world-cup
+git switch -c feat/play/fe-001-preview
+```
+
+프론트 작업에는 Node 24 LTS, 서버 작업에는 Java 21이 필요하다. 전체 검증에는 둘 다 필요하며 Gradle은 저장소의 wrapper를 사용한다. Windows에서는 Git Bash/WSL로 문서의 명령을 실행하거나 서버 wrapper의 `gradlew.bat`를 사용한다.
 
 ```sh
 npm ci
 npm run dev:web
 ```
 
-화면은 `http://127.0.0.1:5173`에서 열린다. 다른 터미널에서 서버를 실행한다.
+화면은 `http://127.0.0.1:5173`에서 열린다. 프론트 담당자는 서버 없이 고정 예제로 화면 작업을 시작할 수 있다. 서버를 실행하려면 저장소 루트에서 다음 명령을 실행한다.
 
 ```sh
 cd backend
@@ -34,6 +44,12 @@ cd backend
 ```
 
 서버 상태: `http://localhost:8080/api/v1/health`. 초기 실행에는 DB나 API key가 필요 없다. 서버의 다른 제품 API는 계약만 있고 구현되지 않았다.
+
+## 변경사항 전달
+
+공개 저장소여도 원본에 push하려면 쓰기 권한이 필요하다. 초대 전에는 GitHub에서 이 저장소를 **Fork**하고, 자신의 Fork에 변경을 push한 뒤 원본 `main`으로 **Pull Request**를 보내면 된다. 위 명령으로 원본을 이미 clone한 경우의 원격 연결 방법은 [협업 안내](docs/COLLABORATION.md#초대-없이-작업하는-방법)에 있다.
+
+협업자 초대를 수락한 팀원은 원본의 작업 브랜치로 직접 push하고 PR을 만들 수 있다. 두 방식 모두 담당 영역과 API 계약 경계를 지킨다.
 
 ## 검증
 
