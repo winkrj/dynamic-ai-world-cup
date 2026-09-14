@@ -27,6 +27,7 @@ B는 `contracts/openapi.json`과 검증된 `contracts/fixtures`를 제공한다.
 main
   feat/play/fe-001-preview       # A: 플레이 경험의 첫 작업
   feat/engine/ce-002-generation  # B: 후보 품질·서버의 다음 작업
+  feat/server/backend-api       # B: 엔진과 분리한 API·저장 구현
 ```
 
 첫 기반 작업/CE-001과 두 시작 브랜치는 이미 저장소에 올라와 있다. 새로 합류하면 갱신된 안내를 포함하는 최신 `main`에서 자신의 작업 브랜치를 만든다. 각 개발자는 별도 clone을 권장한다. 같은 컴퓨터에서 여러 AI가 작업할 때만 작업별 worktree를 사용한다. 서로의 checkout에서 branch를 바꾸지 않는다.
@@ -70,3 +71,12 @@ GitHub에서 base를 `winkrj/dynamic-ai-world-cup`의 `main`, compare를 본인 
 A: “AGENTS.md와 frontend/AGENTS.md, PRD/DESIGN_SPEC, contracts와 FE-001을 읽고 플레이 경험 역할로 작업해. frontend 내부를 소유하고 계약 변경이 필요하면 먼저 차이를 제안해. fixture 모드가 실제 AI 생성처럼 보이지 않게 하고 관련 브라우저 검증을 해.”
 
 B: “AGENTS.md와 backend/AGENTS.md, TECH_DESIGN, contracts와 CE-002를 읽고 후보 품질과 서버 역할로 작업해. backend/evals를 소유하고 최초 plan을 유지한 Generate→Ground→Validate→Repair를 구현해. 실제 provider 비용 호출은 준비된 eval 범위와 자격정보를 확인하고 수행해.”
+
+## B 내부의 엔진 / 서버 작업
+
+두 사람이 맡는 큰 역할 A/B를 바꾸는 것이 아니다. B 안에서 엔진 품질은 사람이 실제 후보와 기준을 함께 결정하고, API·DB는 확정된 계약과 자동 테스트로 길게 진행한다.
+
+- 서버 작업: `feat/server/backend-api`, `api`, `identity`, `generation`의 job/draft service·repository, `tournament`, `sharing`, `infrastructure`, migration/tests. 프론트 내부와 실제 provider 선택은 건드리지 않는다.
+- 엔진 작업: `feat/engine/ce-002-generation`, `candidate`와 실제 engine adapter/evals. `CandidateEngine` port를 구현하고 Generated에 gate-issued set과 공개 제목을 반환한다. server state/SQL/controller는 수정하지 않는다.
+- 공통 접점: `CandidateEngine`, `GenerationInput`, `Context/Generated`, 공개 OpenAPI. 변경이 필요하면 먼저 영향과 테스트 fixture를 기록하고 양쪽 변경을 함께 검토한다.
+- 엔진은 서버 PR이 main에 합쳐진 뒤 최신 main을 반영해 연결한다. 병합 전이라면 해당 PR의 port를 읽고 adapter 설계만 진행한다. main 자동 병합은 하지 않는다.

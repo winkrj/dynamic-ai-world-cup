@@ -6,7 +6,9 @@
 
 ## 현재 상태
 
-개발 기반과 첫 **CE-001 후보 품질 검증 모듈**을 구현했다. API 계약, 공용 예제 데이터, React 화면 기반, Spring health endpoint, 검증 명령이 있다. 실제 AI 생성, DB 저장, 토너먼트 완주와 공유 기능은 아직 구현하지 않았다. 개발 화면의 취미 8강은 고정 예제이며 모델 생성 결과가 아니다.
+후보 품질 검증 모듈과 서버 API를 구현했다. PostgreSQL에 생성 작업·미리보기·재생성·고정 대진·선택 기록·공유 데이터를 저장한다. 같은 요청의 재전송과 동시 시작을 처리하고, 공유받은 사람은 같은 대진으로 별도 세션을 만들 수 있다.
+
+실제 AI 생성·검색과 플레이 화면은 아직 연결하지 않았다. 프론트는 고정 취미 예제를 보여주는 초기 화면이며, 서버의 `dev` 모드는 명시적으로 개발용 합성 후보를 반환한다. 기본/운영 모드에서는 실제 엔진이 없으면 생성에 실패한다.
 
 ## 두 사람의 역할
 
@@ -17,7 +19,7 @@
 
 두 영역은 [API 계약](contracts/openapi.json)과 공용 fixture로 연결한다. [역할·브랜치·AI 작업 경계](docs/COLLABORATION.md)를 기준으로 각자 개발한다.
 
-처음 맡을 작업은 A가 **FE-001 입력·강수·전체 미리보기**, B가 **CE-002 후보 생성 pipeline**이다. [작업 순서와 완료 기준](docs/TICKETS.md)을 읽고 담당 영역의 `AGENTS.md`를 AI에 함께 제공한다.
+다음 작업은 A가 **FE-001 입력·강수·전체 미리보기**, B가 **CE-002 후보 생성 pipeline**이다. B 내부에서는 사람과 후보 품질을 결정하는 엔진 작업과 API·저장 구현을 분리한다. [서버·엔진 접점](docs/BACKEND_DESIGN.md), [작업 순서와 완료 기준](docs/TICKETS.md)을 읽고 담당 영역의 `AGENTS.md`를 AI에 함께 제공한다.
 
 ## 실행
 
@@ -29,7 +31,7 @@ cd dynamic-ai-world-cup
 git switch -c feat/play/fe-001-preview
 ```
 
-프론트 작업에는 Node 24 LTS, 서버 작업에는 Java 21이 필요하다. 전체 검증에는 둘 다 필요하며 Gradle은 저장소의 wrapper를 사용한다. Windows에서는 Git Bash/WSL로 문서의 명령을 실행하거나 서버 wrapper의 `gradlew.bat`를 사용한다.
+프론트 작업에는 Node 24 LTS, 서버 작업에는 Java 21과 실행 중인 Docker가 필요하다. 전체 검증에는 모두 필요하며 Gradle은 저장소의 wrapper를 사용한다. Windows에서는 Git Bash/WSL로 문서의 명령을 실행하거나 서버 wrapper의 `gradlew.bat`를 사용한다.
 
 ```sh
 npm ci
@@ -39,11 +41,16 @@ npm run dev:web
 화면은 `http://127.0.0.1:5173`에서 열린다. 프론트 담당자는 서버 없이 고정 예제로 화면 작업을 시작할 수 있다. 서버를 실행하려면 저장소 루트에서 다음 명령을 실행한다.
 
 ```sh
+docker compose up -d --wait postgres
 cd backend
-./gradlew bootRun
+./gradlew bootRun --args='--spring.profiles.active=dev'
 ```
 
-서버 상태: `http://localhost:8080/api/v1/health`. 초기 실행에는 DB나 API key가 필요 없다. 서버의 다른 제품 API는 계약만 있고 구현되지 않았다.
+서버 상태: `http://localhost:8080/api/v1/health`. 로컬 DB는 `127.0.0.1:55432`에서 실행되어 기본 5432 포트의 다른 프로젝트와 분리된다. 데이터는 전용 Docker volume에 남는다. `docker compose stop postgres`로 중지할 수 있다. 이 설정의 암호는 로컬 개발용 예시이며 운영에 사용하지 않는다.
+
+브라우저는 `http://127.0.0.1:5173`에서 열고 `/api/v1` 상대 경로로 호출한다. Vite가 서버로 전달하며 Origin 확인을 통과한다. 다른 주소로 개발하면 `PUBLIC_ORIGIN`을 정확한 origin으로 설정한다. 환경변수 이름은 [.env.example](.env.example)에 있지만 Spring이 이 파일을 자동으로 읽지는 않는다.
+
+실제 키 없이도 서버 흐름을 확인할 수 있다. [API 연동 예시](docs/API_CONTRACT.md#로컬-api-연동)는 익명 cookie를 유지하면서 생성 작업 조회부터 진행한다. 실제 모델/검색 제공자 선택은 엔진 작업에서 정한다.
 
 ## 변경사항 전달
 
@@ -59,7 +66,7 @@ cd backend
 ./scripts/verify.sh
 ```
 
-계약과 생성 타입의 일치, 공용 fixture의 schema, 프론트 TypeScript/production build, Java 테스트/실행 JAR 생성을 확인한다. 결과와 미검증 영역은 [검증 기록](docs/VERIFICATION.md)에 남긴다. 계약 수정 후에는 `npm run contracts:generate`로 TS 타입을 다시 만든다.
+계약과 생성 타입, 프론트 build, Java 테스트/실행 JAR, 실제 HTTP 응답의 schema를 확인한다. DB 테스트는 Testcontainers가 별도의 PostgreSQL을 자동 생성·정리하며 개발 DB에 연결하지 않는다. Docker가 없으면 DB 검증을 건너뛰지 않고 실패한다. 결과와 미검증 영역은 [검증 기록](docs/VERIFICATION.md)에 남긴다. 계약 수정 후에는 `npm run contracts:generate`로 TS 타입을 다시 만든다.
 
 ## 저장소 구성
 

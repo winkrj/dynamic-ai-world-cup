@@ -7,3 +7,5 @@ npm run contracts:check
 npm run build:web
 cd backend
 ./gradlew --no-daemon test bootJar
+cd "$task_root"
+node scripts/check-contracts.mjs --http

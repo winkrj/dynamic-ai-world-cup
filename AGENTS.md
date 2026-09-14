@@ -30,3 +30,4 @@ Candidate Quality 우선. N=8/16/32 정확, hard constraint/grounding 실패 시
 - 새 프레임워크/DB/큐/계정/실시간 그룹 기능은 현재 설계 밖이다. 문서로만 있는 provider/API를 구현됐다고 보고하지 않는다.
 - behavior 변경은 관련 테스트 후 read-only Reviewer 독립 검토, 마지막 verify. Critical/High가 남으면 완료 아님. 동일 실패 fix/retest 최대 3회, review는 최초 포함 2회.
 - PR에 변경한 AC/계약, 검증, 실제 provider 호출 유무, 남은 한계를 남긴다. 사용자 prompt/비밀키/개인 데이터를 로그/fixture/commit에 넣지 않는다.
+- 서버 API는 `docs/BACKEND_DESIGN.md`의 Google 리소스 설계 적용/호환 예외와 DDD 경계를 따른다. 스타일 통일만을 이유로 공유 API를 깨지 않는다. 실제 엔진 개발과 서버 저장 구현의 접점은 CandidateEngine port이며 dev 대역을 운영 성공으로 사용하지 않는다.

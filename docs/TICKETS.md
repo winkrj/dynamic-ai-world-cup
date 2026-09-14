@@ -39,3 +39,14 @@
 ## 오늘부터의 합류 기준
 
 오늘 기준: 기반/CE-001 검증 결과를 main에 남기고 A FE-001 / B CE-002 시작 브랜치를 만든다. A는 실제 provider/API 작업과 독립적으로 fixture 개발을 진행한다. 두 사람이 처음 통합할 시점은 `generation READY → preview → freeze`가 같은 계약 fixture와 일치할 때다. 대회 최종 제출 시각은 현재 원문 요강을 확인하지 않았으므로 이 문서에 단정하지 않는다.
+
+## 2026-09-14 백엔드 API Goal
+
+브랜치: `feat/server/backend-api`. 아래 서버 범위의 구현·검증·독립 리뷰 완료. Java 78개, HTTP 응답 102개 schema 검사, 웹/서버 build 통과. 최종 review Critical 0 / High 0 / 남은 finding 0. main 자동 병합 없이 PR로 전달한다. 상세 결과는 VERIFICATION.md에 기록했다.
+
+- B-002 서버 범위: PostgreSQL/Flyway, 익명 cookie/소유권, strict HTTP, idempotency, actor/IP quota, DB job/lease 복구, preview/성공 재생성 1회.
+- B-003 서버 범위: atomic freeze, 원본 session 수렴, DB snapshot 불변성, share/replay 데이터.
+- B-004 저장 범위: 8/16/32 순차 선택 검증, atomic batch, 시간 경계/중복 거절, 직접 선택만 최근 50건 읽기, 보존 정리.
+- 제외/남은 의존: CE-002 실제 모델·검색·assessment·Repair·usage/비용, CE-003 맥락별 선호 가중치 eval, A의 화면/타이머/RNG/완주 E2E, 배포.
+
+Google 원칙/DDD 적용은 BACKEND_DESIGN.md에 기록했다. 계약 경로/DTO는 변경하지 않는다. 엔진 대역은 dev/test 전용이고 기본 profile은 생성 실패로 닫혀 있다.

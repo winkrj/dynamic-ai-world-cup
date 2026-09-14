@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Web | React + TypeScript + Vite, Node 24 LTS | 모바일 SPA, A가 독립 개발 |
 | API / Engine | Java 21, Spring Boot 4.1.1, Gradle wrapper | 사용자 선택, B가 엔진/데이터 구현 |
-| DB | PostgreSQL 17, JDBC + 명시적 SQL, Flyway | freeze와 재시도 transaction을 드러냄. DB 티켓에서 의존성 추가 |
+| DB | PostgreSQL 17, JDBC + 명시적 SQL, Flyway | freeze와 재시도 transaction을 드러냄. 로컬/테스트는 공식 17-alpine 이미지 |
 | 계약 | OpenAPI 3.1 JSON + 공용 fixture | TS 자동생성, Java contract test |
 | 배포 | 동일 origin의 정적 Web + Spring + PostgreSQL | CORS/인증 경계 최소화. 사업자는 미정 |
 | 품질 검증 | 순수 Java validator + JUnit, 독립 live eval | HTTP/모델 제공자 없이 핵심 규칙 검증 가능 |
@@ -81,5 +81,7 @@ MVP는 solo client의 타이밍/선택 원인을 신뢰한다. 위조된 client 
 ## 7. 첫 구현 / 완료 경계
 
 이번 첫 티켓 CE-001: 순수 Java quality gate, 실제 실패 사례 테스트, 공용 fixture의 Java/TS 계약 검증, React/Spring 실행 기반, 단일 verify 명령. LLM 생성, DB, 완주 UI, 공유 배포는 다음 티켓이다. 합성 fixture 통과를 Candidate Quality 실제 달성으로 보고하지 않는다.
+
+2026-09-14 서버 API 개발은 `docs/BACKEND_DESIGN.md`로 보완한다. B-002/003 및 B-004의 저장·검증 부분을 엔진 port 대역으로 먼저 개발했다. 원본 v1의 제품 규칙/HTTP DTO는 유지한다. Google API 원칙의 적용·예외, transaction, lease fencing, 보존과 실제 엔진의 미구현 경계는 보완 문서에 기록한다.
 
 다음 병렬 작업은 A의 FE-001과 B의 CE-002다. 공유 계약 변경은 paired review로 처리하고 각자의 파일 ownership은 `docs/COLLABORATION.md`가 기준이다.

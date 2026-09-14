@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-class HealthHttpTest {
+class HealthHttpTest extends dev.worldcup.support.PostgresSupport {
     @Value("${local.server.port}") int port;
 
     @Test void healthRespondsOverRealHttp() throws Exception {

@@ -26,5 +26,10 @@
 | TD-11 | 확정 v1 | 운영은 동일 origin의 정적 frontend + Spring API + PostgreSQL. 배포 사업자 계정/요금은 배포 티켓에서 결정; 현재 배포 없음 |
 | TD-12 | 확정 v1 | 현재 선택된 GitHub 계정의 private 저장소로 생성. 팀원 GitHub ID를 받기 전 협업자 초대/실명 CODEOWNERS 등록 없음 |
 | TD-13 | 확정 (사용자, 2026-09-14) | 링크를 받은 동료가 바로 개발을 시작하도록 저장소를 public으로 전환. 기존 커밋 작성자 정보 공개도 승인. TD-12의 공개 범위는 이 결정으로 변경한다. 초대 없는 참여자는 clone/Fork/PR, 원본 직접 push는 쓰기 권한이 필요하며 기존 ownership은 유지 |
+| TD-14 | 확정 (사용자, 2026-09-14) | Goal로 백엔드 API 개발을 진행하며 Google REST API 원칙, DDD, 클린 코드, 유지보수성을 고려. API·저장 구현을 실제 후보 품질을 결정하는 엔진 작업과 분리. 기존 두 사람의 큰 역할은 유지 |
+| TD-15 | 구현 기준 | Google 리소스/재시도/오류 원칙을 적용하되 기존 v1 경로·DTO는 호환 유지. AIP 완전 준수나 gRPC 도입으로 확장하지 않음. 차이는 docs/BACKEND_DESIGN.md에 명시; AC-01/08/09/15/16 대상 |
+| TD-16 | 구현 기준 | 엔진 port는 ValidatedSet·안전한 공개 제목·버전을 반환. dev 합성 대역은 명확히 표시, 기본/운영 provider 미연결은 실패. 실제 Grounding/Repair/품질 eval과 유료 호출은 이번 API 목표에서 제외 |
+| TD-17 | 구현 기준 | idempotency는 24시간 성공 응답 재현. worker lease 복구는 같은 job에서 최대 두 attempt. terminal FAILED 이후 재생성 의사는 새 key로 표현하며 성공 회수는 미소모. 기존 TD-08의 같은 operation 재시도와 사용자 새 시도를 구별 |
+| TD-18 | 구현 기준 | job/draft 24시간, session/선택 30일 주기 정리. snapshot/share는 MVP 유지. 만료 private source ID는 FK cascade 없이 보존하며 share에 champion을 사본 저장해 원본 session 삭제 뒤에도 결과 보존. AC-09/14/15/16 DB 테스트 대상 |
 
 변경은 `문제 → 대안 → 결정 → 영향받는 AC/계약 → 검증`을 기록한다. 확정된 제품 규칙 변경은 사용자 결정이 필요하다.
