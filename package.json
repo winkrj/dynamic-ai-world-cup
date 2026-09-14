@@ -9,6 +9,8 @@
     "build:web": "tsc -p frontend/tsconfig.json && vite build --config frontend/vite.config.ts frontend",
     "contracts:generate": "openapi-typescript contracts/openapi.json -o frontend/src/api/schema.d.ts",
     "contracts:check": "node scripts/check-contracts.mjs",
+    "api:smoke": "node scripts/smoke-api.mjs",
+    "test:handoff": "node --test scripts/smoke-api.test.mjs",
     "verify": "bash scripts/verify.sh"
   },
   "dependencies": {

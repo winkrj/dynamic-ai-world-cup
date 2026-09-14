@@ -63,3 +63,20 @@ smoke 서버와 이 프로젝트 전용 compose DB는 확인 후 중지했다. �
 최종 독립 review 2회차: clean, Critical 0 / High 0 / 남은 actionable finding 0. 이전 Medium 2개 해결 확인. 이후 코드 변경 없이 전체 verify 재실행: **Java 78개, 실패 0 / 오류 0 / skip 0; HTTP 102개/8개 schema; fixture 5개; TS/웹 build/bootJar 통과**. 문서 로컬 링크 16개와 diff whitespace도 확인했다. 마지막 변경은 이 결과를 반영한 상태/검증 문서다.
 
 실제 provider 품질·Grounding·Repair·개인화 가중치 eval, 프론트 완주 E2E, production 배포는 이번 서버 Goal 범위 밖이다. GitHub Actions 결과는 PR의 실제 check를 기준으로 확인한다.
+
+## 2026-09-14 프론트 API 인수인계
+
+범위는 프론트 시작 안내, FE-001 상세 티켓, 기존 문서의 진입 링크, 로컬 연결 확인 도구다. backend 제품 코드·OpenAPI·생성 TS 타입·프론트 UI는 변경하지 않았다. PR #1이 미병합인 상태에서도 최신 API 브랜치에서 시작하도록 안내한다.
+
+| 검증 | 결과 |
+| --- | --- |
+| `npm run test:handoff` | Node 기본 테스트 6개 통과: 전체 흐름, cookie/key 유지, body 생략, 비로컬 주소 거절, polling 상한, 실패 종료, snapshot 불일치, 안전한 오류 안내 |
+| `./scripts/verify.sh` | 통과. fixture 5개·생성 타입 일치, 위 Node 테스트, 웹 production build, HTTP 응답 102개/8개 schema 대조 통과 |
+| Java / bootJar | 이번에는 코드 변경이 없어 Gradle UP-TO-DATE. 위 API Goal의 78개 성공 결과를 재사용했으며 Java 테스트가 새로 실행됐다고 집계하지 않는다 |
+| 실제 `npm run api:smoke` | 프로젝트 전용 compose DB 55432와 명시적 dev 서버 8080에서 통과. 후보 8개, 전체 재생성 1회, 선택 7개 저장, 공유 및 새 익명 replay의 동일 snapshot 확인 |
+
+smoke는 로컬 DB에 개발용 생성 작업 2개와 경기/공유 기록을 만들었다. 실제 LLM/search는 호출하지 않았고 브라우저 timer/RNG·최종 디자인·실제 후보 품질은 검증하지 않았다. 공유 개발 서버 배포나 main 병합도 하지 않았다.
+
+독립 리뷰 1회차: Critical 0 / High 0 / Medium 1. 연결된 Fork 안내가 다른 브랜치를 push하고 main을 PR base로 고정하는 불일치를 확인했다. 현재 브랜치 `HEAD` push와 PR #1 병합 전후 base 절차로 통일했다. 2회차 리뷰는 clean, Critical 0 / High 0 / 남은 actionable finding 0이다. 수정 후 전체 verify 재실행과 문서 로컬 링크 46개·diff whitespace 검사를 통과했다. Java 작업은 다시 UP-TO-DATE였다.
+
+확인에 사용한 dev 서버와 이 프로젝트 전용 compose DB는 중지했고 데이터 volume은 유지했다. 다른 운영체제의 새 clone이나 실제 Fork UI 절차는 직접 실행하지 않았다. 이후 변경은 이 검증 기록뿐이다.

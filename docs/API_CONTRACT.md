@@ -2,6 +2,8 @@
 
 `contracts/openapi.json`이 DTO source of truth다. 아래 endpoint의 서버·저장 경로를 구현했다. 실제 AI 엔진은 미연결이며 개발용 합성 provider 또는 기본 fail-closed provider로 동작한다. 구현/검증 경계는 `BACKEND_DESIGN.md`와 `VERIFICATION.md`를 함께 읽는다.
 
+프론트 담당자의 시작점은 [인수인계 안내](FRONTEND_HANDOFF.md)다. dev 서버를 켠 뒤 `npm run api:smoke`로 전체 HTTP 연결을 확인할 수 있다. 이 명령은 로컬 데이터와 생성 작업 2개를 만들며 실제 AI/프론트 UI 검증은 아니다.
+
 ## 공통
 
 - Base `/api/v1`. JSON / UTF-8. 날짜 UTC RFC3339. opaque ID는 UUID라고 frontend가 가정하지 않는다.

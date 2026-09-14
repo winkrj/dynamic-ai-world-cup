@@ -2,6 +2,8 @@
 
 역할은 화면별로 매번 바꾸지 않는다. **A는 플레이 경험 전체, B는 후보 품질과 서버 전체**를 책임진다. 각자 자신의 AI와 역할 내부 작업을 나누되, 다른 역할의 소유 파일을 동시에 수정하지 않는다.
 
+프론트 API 전달은 [시작 안내 한 장](FRONTEND_HANDOFF.md)과 [FE-001 상세 티켓](tickets/FE-001.md)을 기준으로 한다. PR #1 미병합 상태에서 최신 API로 착수하려면 해당 안내의 `feat/server/backend-api` clone 절차를 사용한다. 아래 main 기준 예시는 서버 PR 병합 이후의 일반 절차다.
+
 | 큰 역할 | 결과 책임 | 소유 경로 |
 | --- | --- | --- |
 | A — 플레이 경험 | 입력부터 Champion·공유 진입까지 모바일 경험, 접근성, 애니메이션, 타이머, 게임 상태, API client와 mock, 브라우저 테스트 | `frontend/**` (자동생성 schema 제외) |
@@ -56,13 +58,13 @@ git remote rename origin upstream
 git remote add origin https://github.com/YOUR_GITHUB_ID/dynamic-ai-world-cup.git
 ```
 
-담당 작업을 구현하고 관련 검증을 마친 뒤 변경 파일을 commit한다. A의 경우 다음 명령으로 자신의 Fork에 올린다. B는 브랜치 이름을 `feat/engine/ce-002-generation`으로 바꾼다.
+담당 작업을 구현하고 관련 검증을 마친 뒤 변경 파일을 commit한다. 현재 작업 브랜치에 있는지 `git branch --show-current`로 확인하고 다음 명령으로 자신의 Fork에 같은 이름으로 올린다. `HEAD`는 현재 브랜치이므로 시작 안내의 `feat/play/fe-001-integration`과 다른 역할의 브랜치에도 그대로 사용한다.
 
 ```sh
-git push -u origin feat/play/fe-001-preview
+git push -u origin HEAD
 ```
 
-GitHub에서 base를 `winkrj/dynamic-ai-world-cup`의 `main`, compare를 본인 Fork의 작업 브랜치로 선택해 PR을 만든다. 원본의 변경을 가져올 때는 `git fetch upstream` 후 작업 브랜치에서 `git merge upstream/main`으로 반영한다.
+GitHub에서 base repository는 `winkrj/dynamic-ai-world-cup`, compare는 본인 Fork의 작업 브랜치를 선택한다. **API 브랜치에서 시작한 프론트 작업은 PR #1 미병합 동안 base branch를 `feat/server/backend-api`로 지정한다.** 이 기간에 원본 API 변경을 반영할 때는 `git fetch upstream` 후 자신의 작업 브랜치에서 `git merge upstream/feat/server/backend-api`를 사용한다. 서버 PR 병합 이후에는 PR base를 `main`으로 변경하고 차이를 확인한다. 이후 일반 작업은 `main`을 base로 하며 `git fetch upstream`과 `git merge upstream/main`으로 갱신한다.
 
 협업자 초대를 수락해 원본 쓰기 권한이 생기면 Fork 없이 원본의 작업 브랜치로 push할 수 있다. 공개 전환만으로 모든 방문자에게 원본 쓰기 권한이 생기지는 않는다.
 

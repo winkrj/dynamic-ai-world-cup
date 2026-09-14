@@ -15,7 +15,8 @@
 
 - Node 24 LTS, Java 21. 루트에서 `npm ci`.
 - 전체: `./scripts/verify.sh` — contract check, frontend type/build, backend test/bootJar.
-- 프론트: `npm run dev:web`; 백엔드: `cd backend && ./gradlew bootRun`.
+- 프론트: `npm run dev:web`; 백엔드: 루트 `docker compose up -d --wait postgres` 후 `cd backend && ./gradlew bootRun --args='--spring.profiles.active=dev'`.
+- 프론트 착수: `docs/FRONTEND_HANDOFF.md`와 `docs/tickets/FE-001.md`. API 연결: dev 서버 실행 후 루트 `npm run api:smoke` (합성 생성 2회, 로컬 기록 생성). 인수인계 도구 단위 테스트: `npm run test:handoff`.
 - 계약: `npm run contracts:generate`, `npm run contracts:check`.
 - Java 범위 테스트: `cd backend && ./gradlew test --tests '*CandidateQualityGateTest'`.
 

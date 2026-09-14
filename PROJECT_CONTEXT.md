@@ -26,9 +26,10 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
-- A: `feat/play/fe-001-preview`에서 입력·강수·미리보기. fixture를 기준으로 서버와 독립 개발.
+- A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
 - B: `feat/engine/ce-002-generation`에서 실제 plan/생성/grounding/독립 assessment/Repair adapter와 eval.
 - 모델/검색 제공자와 API 자격정보는 CE-002 실행 전 선택한다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
 - GitHub collaborator 초대는 역할별 실제 계정이 정해진 뒤 한다. 현 단계에서 팀원 초대/branch protection을 완료했다고 주장하지 않는다.
+- 외부 공유 개발 API/Swagger UI와 최종 화면 시안은 아직 없다. OpenAPI JSON·생성 TS 타입·fixture가 전달물이며, `npm run api:smoke`는 로컬 dev API의 생성부터 공유 replay까지 연결을 확인한다. 실제 AI 품질이나 프론트 완주 UI 테스트를 대신하지 않는다.
 
 핵심 동시성/게임 정책과 기술 선택은 `TECH_DESIGN.md`, 결정 변경은 `DECISIONS.md`, source 한계는 `docs/SOURCE_PROVENANCE.md`에 남긴다.
