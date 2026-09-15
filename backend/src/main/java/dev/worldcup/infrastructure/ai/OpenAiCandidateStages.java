@@ -36,6 +36,10 @@ public final class OpenAiCandidateStages implements EngineStages {
             """;
     private static final String QUALITY = """
             Candidate quality outranks filling slots. Keep one comparison unit and comparable abstraction level.
+            Each intent and display card must offer one coherent choice, not a menu of independent alternatives.
+            Choose the actual activity instead of 'play chess or play Go'; this does not require putting both in the set.
+            Examples, genres and complementary steps within one activity are allowed; punctuation alone is not a defect.
+            Do not split those examples or steps into extra candidates merely to fill slots.
             A set must contain genuinely different choices, not aliases, parent/child concepts, or variants of one core activity.
             For a broad hobby request, drawing with different materials, styles or devices does not supply distinct hobbies.
             A hobby must be repeatable and deepen over weeks; chores, admin tasks or one-off missions are not filler hobbies.
@@ -142,7 +146,7 @@ public final class OpenAiCandidateStages implements EngineStages {
                 ONE SHARED REPAIR ATTEMPT before quota freeze. Replace only the rejected intent IDs listed in rejections.
                 Return one replacement per rejected ID, preserving that ID. Choose an existing coverage group for each replacement.
                 Address its rejection reason with a genuinely different eligible activity, distinct from every retained activity
-                and the other replacements. Do not rename the same rejected activity or use 'or' to bundle separate choices.
+                and the other replacements. Do not rename the same rejected activity.
                 All original request conditions, comparison unit, hobby interpretation and grounding requirements remain binding.
                 You cannot edit the interpretation, group definitions or retained activities. The server applies only this patch.
                 The entire pool will be independently reviewed again, and all detailed candidates still need final validation.
@@ -160,7 +164,6 @@ public final class OpenAiCandidateStages implements EngineStages {
                 description explains what one does and its appeal.
                 repeatability describes sustained practice for hobbies; for other domains describe the appropriate experience instead.
                 requirements states concrete prerequisites and fit, not invented guarantees. Do not emit valid/pass/self-scores.
-                A single candidate must not bundle two independent hobbies with 'or' to escape the requested size.
                 """, generationData(plan), AiSchemas.batch(plan), Batch.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }

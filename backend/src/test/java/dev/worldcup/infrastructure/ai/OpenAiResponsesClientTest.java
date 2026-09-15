@@ -260,6 +260,54 @@ class OpenAiResponsesClientTest {
                 "GROUNDED_FACT requires external evidence", "Explicit or numeric wording alone does not require web evidence",
                 "never downgrade externally verifiable entity facts");
     }
+    @ParameterizedTest @ValueSource(strings = {"plan", "allocate", "repairIntents", "generate", "review", "repair"})
+    void everyCandidateStageUsesTheSameSingleChoiceBoundary(String phase) {
+        var input = new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul");
+        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
+                List.of(new BucketSpec("group", "활동", List.of(new IntentSpec("i1", "합성 활동", "적합")))), List.of());
+        var fixed = new FixedPlan(input, Instant.now(), proposal, new Plan(8, "취미", false, List.of(),
+                List.of(new CoverageBucket("group", 8))), proposal.intents());
+        var batch = new Batch(List.of());
+        var interpretation = new InterpretationReview(Verdict.PASS, List.of());
+        var call = new CallContext("job", 1, phase, Instant.now().plusSeconds(10));
+        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+        switch (phase) {
+            case "plan" -> {
+                response = completed(json.writeValueAsString(proposal));
+                stages.plan(input, List.of(), Instant.now(), call);
+            }
+            case "allocate" -> {
+                response = completed(json.writeValueAsString(new AllocationReview(interpretation, Verdict.PASS,
+                        Verdict.PASS, Verdict.PASS, List.of("i1"), List.of())));
+                stages.allocate(input, Instant.now(), proposal, call);
+            }
+            case "repairIntents" -> {
+                response = completed(json.writeValueAsString(new IntentRepairs(proposal.intents())));
+                stages.repairIntents(input, Instant.now(), proposal, List.of(new IntentRejection("i1", "독립 선택 묶음")), call);
+            }
+            case "generate" -> {
+                response = completed(json.writeValueAsString(batch));
+                stages.generate(fixed, call);
+            }
+            case "review" -> {
+                response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS,
+                        Verdict.PASS, List.of(), List.of())));
+                stages.review(fixed, batch, Grounding.empty(), call);
+            }
+            case "repair" -> {
+                response = completed(json.writeValueAsString(batch));
+                stages.repair(fixed, batch, List.of("c1"), List.of(new Finding("BUNDLE", List.of("c1"), "독립 선택 묶음")), call);
+            }
+            default -> throw new AssertionError(phase);
+        }
+        var instructions = request.path("instructions").asString();
+        assertThat(instructions).containsOnlyOnce("one coherent choice, not a menu of independent alternatives");
+        assertThat(instructions).contains("this does not require putting both in the set",
+                "Examples, genres and complementary steps within one activity are allowed",
+                "punctuation alone is not a defect", "Do not split those examples or steps into extra candidates");
+        assertThat(calls).hasValue(1);
+        assertThat(request.path("tools").size()).isZero();
+    }
     @Test void laterStageSchemasAllowOnlyExistingIntentAndBucketIds() {
         var allocation = json.valueToTree(AiSchemas.allocation(8, List.of("known-intent")));
         assertThat(allocation.path("properties").path("approvedIntentIds").path("items").path("enum").toString())
