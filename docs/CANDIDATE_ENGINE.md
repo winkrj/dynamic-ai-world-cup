@@ -1,14 +1,24 @@
 # Candidate Engine — CE-002 구현 설계
 
-2026-09-15. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
+2026-09-16 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
 
-## 최신 구현: 한 번의 Repair 예산 공유
+## 현재 구현: 해석 판정 분리와 불투명한 활동 식별자
+
+v7 social 실패에서 `planFaithful=FAIL`과 후보 부적합 사유만 함께 반환되어, 원 입력 누락인지 후보 문제인지 구분할 근거가 없었다. v8은 사전 배정과 최종 검토 모두 `InterpretationReview(verdict, findings)`를 사용한다. 해석 finding은 `UNIT/HOBBY/CONSTRAINTS/SOFT_PREFERENCES/GROUNDING_REQUIRED` 중 항목, 원 요청의 발췌, 불일치·불명확성 설명을 갖는다. 후보 ID와 품질 사유는 기존 intent rejection/candidate finding에만 둔다. 예를 들어 조용함 조건 자체를 누락한 계획과, 조건을 올바로 담았지만 시끄러운 후보가 생긴 경우를 구별한다.
+
+서버는 PASS의 근거 목록이 비어 있고 FAIL/UNKNOWN에는 근거가 있는지, 항목·원문 포함 관계·길이를 검사한다. 모순/파싱 실패와 어떤 해석 FAIL/UNKNOWN도 계속 종료하며 설명 없는 FAIL을 PASS로 바꾸지 않는다. 후보 문제가 해석 문제로 잘못 분류되지 않게 역할을 명시한 것이지 취미/중복 기준을 완화한 변경이 아니다. 해석 근거의 형식 검사는 의미적 진실의 증명이 아니며 실제 판정 정확도는 별도 평가한다. 두 검토 단계는 여전히 독립 요청이며 이전 PASS를 재사용하지 않는다.
+
+새 호출·모델·DB·공개 DTO를 추가하지 않는다. 공유 Repair 1회와 기존 시간/비용 한도는 그대로다. 특히 v7에서 승인된 대안이 없었던 social 후보의 품질을 이 변경만으로 회복한다고 주장하지 않는다. 해당 변경의 실제 결과는 아래 v8/v9 체크포인트에 기록한다.
+
+v8의 hobby-home/8에서는 식물 활동을 명상으로 교체했지만, 모델이 유지된 `houseplant_care` ID의 의미와 새 활동이 다르다는 이유만으로 거절했다. v9는 구조 검사를 통과한 최초 계획의 활동에 서버가 `i1..iN` 형태의 불투명한 추적 ID를 한 번 부여한다(여유 활동이 있으면 그 수까지). 이후 검토·교체·생성은 그 ID를 보존하고 원래 의미를 담은 ID는 전달하지 않는다. 활동 내용·그룹·조건은 바꾸지 않으며 교체 뒤 재번호를 붙이지 않는다. ID는 품질 증거가 아니라 참조 키이고, 실제 핵심 활동과 요청 조건으로 검토하도록 명시한다. 공개 후보 ID/DTO에는 영향이 없다.
+
+## v7 구현: 한 번의 Repair 예산 공유
 
 v6의 사전 검토에서 7/8·14/16개가 승인되어도 상세 생성 전에는 Repair를 사용할 수 없었다. 이를 보완하는 v7은 해석과 승인 집합이 모두 PASS이고 수만 부족할 때에 한해, 탈락 ID와 이유로 활동 교체 patch를 요청한다. 서버가 원래 해석·조건·그룹 정의·통과 활동을 보존한 채 합치고 전체 pool을 새 독립 요청으로 다시 검토한다. 검토를 건너뛰거나 이전 PASS를 복사하지 않는다. 필요한 N개가 여전히 부족하면 실패한다. 잘못된 해석·불명확한 판정·깨진 ID 목록은 이 경로로 수리하지 않는다.
 
 Repair 예산은 단계별로 1회가 아니라 **한 engine attempt 전체에서 1회**다. 사전 활동 Repair를 사용했으면 뒤의 상세 생성/grounding/최종 검토 실패에서 추가 Repair는 없다. 정상 경로는 기존 상세 Repair가 가능하다. 의미 검토만 필요한 경우 최악 호출 수는 기존과 동일한 6회이며, 90초/전체 280초/lease 300초와 누적 비용 예약을 유지한다. 새 보완 경로의 실제 실행은 확인했지만 품질 회복 성공은 아직 없으며 성공률·지연 개선을 주장하지 않는다. 구현 검증은 patch 범위, 정상 활동·조건 보존, 독립 재검토, 중복 Repair 금지, deadline과 공개 계약 회귀에 집중한다.
 
-최신 v7은 `seed-v1/hobby-home/8`에서 실제 READY와 미리보기 연결을 확인했다. 사람을 만나는 취미 8/16강은 실패했으며, 32강은 v7 미실행이다. 상세 결과는 아래 v7 체크포인트를 따른다.
+v7은 `seed-v1/hobby-home/8`에서 실제 READY와 미리보기 연결을 확인했다. 사람을 만나는 취미 8/16강은 실패했으며, 32강은 v7 미실행이다. 상세 결과는 아래 v7 체크포인트를 따른다.
 
 ## 실행 경계
 
@@ -133,4 +143,16 @@ v6에서는 bucket 참조 오류를 제거한 뒤 같은 `hobby-social/16`을 1�
 
 누적 사용량 기반 추정 비용은 **$1.2504463 / 승인 $5**, 제공자 51회 호출(4회 생성-only 비교 + 14개 pipeline 작업). 미확인 비용 예약 없음. 자동 충전 OFF를 변경하지 않았고 비공개 키·원본은 gitignored 로컬에만 보존한다. 공개 계약과 frontend 소유 경로는 변경하지 않았다. seed 18세트 중 고유 4세트 첫 실행은 READY 1/FAILED 3, 나머지 14세트 미실행이다. 최신 16/32강 품질, 검색 사실 정확도, 2명 사람 평가와 실제 프론트 화면·배포는 남아 있으므로 **전체 Goal은 아직 미완료**다.
 
-공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna). 2026-09-15 확인.
+## v8/v9 체크포인트 — 판정 분리와 식별자 수정
+
+v8의 `seed-v1/hobby-home/16` 첫 실행: **QUALITY_GATE_FAILED**, 6회 호출/상세 Repair 1회, 126.962초, $0.177367. 사전·최종·재검토의 해석 판정은 모두 PASS였고, 최초 후보 검토는 직소 퍼즐(c11)의 준비·정리 포함 30분 가능성을 UNKNOWN으로 표시했다. 그 후보만 보완했으며 나머지 15개 객체는 원문 비교에서도 같았다. 재검토에서 c11은 통과했지만 변경하지 않은 조립 모형·미니어처 채색(c3/c4)의 시간 조건이 새로 UNKNOWN이 되어 중단했다. 해석/후보 판정 경계의 실제 실행과 최대 1회 집행은 확인했으나, 시간 적합성 판단의 일관성과 16강 후보 품질은 미완료다. 모델이 통과시킨 성도 탐구 등도 기존 사람 피드백과 별도 대조해야 하며 자동 PASS를 사람 승인으로 사용하지 않는다.
+
+v8의 `hobby-home/8` 회귀 비교도 **QUALITY_GATE_FAILED**: 4회 호출/사전 Repair 1회, 31.243초, $0.032536. 식물 돌보기 1개가 탈락해 명상으로 교체됐지만, 재검토는 내용의 부적합 대신 유지된 식물 이름 ID와 새 활동이 다르다는 이유로 거절했다. v9는 이 구체적 참조 키 결함을 서버의 최초 ID 부여로 수정한다. 원문이 요청하지 않은 ‘매일’ 빈도를 사전 검토가 요구했던 문제도 남아 있어, 식별자 수정만으로 전체 의미 판정이 정확해진다고 보지 않는다. v8에서 최신 READY를 확인하지 못했으며 이전 v7의 성공과 구분한다.
+
+v9(`ce002-v9-opaque-intents`)의 같은 `hobby-home/8` 수정 후 재확인 1회: **QUALITY_GATE_FAILED**, 2회 호출/Repair 0회, 24.160초, $0.0219575. 실제 사전 검토에는 서버의 i1..i8 식별자가 전달됐고 활동 8개 모두 승인됐다. 그러나 계획이 요청의 size=8을 개별 후보 조건 `candidate_count`로 넣고 ‘고르고 싶어.’를 근거로 붙여 해석 검토가 CONSTRAINTS 오류를 명시했다. 서버는 이 실패를 우회하거나 후보 Repair로 넘기지 않았다. 식별자 적용과 원인 분리 증거이지 v9의 READY·Repair 성공 증거는 아니다. 같은 질문을 추가로 재추첨하지 않았으며 **최신 v9의 READY는 아직 없다**.
+
+이번 변경의 최종 전체 verify: **Java 149개 실행, 실패·오류 0, opt-in 유료 1개 제외**, handoff 6개, fixture 5개, 기존 실제 HTTP 102개/8개 schema, 웹 build·bootJar 통과. 집중 테스트 후 읽기 전용 독립 리뷰 2회에서 최종 Critical 0 / High 0 / actionable finding 0, 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 36개도 공개 schema 적합이며 FAILED 응답을 성공으로 세지 않는다. 형식·코드 검증과 사람 기준의 후보 품질 검증은 별개다.
+
+2026-09-16 누적 사용량 기반 추정 **$1.4823068 / 승인 $5**, 제공자 63회 호출(4회 생성-only 비교 + 17개 pipeline 작업), 미확인 비용 예약 없음. 자동 충전 OFF를 변경하지 않았다. seed 고유 **5/18세트**의 첫 실행은 READY 1/FAILED 4이며 13세트 미실행이다. 후속 회귀 비교는 첫 실행 결과를 덮어쓰지 않는다. 요청 크기와 개별 후보 조건의 혼동, 요청에 없는 빈도 가정, 시간 판정 변동과 취미 filler의 사람 기준 일치는 남은 품질 문제다. 16/32강·검색 사실 정확도·2명 사람 평가가 미완료이므로 Goal을 완료 처리하지 않는다. 공개 계약·frontend·DB는 그대로이고 키와 비공개 실행 원본은 commit하지 않는다.
+
+공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인.

@@ -200,6 +200,50 @@ class OpenAiResponsesClientTest {
         assertThat(request.path("tools").size()).isZero();
         assertThat(request.toString()).doesNotContain("previous_response_id");
     }
+    @ParameterizedTest @ValueSource(strings = {"allocation", "final"})
+    void bothReviewRoutesSeparateAttributedInterpretationFromCandidateFindings(String phase) {
+        var input = new GenerationInput("조용한 취미", 8, "ko-KR", "Asia/Seoul");
+        var plan = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
+                List.of(new BucketSpec("group", "활동", List.of(new IntentSpec("known", "합성 활동", "검토 대상")))), List.of());
+        var interpretation = new InterpretationReview(Verdict.FAIL, List.of(new InterpretationFinding(
+                InterpretationField.CONSTRAINTS, "조용한", "계획에 조용함 조건이 빠져 있음")));
+        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+        if (phase.equals("allocation")) {
+            response = completed(json.writeValueAsString(new AllocationReview(interpretation, Verdict.PASS, Verdict.PASS,
+                    Verdict.PASS, List.of("known"), List.of())));
+            assertThat(stages.allocate(input, Instant.now(), plan, new CallContext("job", 1, "ALLOCATE", Instant.now().plusSeconds(10)))
+                    .value().interpretation()).isEqualTo(interpretation);
+        } else {
+            response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS, Verdict.FAIL,
+                    List.of(), List.of(new Finding("FILLER", List.of("c1"), "별도의 후보 문제")))));
+            var fixed = new FixedPlan(input, Instant.now(), plan, new Plan(8, "취미", false, List.of(),
+                    List.of(new CoverageBucket("group", 8))), plan.intents());
+            var reviewed = stages.review(fixed, new Batch(List.of()), Grounding.empty(),
+                    new CallContext("job", 1, "REVIEW_INITIAL", Instant.now().plusSeconds(10))).value();
+            assertThat(reviewed.interpretation()).isEqualTo(interpretation);
+            assertThat(reviewed.findings()).hasSize(1);
+        }
+        var properties = request.path("text").path("format").path("schema").path("properties");
+        assertThat(properties.has("planFaithful")).isFalse();
+        var fields = properties.path("interpretation").path("properties").path("findings").path("items").path("properties");
+        assertThat(fields.has("candidateIds")).isFalse();
+        assertThat(fields.path("field").path("enum").size()).isEqualTo(InterpretationField.values().length);
+        assertThat(fields.has("sourceText")).isTrue();
+        assertThat(request.path("instructions").asString()).contains("An unsuitable candidate does not itself make the interpretation unfaithful");
+        assertThat(request.toString()).doesNotContain("previous_response_id");
+        assertThat(request.path("tools").size()).isZero();
+    }
+    @Test void candidateFieldCannotMasqueradeAsInterpretationAtProviderBoundary() {
+        response = completed("""
+                {"verdict":"FAIL","findings":[{"field":"CANDIDATE","sourceText":"취미","detail":"후보 문제"}]}
+                """);
+        assertThatThrownBy(() -> client.complete("gpt-5.6-terra", "trusted instructions", Map.of("request", "취미"),
+                Map.of("type", "object"), InterpretationReview.class, false,
+                new CallContext("job", 1, "REVIEW_INITIAL", Instant.now().plusSeconds(10))))
+                .isInstanceOf(InvalidModelOutput.class);
+        assertThat(ledger.completed).isEqualTo(1);
+        assertThat(calls).hasValue(1);
+    }
     @Test void badUsageAndUnrequestedToolsFailClosed() {
         response.put("usage", Map.of("input_tokens", -1));
         assertProviderFailure();

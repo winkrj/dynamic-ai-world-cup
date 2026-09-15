@@ -30,9 +30,15 @@ public final class EngineModels {
                     .map(intent -> new ActivityIntent(intent.id(), bucket.id(), intent.coreActivity(), intent.fit()))).toList();
         }
     }
-    /** Ranked, jointly distinct feasible intents; rejected items never enter the fixed allocation. */
+    public enum InterpretationField { UNIT, HOBBY, CONSTRAINTS, SOFT_PREFERENCES, GROUNDING_REQUIRED }
+    public record InterpretationFinding(InterpretationField field, String sourceText, String detail) {}
+    /** Request interpretation only; candidate defects belong to their own review findings. */
+    public record InterpretationReview(Verdict verdict, List<InterpretationFinding> findings) {
+        public InterpretationReview { findings = List.copyOf(findings); }
+    }
     public record IntentRejection(String intentId, String reason) {}
-    public record AllocationReview(Verdict planFaithful, Verdict comparable, Verdict noSemanticDuplicates,
+    /** Ranked, jointly distinct feasible intents; rejected items never enter the fixed allocation. */
+    public record AllocationReview(InterpretationReview interpretation, Verdict comparable, Verdict noSemanticDuplicates,
                                    Verdict feasible, List<String> approvedIntentIds, List<IntentRejection> rejections) {
         public AllocationReview { approvedIntentIds = List.copyOf(approvedIntentIds); rejections = List.copyOf(rejections); }
     }
@@ -54,7 +60,7 @@ public final class EngineModels {
     public record Finding(String code, List<String> candidateIds, String detail) {
         public Finding { candidateIds = List.copyOf(candidateIds); }
     }
-    public record Review(Verdict planFaithful, Verdict comparable, Verdict noSemanticDuplicates,
+    public record Review(InterpretationReview interpretation, Verdict comparable, Verdict noSemanticDuplicates,
                          Verdict candidateQuality, List<Assessment> assessments, List<Finding> findings) {
         public Review { assessments = List.copyOf(assessments); findings = List.copyOf(findings); }
     }

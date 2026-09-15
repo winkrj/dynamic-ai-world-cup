@@ -1,6 +1,6 @@
 # 프로젝트 컨텍스트
 
-갱신일: 2026-09-15.
+갱신일: 2026-09-16.
 
 목적: 좋은 후보군과 빠른 A/B 선택으로 결정 비용을 줄이는 Dynamic AI World Cup. Candidate Quality가 우선이다.
 
@@ -27,11 +27,11 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
-2026-09-15 최신 CE-002/v7 체크포인트: 구체 활동을 별도 ALLOCATE로 검토하고 승인된 첫 N개에서 서버가 quota를 계산한다. 승인 부족일 때 탈락 활동만 한 번 patch하고 전체를 새로 검토할 수 있다. 사전 활동 Repair와 상세 후보 Repair는 **한 engine attempt의 같은 1회 예산**을 공유한다. 조건·정상 후보·시간/비용 제한·공개 계약을 유지한다.
+2026-09-16 최신 CE-002/v9 체크포인트: 사전·최종 검토에서 원 요청의 해석 오류와 개별 후보 문제를 분리하여 항목·원문 근거·설명을 받는다. 서버는 최초 활동에 불투명한 추적 ID를 한 번 부여하고 교체 뒤에도 보존하여 이름처럼 보이는 ID 때문에 새 활동이 거절되는 결함을 수정했다. 해석 FAIL/UNKNOWN은 여전히 종료하며 사전 활동 Repair와 상세 후보 Repair는 **한 engine attempt의 같은 1회 예산**을 공유한다. 조건·정상 후보·시간/비용 제한·공개 계약을 유지한다.
 
-실제 `seed-v1/hobby-home/8`에서 READY와 preview를 확인했다(49.184초, $0.0579285). 같은 최신 버전의 hobby-social 8/16강은 실패했고, 16강의 사전 Repair 실행 후에도 후보가 부족했다. 최신 32강은 미실행이며 이전 v4의 16/32강도 실패했다. 검색 사례는 실제 도구 연결만 확인했고 사실 정확도·품질은 통과하지 못했다. 엔진/API 연결과 모든 후보 품질 완료를 구별하여 Goal은 미완료로 유지한다. 취미 경계/판정 일관성, 32강 퍼즐 구분의 사람 판단, 2명 사람 평가는 남아 있다. 버전별 실패 원본과 해석은 `docs/CANDIDATE_ENGINE.md` 한 문서에 모았다.
+이전 v7의 실제 `seed-v1/hobby-home/8`에서 READY와 preview를 확인했다(49.184초, $0.0579285). **최신 v9의 READY는 아직 없다.** 같은 질문의 v9 비교는 계획이 size=8을 개별 후보 조건으로 혼동하고 잘못된 원문 근거를 붙여 해석 검토에서 실패했다(24.160초, $0.0219575). v8 hobby-home/16은 상세 Repair 뒤 변경하지 않은 후보의 시간 판정이 달라져 실패했다. 최신 32강은 미실행이며 검색 사례도 연결만 확인했을 뿐 사실 정확도·품질을 통과하지 못했다. 엔진/API 연결과 모든 후보 품질 완료를 구별하여 Goal은 미완료로 유지한다. 요청 해석·판정 일관성·취미 filler, 32강 퍼즐 구분의 사람 판단과 2명 사람 평가는 남아 있다. 버전별 결과와 해석은 `docs/CANDIDATE_ENGINE.md` 한 문서에 모았다.
 
-v7 일반 `verify`: Java 142개 실행/실패·오류 0(유료 1개 제외), handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 후 독립 리뷰 1회 Critical/High/actionable 0, 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 30개도 공개 schema 적합(실패 응답 포함). 누적 실험 추정 **$1.2504463 / 승인 $5**, 제공자 51회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed 고유 4/18세트의 첫 실행 READY 1/FAILED 3이며 14세트 미실행이다. 실제 공개 서버 배포나 프론트 완주를 완료한 것은 아니다.
+v9 일반 `verify`: Java 149개 실행/실패·오류 0(유료 1개 제외), handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 후 독립 리뷰 2회, 최종 Critical/High/actionable 0이며 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 36개도 공개 schema 적합(실패 응답 포함). 누적 실험 추정 **$1.4823068 / 승인 $5**, 제공자 63회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed 고유 5/18세트의 첫 실행 READY 1/FAILED 4이며 13세트 미실행이다. 실제 공개 서버 배포나 프론트 완주를 완료한 것은 아니다.
 
 - A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
 - B: `feat/engine/ce-002-generation`의 연동 결과를 기준으로 16/32강 및 외부 사실 사례의 평가 범위를 확장한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.

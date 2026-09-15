@@ -17,7 +17,7 @@ final class AiSchemas {
     }
     static Map<String, Object> allocation(int size, List<String> intentIds) {
         var id = choice(intentIds.toArray(String[]::new));
-        return object(Map.of("planFaithful", verdict(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
+        return object(Map.of("interpretation", interpretation(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
                 "feasible", verdict(), "approvedIntentIds", array(id, 0, size + 4),
                 "rejections", array(object(Map.of("intentId", id, "reason", string(300))), 0, size + 4)));
     }
@@ -37,7 +37,7 @@ final class AiSchemas {
                 "description", string(240), "repeatability", string(240), "requirements", string(300))), size, size)));
     }
     static Map<String, Object> review(int size, int constraints) {
-        return object(Map.of("planFaithful", verdict(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
+        return object(Map.of("interpretation", interpretation(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
                 "candidateQuality", verdict(),
                 "assessments", array(object(Map.of("candidateId", candidateId(size), "constraintId", identifier(), "verdict", verdict())), 0, size * constraints),
                 "findings", array(object(Map.of("code", string(60), "candidateIds", array(candidateId(size), 0, size), "detail", string(300))), 0, 64)));
@@ -45,6 +45,12 @@ final class AiSchemas {
     static Map<String, Object> facts(int size, int constraints) {
         return object(Map.of("facts", array(object(Map.of("candidateId", candidateId(size), "claimKey", identifier(), "verdict", verdict(),
                 "sourceUrl", string(2000), "excerpt", string(600), "requestApplicability", string(400))), 0, size * (constraints + 1))));
+    }
+    private static Map<String, Object> interpretation() {
+        return object(Map.of("verdict", verdict(), "findings", array(object(Map.of(
+                "field", choice(java.util.Arrays.stream(dev.worldcup.generation.engine.EngineModels.InterpretationField.values())
+                        .map(Enum::name).toArray(String[]::new)),
+                "sourceText", string(500), "detail", string(300))), 0, 12)));
     }
     private static Map<String, Object> verdict() { return choice("PASS", "FAIL", "UNKNOWN"); }
     private static Map<String, Object> identifier() { return Map.of("type", "string", "pattern", "^[a-z][a-z0-9_-]{0,39}$"); }

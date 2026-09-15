@@ -39,8 +39,9 @@ public final class StagedCandidateEngine implements CandidateEngine {
         try {
             var proposed = stages.plan(input, context.recentDirectChoices().stream().limit(50).toList(), now, run.call("PLAN")).value();
             validateProposal(input, proposed);
+            proposed = assignIntentHandles(proposed);
             var allocation = stages.allocate(input, now, proposed, run.call("ALLOCATE")).value();
-            validateAllocation(proposed, allocation);
+            validateAllocation(input, proposed, allocation);
             if (allocation.approvedIntentIds().size() < input.size()) {
                 var patch = stages.repairIntents(input, now, proposed, allocation.rejections(), run.repairCall("REPAIR_INTENTS"));
                 proposed = applyIntentRepairs(proposed, allocation.rejections(), patch.value());
@@ -97,8 +98,34 @@ public final class StagedCandidateEngine implements CandidateEngine {
         if (specification.softPreferences().stream().anyMatch(s -> blank(s) || s.length() > 300)) throw new InvalidModelOutput();
     }
 
-    private void validateAllocation(PlanProposal specification, AllocationReview review) {
-        if (review.planFaithful() != Verdict.PASS || review.comparable() != Verdict.PASS
+    /** Assign once before any review; a repaired activity must not inherit a misleading semantic ID. */
+    private PlanProposal assignIntentHandles(PlanProposal original) {
+        var coverage = new ArrayList<BucketSpec>();
+        int next = 1;
+        for (var bucket : original.coverage()) {
+            var intents = new ArrayList<IntentSpec>();
+            for (var intent : bucket.intents()) intents.add(new IntentSpec("i" + next++, intent.coreActivity(), intent.fit()));
+            coverage.add(new BucketSpec(bucket.id(), bucket.description(), intents));
+        }
+        return new PlanProposal(original.decision(), original.unit(), original.hobby(), original.groundingRequired(),
+                original.constraints(), coverage, original.softPreferences());
+    }
+
+    private void requireFaithfulInterpretation(GenerationInput input, InterpretationReview review) {
+        if (review == null || review.verdict() == null || review.findings().size() > 12
+                || (review.verdict() == Verdict.PASS) != review.findings().isEmpty()) throw new InvalidModelOutput();
+        for (var finding : review.findings()) {
+            if (finding.field() == null || blank(finding.sourceText()) || finding.sourceText().length() > 500
+                    || !normalize(input.prompt()).contains(normalize(finding.sourceText()))
+                    || blank(finding.detail()) || finding.detail().length() > 300) throw new InvalidModelOutput();
+        }
+        // Attribution does not establish truth or authorize repairing away a request condition.
+        if (review.verdict() != Verdict.PASS) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+    }
+
+    private void validateAllocation(GenerationInput input, PlanProposal specification, AllocationReview review) {
+        requireFaithfulInterpretation(input, review.interpretation());
+        if (review.comparable() != Verdict.PASS
                 || review.noSemanticDuplicates() != Verdict.PASS || review.feasible() != Verdict.PASS) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
         var poolIds = specification.intents().stream().map(ActivityIntent::id).collect(java.util.stream.Collectors.toSet());
         Set<String> assessed = new HashSet<>(review.approvedIntentIds());
@@ -129,7 +156,7 @@ public final class StagedCandidateEngine implements CandidateEngine {
     }
 
     private FixedPlan freeze(GenerationInput input, Instant now, PlanProposal specification, AllocationReview review) {
-        validateAllocation(specification, review);
+        validateAllocation(input, specification, review);
         if (review.approvedIntentIds().size() < input.size()) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
         var pool = specification.intents().stream().collect(java.util.stream.Collectors.toMap(ActivityIntent::id, i -> i));
         var approved = review.approvedIntentIds().stream().map(pool::get).toList();
@@ -150,7 +177,7 @@ public final class StagedCandidateEngine implements CandidateEngine {
         var result = stages.review(plan, batch, grounding, run.call("REVIEW_" + phase));
         Review review = result.value();
         // Candidate repair must never hide omitted constraints or an invalid interpretation.
-        if (review.planFaithful() != Verdict.PASS) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+        requireFaithfulInterpretation(plan.input(), review.interpretation());
         Set<String> ids = batch.candidates().stream().map(Proposal::id).collect(java.util.stream.Collectors.toSet());
         for (var finding : review.findings()) {
             if (blank(finding.code()) || blank(finding.detail()) || !ids.containsAll(finding.candidateIds())) throw new InvalidModelOutput();
