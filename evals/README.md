@@ -20,6 +20,6 @@ API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/loc
 
 ## 실행 현황과 구분
 
-2026-09-16: `seed-v1` 고유 **6/18세트**를 처음 실행했다. `seoul-indoor/8`(v4), `hobby-social/16`(v5), `hobby-social/8`(v6), `hobby-home/16`(v8)은 `QUALITY_GATE_FAILED`, `hobby-home/8`(v7)과 `hobby-social/32`(v11)는 READY였다. 고유 12세트는 미실행이다. 이후 회귀 비교는 첫 결과를 덮어쓰지 않는다. 최신 v11은 hobby-home/8 READY, hobby-home/16 FAILED, hobby-social/32 READY이며 사람의 중복·품질 평가를 완료한 것은 아니다. 이전 Terra/Luna 16·32강 4회 생성-only 비교와 별도 `hobby-calibration` 실행은 seed 18세트 완료로 세지 않는다. 버전별 후속 실행·비용·제한은 `docs/CANDIDATE_ENGINE.md`에 통합 기록한다. 2명 독립 사람 평가는 미완료다.
+2026-09-16: `seed-v1` 고유 **7/18세트**를 처음 실행했다. `seoul-indoor/8`(v4), `hobby-social/16`(v5), `hobby-social/8`(v6), `hobby-home/16`(v8), `seoul-parent/8`(v12)은 `QUALITY_GATE_FAILED`, `hobby-home/8`(v7)과 `hobby-social/32`(v11)는 READY였다. 고유 11세트는 미실행이다. 이후 회귀 비교는 첫 결과를 덮어쓰지 않는다. hobby-home/16은 v12 비교에서 READY·preview 16개를 확인했지만, 천문 자료 학습·읽기 분할 등의 사람 품질 기준과 일치했음을 뜻하지 않는다. 이전 Terra/Luna 16·32강 4회 생성-only 비교와 별도 `hobby-calibration` 실행은 seed 18세트 완료로 세지 않는다. 버전별 후속 실행·비용·제한은 `docs/CANDIDATE_ENGINE.md`에 통합 기록한다. 2명 독립 사람 평가는 미완료다.
 
 유료 harness는 `CANDIDATE_LIVE_CASE`로 이 파일의 사례 ID를 선택하며 질문 원문을 변경하지 않는다. 기본 `hobby-calibration`은 datasetVersion `calibration-2026-09-15`로 별도 표시한다. `CANDIDATE_LIVE_SIZE=8|16|32`; 일반 검증에서는 `CANDIDATE_LIVE_TEST=false`로 실제 과금을 막는다. 정확한 실행 환경·키/예산 주입·누적 비용 대조는 `docs/CANDIDATE_ENGINE.md`를 따른다.

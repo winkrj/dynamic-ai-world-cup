@@ -259,10 +259,14 @@ class StagedCandidateEngineTest {
         assertThat(stages.repairs).isEqualTo(1);
         assertThat(stages.lastReplacementIds).hasSize(8);
     }
-    @Test void groundingCannotBeReplacedWithSemanticSelfApproval() {
-        stages.groundingRequired = true;
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void groundingCannotBeReplacedWithSemanticSelfApproval(boolean entityAvailabilityRequired) {
+        stages.groundingRequired = entityAvailabilityRequired;
+        stages.constraintMode = entityAvailabilityRequired ? VerificationMode.SEMANTIC_ESTIMATE : VerificationMode.GROUNDED_FACT;
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.calls).contains("GROUND_INITIAL", "GROUND_REPAIRED");
+        assertThat(stages.seenPlans).allSatisfy(p -> assertThat(p.gatePlan().hardConstraints())
+                .containsExactly(new HardConstraint("quiet", stages.constraintMode)));
         assertThat(stages.repairs).isEqualTo(1);
     }
     @Test void deadlinePreventsAnotherPaidStageAfterSlowGeneration() {
@@ -296,13 +300,14 @@ class StagedCandidateEngineTest {
         PlanProposal originalPlan;
         String patchMode = "valid";
         String source = "조용한"; List<String> lastReplacementIds;
+        VerificationMode constraintMode = VerificationMode.SEMANTIC_ESTIMATE;
         Function<PlanProposal, AllocationReview> allocationFunction = plan -> allocation(plan, plan.intents().stream().map(ActivityIntent::id).toList());
         BiFunction<Batch, Integer, Review> reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
         @Override public StageResult<PlanProposal> plan(GenerationInput input, List<CandidateEngine.Preference> history, Instant time, CallContext call) {
             var intents = IntStream.rangeClosed(1, input.size() + intentCountOffset)
                     .mapToObj(i -> new IntentSpec((semanticIntentIds ? "original_activity_" : "i") + i, "핵심 활동 " + i, "합성 적합성 설명")).toList();
             calls.add(call.stage()); originalPlan = new PlanProposal(Decision.READY, "취미", true, groundingRequired,
-                    omitConstraints ? List.of() : List.of(new ConstraintSpec("quiet", "조용해야 한다", source, VerificationMode.SEMANTIC_ESTIMATE)),
+                    omitConstraints ? List.of() : List.of(new ConstraintSpec("quiet", "조용해야 한다", source, constraintMode)),
                     readingVariants ? List.of(new BucketSpec("reading", "독서", intents.subList(0, 3)), new BucketSpec("broad", "합성 테스트 활동", intents.subList(3, intents.size())))
                             : List.of(new BucketSpec("broad", "합성 테스트 활동", intents)), List.of());
             return new StageResult<>(originalPlan, "fake-plan");

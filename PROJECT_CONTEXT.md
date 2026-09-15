@@ -27,14 +27,16 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
-2026-09-16 최신 CE-002/v11 체크포인트: 계획·사전·최종 검토에 같은 요청 범위 기준을 적용한다. 후보 N개는 서버가 집행하는 전체 목록 규칙이며, 인원/시간/예산은 각 후보의 조건이다. 회당 시간에서 daily 빈도를 만들거나 퇴근 후라는 상황에서 피로/초보/쉬운 준비를 필수 조건으로 추가하지 않는다. 원문·명시 조건·불투명 활동 ID를 유지하고, 해석 FAIL/UNKNOWN은 여전히 종료한다. 사전 활동 Repair와 상세 후보 Repair는 **한 engine attempt의 같은 1회 예산**을 공유하며 기존 시간/비용 제한·공개 계약은 그대로다.
+2026-09-16 최신 CE-002/v13 체크포인트: 모든 constraints는 필수이며 SEMANTIC_ESTIMATE/GROUNDED_FACT는 중요도가 아니라 검증 방법이다. 공통 단계 지침으로 이 구분을 전달하고, 검색 응답 schema와 서버 검사는 실제 외부 근거가 필요한 claim만 허용한다. 일반 적합성은 최종 REVIEW가 판단하며 양쪽 모두 누락/FAIL/UNKNOWN은 차단한다. 후보 N개는 서버의 목록 규칙이며 원문에 없는 daily 빈도·피로/초보 조건을 만들지 않는다. 원문·명시 조건·불투명 활동 ID를 유지하고, 해석 FAIL/UNKNOWN은 종료한다. 사전 활동 Repair와 상세 후보 Repair는 **한 engine attempt의 같은 1회 예산**을 공유하며 기존 시간/비용 제한·공개 계약은 그대로다.
 
-**최신 v11에서 hobby-home/8과 hobby-social/32의 실제 READY·preview 연결을 확인했다.** 각각 65.505초/$0.0685255, 117.055초/$0.1526235이며 Repair 없이 4회 호출이었다. hobby-home/16은 16개 중 10개만 승인되고, 검토기가 필수 조건과 검증 방법(SEMANTIC_ESTIMATE)을 혼동해 실패했다. 32강도 보드게임/체스/바둑, 메이커/전자공작 같은 중복 경계를 사람에게 대조해야 하므로 자동 PASS를 사람 승인으로 사용하지 않는다. 검색 사례는 기술 연결만 확인했고 사실 정확도·품질은 미통과다. 엔진/API 연결과 후보 품질 완료를 구별하여 Goal은 미완료로 유지한다. 버전별 결과·남은 판정 문제는 `docs/CANDIDATE_ENGINE.md` 한 문서에 모았다.
+**hobby-home/8(v11)·16(v12), hobby-social/32(v11)의 실제 READY·preview 연결을 확인했다.** 각각 65.505초/$0.0685255, 77.082초/$0.1002145, 117.055초/$0.1526235이며 Repair 없이 4회 호출이었다. 현재 버전에서 전 사례를 재실행한 것은 아니다. 16강의 읽기 분할·천문 자료 학습과 32강의 보드게임/체스/바둑, 메이커/전자공작 등은 사람 기준과 대조해야 하므로 자동 PASS를 사람 승인으로 사용하지 않는다. v12 seoul-parent/8 첫 실행은 검색 응답 범위 오류와 무계단·보행 근거 부족으로 FAILED였고 미리보기를 공개하지 않았다. 엔진/API 연결과 후보 품질 완료를 구별하여 Goal은 미완료로 유지한다. 버전별 결과·남은 판정 문제는 `docs/CANDIDATE_ENGINE.md` 한 문서에 모았다.
 
-v11 일반 `verify`: Java 152개 실행/실패·오류 0(유료 1개 제외), handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 후 독립 리뷰 2회, 최종 Critical/High/actionable 0이며 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 46개도 공개 schema 적합(실패 응답 포함). 누적 실험 추정 **$1.8197908 / 승인 $5**, 제공자 77회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed 고유 6/18세트의 첫 실행 READY 2/FAILED 4이며 12세트와 2명 사람 평가는 남아 있다. 실제 공개 서버 배포나 프론트 완주를 완료한 것은 아니다.
+v13 seoul-parent/8 비교는 사실 응답 32개가 허용 claim만 사용하여 최종 검토까지 진행했지만, 7개 후보의 접근성/장소 근거 부족으로 FAILED였다(168.750초, 7회 호출, 사전 Repair 1회, $0.293628). 합쳐진 ‘무계단·짧은 동선’의 일부 근거만으로 전체 PASS를 받은 후보도 있어, 세트 차단 성공과 개별 사실 정확도를 구별한다. 다음에는 조건별 근거 적용과 장소 실재·이용 가능성 문제를 우선 보완한다.
+
+v13 일반 `verify`: Java 159개 실행/실패·오류 0(유료 1개 제외), handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 후 독립 리뷰 2회, 최종 Critical/High/actionable 0이며 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 53개도 공개 schema 적합(실패 응답 포함). 누적 실험 추정 **$2.4654548 / 승인 $5**, 제공자 92회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed 고유 7/18세트의 첫 실행 READY 2/FAILED 5이며 11세트와 2명 사람 평가는 남아 있다. 실제 공개 서버 배포나 프론트 완주를 완료한 것은 아니다.
 
 - A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
-- B: `feat/engine/ce-002-generation`의 연동 결과를 기준으로 16/32강 및 외부 사실 사례의 평가 범위를 확장한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.
+- B: `feat/engine/ce-002-generation`에서 외부 사실의 출처/적용 범위, 큰 후보군의 활동 분할·filler를 우선 보완하고 미실행 사례를 확인한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.
 - OpenAI API는 별도 사용자 결제/키와 기존 누적 실험 예산 $5 범위에서 사용한다. 자동 충전 OFF. 저장소에 키나 실제 비공개 평가 원문을 추가하지 않는다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
 - GitHub collaborator 초대는 역할별 실제 계정이 정해진 뒤 한다. 현 단계에서 팀원 초대/branch protection을 완료했다고 주장하지 않는다.
 - 외부 공유 개발 API/Swagger UI와 최종 화면 시안은 아직 없다. OpenAPI JSON·생성 TS 타입·fixture가 전달물이며, `npm run api:smoke`는 로컬 dev API의 생성부터 공유 replay까지 연결을 확인한다. 실제 AI 품질이나 프론트 완주 UI 테스트를 대신하지 않는다.

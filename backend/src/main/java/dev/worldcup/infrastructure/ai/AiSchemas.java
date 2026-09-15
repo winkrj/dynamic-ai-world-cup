@@ -42,9 +42,9 @@ final class AiSchemas {
                 "assessments", array(object(Map.of("candidateId", candidateId(size), "constraintId", identifier(), "verdict", verdict())), 0, size * constraints),
                 "findings", array(object(Map.of("code", string(60), "candidateIds", array(candidateId(size), 0, size), "detail", string(300))), 0, 64)));
     }
-    static Map<String, Object> facts(int size, int constraints) {
-        return object(Map.of("facts", array(object(Map.of("candidateId", candidateId(size), "claimKey", identifier(), "verdict", verdict(),
-                "sourceUrl", string(2000), "excerpt", string(600), "requestApplicability", string(400))), 0, size * (constraints + 1))));
+    static Map<String, Object> facts(int size, List<String> claimIds) {
+        return object(Map.of("facts", array(object(Map.of("candidateId", candidateId(size), "claimKey", choice(claimIds.toArray(String[]::new)), "verdict", verdict(),
+                "sourceUrl", string(2000), "excerpt", string(600), "requestApplicability", string(400))), 0, size * claimIds.size())));
     }
     private static Map<String, Object> interpretation() {
         return object(Map.of("verdict", verdict(), "findings", array(object(Map.of(

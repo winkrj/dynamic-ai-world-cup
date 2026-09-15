@@ -149,7 +149,56 @@ class OpenAiResponsesClientTest {
         assertThat(result.facts().get(0).verdict()).isEqualTo(Verdict.UNKNOWN);
         assertThat(result.facts().get(1).verdict()).isEqualTo(Verdict.PASS);
         assertThat(result.facts().get(1).validUntil()).isAfter(result.facts().get(1).checkedAt());
+        assertVerificationInstructions();
         // This is source binding only; content truth remains a separate model/human evaluation.
+    }
+    @ParameterizedTest @ValueSource(booleans = {true, false})
+    void groundingSchemaContainsOnlyRequiredFactualClaims(boolean availabilityRequired) {
+        stubGroundingFacts(List.of(new FactCheck("c1", "access", Verdict.UNKNOWN, "", "", "근거 부족")));
+        var result = groundingStages().ground(mixedGroundingPlan(availabilityRequired), new Batch(List.of()),
+                new CallContext("job", 1, "GROUND_INITIAL", Instant.now().plusSeconds(10)));
+        var facts = request.path("text").path("format").path("schema").path("properties").path("facts");
+        var expected = availabilityRequired ? List.of("availability", "access") : List.of("access");
+        assertThat(facts.path("items").path("properties").path("claimKey").path("enum")).isEqualTo(json.valueToTree(expected));
+        assertThat(facts.path("maxItems").asInt()).isEqualTo(8 * expected.size());
+        assertThat(request.path("instructions").asString()).contains("SEMANTIC_ESTIMATE conditions belong to the later reviewer");
+        assertThat(result.facts().getFirst().verdict()).isEqualTo(Verdict.UNKNOWN);
+    }
+    @ParameterizedTest @ValueSource(strings = {"parents", "availability", "unrequested"})
+    void groundingStillRejectsOutputOutsideFactualClaimScope(String claimKey) {
+        stubGroundingFacts(List.of(new FactCheck("c1", claimKey, Verdict.PASS, "https://official.example/place", "exists", "context")));
+        assertThatThrownBy(() -> groundingStages().ground(mixedGroundingPlan(false), new Batch(List.of()),
+                new CallContext("job", 1, "GROUND_INITIAL", Instant.now().plusSeconds(10))))
+                .isInstanceOf(InvalidModelOutput.class);
+        assertThat(calls).hasValue(1);
+        assertThat(ledger.completed).isEqualTo(1);
+    }
+    @Test void groundingWithoutFactualClaimsMakesNoPaidCall() {
+        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(), List.of(), List.of());
+        var fixed = new FixedPlan(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
+                new Plan(8, "취미", false, List.of(), List.of()), List.of());
+        assertThatThrownBy(() -> groundingStages().ground(fixed, new Batch(List.of()),
+                new CallContext("job", 1, "GROUND_INITIAL", Instant.now().plusSeconds(10))))
+                .isInstanceOf(InvalidModelOutput.class);
+        assertThat(calls).hasValue(0);
+        assertThat(ledger.reserved).isZero();
+    }
+    private OpenAiCandidateStages groundingStages() {
+        return new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+    }
+    private FixedPlan mixedGroundingPlan(boolean availabilityRequired) {
+        var constraints = List.of(new ConstraintSpec("parents", "부모님과 함께", "부모님과", VerificationMode.SEMANTIC_ESTIMATE),
+                new ConstraintSpec("access", "계단 없이", "계단 없이", VerificationMode.GROUNDED_FACT));
+        var proposal = new PlanProposal(Decision.READY, "장소", false, availabilityRequired, constraints, List.of(), List.of());
+        return new FixedPlan(new GenerationInput("부모님과 계단 없이", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
+                new Plan(8, "장소", availabilityRequired, constraints.stream().map(c -> new HardConstraint(c.id(), c.mode())).toList(), List.of()), List.of());
+    }
+    private void stubGroundingFacts(List<FactCheck> facts) {
+        response = completed(json.writeValueAsString(new FactChecks(facts)));
+        var items = new ArrayList<Object>((List<?>) response.get("output"));
+        items.add(Map.of("type", "web_search_call", "status", "completed", "action", Map.of("type", "search", "sources",
+                List.of(Map.of("type", "url", "url", "https://official.example/place")))));
+        response.put("output", items);
     }
     @Test void planningSchemaUsesContainmentInsteadOfAnUnverifiableBucketReference() {
         var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
@@ -182,12 +231,20 @@ class OpenAiResponsesClientTest {
         assertThat(calls).hasValue(1);
     }
     private void assertRequestScopeInstructions() {
+        assertVerificationInstructions();
         assertThat(request.path("instructions").asString()).contains(
                 "not a candidate constraint", "Participant counts, time limits and budgets",
                 "Context may guide activity fit without creating extra mandatory conditions",
                 "Preserve the actual timing condition",
                 "a session duration does not imply a daily frequency or a completion deadline",
                 "preserve an explicit daily/weekly frequency when present", "Do not add or drop user conditions");
+    }
+    private void assertVerificationInstructions() {
+        assertThat(request.path("instructions").asString()).contains(
+                "Every entry in constraints is mandatory", "Verification mode is NOT requirement strength",
+                "SEMANTIC_ESTIMATE evaluates general activity fit", "FAIL or UNKNOWN assessments still block",
+                "GROUNDED_FACT requires external evidence", "Explicit or numeric wording alone does not require web evidence",
+                "never downgrade externally verifiable entity facts");
     }
     @Test void laterStageSchemasAllowOnlyExistingIntentAndBucketIds() {
         var allocation = json.valueToTree(AiSchemas.allocation(8, List.of("known-intent")));
