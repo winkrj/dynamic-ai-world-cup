@@ -27,11 +27,11 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
-2026-09-15 CE-002 실제 연결 체크포인트: 최종 v4 합성 취미 입력에서 8강 READY(46.479초), 16/32강은 Repair 후 품질 미달로 FAILED. 누적 API 실험 추정 $0.7802948 / 승인 $5, 자동 충전 OFF. 엔진/API 연결 구현과 전체 후보 품질 완료를 구별하며, Goal은 아직 완료 처리하지 않는다. 근거와 다음 설계 문제는 `docs/CANDIDATE_ENGINE.md`에 모았다.
+2026-09-15 최신 CE-002/v7 체크포인트: 구체 활동을 별도 ALLOCATE로 검토하고 승인된 첫 N개에서 서버가 quota를 계산한다. 승인 부족일 때 탈락 활동만 한 번 patch하고 전체를 새로 검토할 수 있다. 사전 활동 Repair와 상세 후보 Repair는 **한 engine attempt의 같은 1회 예산**을 공유한다. 조건·정상 후보·시간/비용 제한·공개 계약을 유지한다.
 
-후속 최신 v6 체크포인트: 추상 quota 대신 그룹 안의 구체 활동을 별도 ALLOCATE로 검토하고 승인된 첫 N개에서 서버가 quota를 계산한다. 승인 부족이면 상세 생성 전에 실패, 생성/Repair는 승인 활동·고정 quota에 묶인다. 실제 v6 hobby-social 8/16강은 각각 승인 7/14개로 조기 실패했으며 **v6 READY 증거는 아직 없다**. seed grounding 8강도 실제 검색은 연결됐지만 사실/중복 기준 미달로 실패했다. 누적 추정 비용은 $1.0870328 / 승인 $5이며 미확인 비용 예약 없음. 이번 구조의 일반 verify는 Java 129개 실행/실패 0(유료 1개 제외), 독립 리뷰 2회 최종 Critical/High 0. 구체적 원인과 버전별 증거는 `docs/CANDIDATE_ENGINE.md`를 따른다. 32강 후보 구분의 사람 판단과 제안 품질 개선은 남아 있으며 반복 호출로 성공을 만들지 않는다.
+실제 `seed-v1/hobby-home/8`에서 READY와 preview를 확인했다(49.184초, $0.0579285). 같은 최신 버전의 hobby-social 8/16강은 실패했고, 16강의 사전 Repair 실행 후에도 후보가 부족했다. 최신 32강은 미실행이며 이전 v4의 16/32강도 실패했다. 검색 사례는 실제 도구 연결만 확인했고 사실 정확도·품질은 통과하지 못했다. 엔진/API 연결과 모든 후보 품질 완료를 구별하여 Goal은 미완료로 유지한다. 취미 경계/판정 일관성, 32강 퍼즐 구분의 사람 판단, 2명 사람 평가는 남아 있다. 버전별 실패 원본과 해석은 `docs/CANDIDATE_ENGINE.md` 한 문서에 모았다.
 
-이 체크포인트의 일반 `verify` 통과: Java 119개 실행/실패 0, opt-in paid test 1개 제외, handoff 6개, 기존 HTTP 응답 102개, 웹 build/bootJar. 별도 실제 AI HTTP 13개는 schema 적합 확인(그중 terminal FAILED도 포함). 독립 리뷰 최종 Critical 0 / High 0 / 남은 finding 0. 실서비스 품질 통과를 의미하지 않는다.
+v7 일반 `verify`: Java 142개 실행/실패·오류 0(유료 1개 제외), handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 후 독립 리뷰 1회 Critical/High/actionable 0, 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 30개도 공개 schema 적합(실패 응답 포함). 누적 실험 추정 **$1.2504463 / 승인 $5**, 제공자 51회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed 고유 4/18세트의 첫 실행 READY 1/FAILED 3이며 14세트 미실행이다. 실제 공개 서버 배포나 프론트 완주를 완료한 것은 아니다.
 
 - A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
 - B: `feat/engine/ce-002-generation`의 연동 결과를 기준으로 16/32강 및 외부 사실 사례의 평가 범위를 확장한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.

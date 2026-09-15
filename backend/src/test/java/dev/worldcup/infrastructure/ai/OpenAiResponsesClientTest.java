@@ -178,6 +178,28 @@ class OpenAiResponsesClientTest {
         assertThat(fields.path("intentId").path("enum").toString()).isEqualTo("[\"approved-intent\"]");
         assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"active-bucket\"]");
     }
+    @Test void intentRepairRequestOnlyExposesRejectedIdsAndExistingGroupsAsWritableFields() {
+        var plan = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
+                List.of(new BucketSpec("group", "활동 그룹", List.of(new IntentSpec("keep", "유지 활동", "적합"),
+                        new IntentSpec("replace", "부적합 활동", "부적합")))), List.of());
+        response = completed(json.writeValueAsString(new IntentRepairs(List.of(new ActivityIntent("replace", "group", "새 활동", "조건 부합")))));
+        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+        var result = stages.repairIntents(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), plan,
+                List.of(new IntentRejection("replace", "기존 활동과 겹침")), new CallContext("job", 1, "REPAIR_INTENTS", Instant.now().plusSeconds(10)));
+        assertThat(result.value().replacements()).hasSize(1);
+        var properties = request.path("text").path("format").path("schema").path("properties");
+        assertThat(properties.size()).isEqualTo(1);
+        var replacements = properties.path("replacements");
+        assertThat(replacements.path("minItems").asInt()).isEqualTo(1);
+        assertThat(replacements.path("maxItems").asInt()).isEqualTo(1);
+        var fields = replacements.path("items").path("properties");
+        assertThat(fields.path("id").path("enum").toString()).isEqualTo("[\"replace\"]");
+        assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"group\"]");
+        assertThat(fields.has("constraints")).isFalse();
+        assertThat(request.path("input").asString()).contains("기존 활동과 겹침");
+        assertThat(request.path("tools").size()).isZero();
+        assertThat(request.toString()).doesNotContain("previous_response_id");
+    }
     @Test void badUsageAndUnrequestedToolsFailClosed() {
         response.put("usage", Map.of("input_tokens", -1));
         assertProviderFailure();

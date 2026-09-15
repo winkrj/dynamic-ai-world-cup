@@ -63,7 +63,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 Across ALL buckets, do not pad with materials/styles/genres of one activity. Do not force an unsuitable domain
                 into the request by inventing chores or artificial schedules. Extra intents are optional repair options, never filler.
                 For entity requests, each intent must identify the specific entity/experience whose facts will later be checked.
-                An independent allocation reviewer will reject intents; fewer than N suitable distinct intents means failure, not padding.
+                Do not include an activity that your own fit explanation says violates a hard condition.
+                An independent allocation reviewer will reject unsuitable intents; do not leave obvious violations for it to fix.
                 If one comparison unit cannot safely be inferred, return CLARIFICATION_REQUIRED (not a made-up assumption).
                 If a request cannot responsibly be served, return UNSUPPORTED_REQUEST. These decisions may use empty coverage.
                 """, Map.of("request", input, "referenceTime", referenceTime, "history", history), AiSchemas.plan(input.size()), PlanProposal.class, false, call);
@@ -81,10 +82,28 @@ public final class OpenAiCandidateStages implements EngineStages {
                 The server derives coverage quotas from the first N, so rejecting a domain does not leave a mandatory empty slot.
                 comparable/noSemanticDuplicates/feasible judge the APPROVED pool, not the rejected intents. If fewer than N qualify,
                 return that shorter list; never copy rejected IDs to fill it. Unknown contextual fit is not feasible.
+                Partition every proposed intent exactly once: either approvedIntentIds or rejections.
+                For each rejected intent give one concise actionable reason (violated condition, overlap with a named retained ID,
+                or specific quality problem). Do not hide an unassessed intent by omitting it from both lists.
                 Current entity facts are only provisionally plausible here, never verified: require the appropriate grounding
                 classification in the plan and leave proof of current prices/accessibility/availability to the later web verifier.
                 """, Map.of("request", input, "referenceTime", referenceTime, "proposal", proposal),
                 AiSchemas.allocation(input.size(), proposal.intents().stream().map(ActivityIntent::id).toList()), AllocationReview.class, false, call);
+        return new StageResult<>(reply.value(), reply.version());
+    }
+    @Override public StageResult<IntentRepairs> repairIntents(GenerationInput input, Instant referenceTime, PlanProposal original,
+                                                            List<IntentRejection> rejections, CallContext call) {
+        var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
+                ONE SHARED REPAIR ATTEMPT before quota freeze. Replace only the rejected intent IDs listed in rejections.
+                Return one replacement per rejected ID, preserving that ID. Choose an existing coverage group for each replacement.
+                Address its rejection reason with a genuinely different eligible activity, distinct from every retained activity
+                and the other replacements. Do not rename the same rejected activity or use 'or' to bundle separate choices.
+                All original request conditions, comparison unit, hobby interpretation and grounding requirements remain binding.
+                You cannot edit the interpretation, group definitions or retained activities. The server applies only this patch.
+                The entire pool will be independently reviewed again, and all detailed candidates still need final validation.
+                There is no further Repair after this one. Never compensate for unsuitable activities by weakening conditions.
+                """, Map.of("request", input, "referenceTime", referenceTime, "original", original, "rejections", rejections),
+                AiSchemas.intentRepairs(original, rejections), IntentRepairs.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public StageResult<Batch> generate(FixedPlan plan, CallContext call) {

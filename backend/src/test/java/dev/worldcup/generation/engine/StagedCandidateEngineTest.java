@@ -42,27 +42,93 @@ class StagedCandidateEngineTest {
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.calls).containsExactly("PLAN");
     }
-    @Test void fewerThanNIndependentlyApprovedIntentsFailsBeforeDetailedGeneration() {
-        stages.allocationFunction = plan -> allocation(plan.intents().stream().limit(7).map(ActivityIntent::id).toList());
+    @Test void stillTooFewAfterSingleIntentRepairFailsBeforeDetailedGeneration() {
+        stages.allocationFunction = plan -> allocation(plan, plan.intents().stream().limit(7).map(ActivityIntent::id).toList());
         qualityFailure(() -> engine.generate(input(8), context()));
-        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS", "ALLOCATE_REPAIRED");
+        assertThat(stages.intentRepairs).isEqualTo(1);
     }
     @Test void independentAllocationCannotInventOrRepeatIds() {
-        stages.allocationFunction = plan -> allocation(List.of("i1", "i2", "i3", "i4", "i5", "i6", "i7", "invented"));
+        stages.allocationFunction = plan -> allocation(plan, List.of("i1", "i2", "i3", "i4", "i5", "i6", "i7", "invented"));
         qualityFailure(() -> engine.generate(input(8), context()));
-        stages.allocationFunction = plan -> allocation(List.of("i1", "i2", "i3", "i4", "i5", "i6", "i7", "i7"));
+        stages.allocationFunction = plan -> allocation(plan, List.of("i1", "i2", "i3", "i4", "i5", "i6", "i7", "i7"));
         qualityFailure(() -> engine.generate(input(8), context()));
-        assertThat(stages.calls).doesNotContain("GENERATE", "REPAIR");
+        assertThat(stages.calls).doesNotContain("GENERATE", "REPAIR", "REPAIR_INTENTS");
     }
     @Test void unknownAllocationNeverFreezesEvenWithEnoughIds() {
         stages.allocationFunction = plan -> new AllocationReview(Verdict.PASS, Verdict.PASS, Verdict.PASS, Verdict.UNKNOWN,
-                plan.intents().stream().map(ActivityIntent::id).toList());
+                plan.intents().stream().map(ActivityIntent::id).toList(), List.of());
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
     }
+    @Test void insufficientActivitiesArePatchedOnceAndIndependentlyRecheckedBeforeFreeze() {
+        rejectLastIntentUntilRepaired();
+        var result = engine.generate(input(8), context());
+        assertThat(result.candidates().candidates()).hasSize(8);
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS", "ALLOCATE_REPAIRED", "GENERATE", "REVIEW_INITIAL");
+        assertThat(stages.intentRepairs).isEqualTo(1);
+        assertThat(stages.repairs).isZero();
+        var fixed = stages.seenPlans.getFirst().specification();
+        assertThat(fixed.unit()).isEqualTo(stages.originalPlan.unit());
+        assertThat(fixed.constraints()).isEqualTo(stages.originalPlan.constraints());
+        assertThat(fixed.hobby()).isEqualTo(stages.originalPlan.hobby());
+        assertThat(fixed.groundingRequired()).isEqualTo(stages.originalPlan.groundingRequired());
+        assertThat(fixed.softPreferences()).isEqualTo(stages.originalPlan.softPreferences());
+        assertThat(fixed.coverage().getFirst().description()).isEqualTo(stages.originalPlan.coverage().getFirst().description());
+        assertThat(fixed.intents().subList(0, 7)).isEqualTo(stages.originalPlan.intents().subList(0, 7));
+        assertThat(fixed.intents().getLast().coreActivity()).isEqualTo("교체 활동 i8");
+    }
+    @ParameterizedTest @ValueSource(strings = {"missing", "duplicate", "retained", "unknown-bucket"})
+    void intentPatchCannotOmitRepeatExpandOrTouchRetainedIds(String mode) {
+        rejectLastIntentUntilRepaired(); stages.patchMode = mode;
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS");
+    }
+    @Test void missingRejectionReasonNeverBecomesARepairRequest() {
+        stages.allocationFunction = plan -> new AllocationReview(Verdict.PASS, Verdict.PASS, Verdict.PASS, Verdict.PASS,
+                plan.intents().stream().limit(7).map(ActivityIntent::id).toList(), List.of());
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+    }
+    @Test void unfaithfulInterpretationWithTooFewActivitiesIsNotRepairable() {
+        stages.allocationFunction = plan -> new AllocationReview(Verdict.FAIL, Verdict.PASS, Verdict.PASS, Verdict.PASS,
+                List.of(), plan.intents().stream().map(i -> new IntentRejection(i.id(), "해석 불일치")).toList());
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+    }
+    @Test void aPreviouslyApprovedActivityCanFailTheFreshReallocation() {
+        stages.intentCountOffset = 0;
+        stages.allocationFunction = plan -> allocation(plan, plan.intents().stream()
+                .filter(i -> !i.id().equals(stages.allocationCount == 1 ? "i8" : "i1")).map(ActivityIntent::id).toList());
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS", "ALLOCATE_REPAIRED");
+    }
+    @ParameterizedTest @ValueSource(strings = {"semantic", "malformed", "grounding"})
+    void intentRepairConsumesTheSameBudgetAsDetailedCandidateRepair(String failure) {
+        rejectLastIntentUntilRepaired();
+        stages.malformedGeneration = failure.equals("malformed");
+        stages.groundingRequired = failure.equals("grounding");
+        if (failure.equals("semantic")) stages.reviewFunction = (batch, count) -> new Review(Verdict.PASS, Verdict.PASS,
+                Verdict.PASS, Verdict.FAIL, assessments(batch), List.of(new Finding("FILLER", List.of("c1"), "Invalid detail")));
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.intentRepairs).isEqualTo(1);
+        assertThat(stages.repairs).isZero();
+        assertThat(stages.calls).doesNotContain("REPAIR", "REVIEW_REPAIRED", "GROUND_REPAIRED");
+    }
+    @Test void expiredDeadlineCannotStartTheNewIntentRepairStage() {
+        rejectLastIntentUntilRepaired(); stages.slowAllocation = true;
+        assertThatThrownBy(() -> engine.generate(input(8), context())).isInstanceOfSatisfying(Failure.class,
+                e -> assertThat(e.code()).isEqualTo(Failure.Code.PROVIDER_UNAVAILABLE));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+    }
+    private void rejectLastIntentUntilRepaired() {
+        stages.intentCountOffset = 0;
+        stages.allocationFunction = plan -> allocation(plan, plan.intents().stream()
+                .filter(i -> stages.intentRepairs > 0 || !i.id().equals("i8")).map(ActivityIntent::id).toList());
+    }
     @Test void quotaIsDerivedFromApprovedActivitiesNotRejectedReadingVariants() {
         stages.readingVariants = true;
-        stages.allocationFunction = plan -> allocation(plan.intents().stream()
+        stages.allocationFunction = plan -> allocation(plan, plan.intents().stream()
                 .filter(i -> !List.of("i2", "i3").contains(i.id())).map(ActivityIntent::id).toList());
         var result = engine.generate(input(8), context());
         assertThat(result.candidates().candidates()).hasSize(8);
@@ -157,7 +223,10 @@ class StagedCandidateEngineTest {
         assertThat(stages.calls).isEmpty();
     }
     private List<Assessment> assessments(Batch batch) { return batch.candidates().stream().map(c -> new Assessment(c.id(), "quiet", Verdict.PASS)).toList(); }
-    private AllocationReview allocation(List<String> ids) { return new AllocationReview(Verdict.PASS, Verdict.PASS, Verdict.PASS, Verdict.PASS, ids); }
+    private AllocationReview allocation(PlanProposal plan, List<String> ids) {
+        return new AllocationReview(Verdict.PASS, Verdict.PASS, Verdict.PASS, Verdict.PASS, ids,
+                plan.intents().stream().filter(i -> !ids.contains(i.id())).map(i -> new IntentRejection(i.id(), "합성 부적합 활동")).toList());
+    }
     private Batch batch(FixedPlan plan) { return new Batch(IntStream.rangeClosed(1, plan.input().size()).mapToObj(i -> {
         var intent = plan.approvedIntents().get(i - 1);
         return new Proposal("c" + i, intent.id(), "합성 취미 " + i, intent.bucketId(), List.of("합성"),
@@ -166,21 +235,39 @@ class StagedCandidateEngineTest {
     private Proposal change(Proposal c) { return new Proposal(c.id(), c.intentId(), c.name() + " 수정", c.bucketId(), c.tags(), c.coreActivity(), c.description(), c.repeatability(), c.requirements()); }
     private final class FakeStages implements EngineStages {
         final List<String> calls = new ArrayList<>(); final List<FixedPlan> seenPlans = new ArrayList<>();
-        int intentCountOffset = 2, repairs, reviewCount;
-        boolean modifyUnflagged, malformedGeneration, groundingRequired, slowGeneration, readingVariants, changeCore, useAlternative;
+        int intentCountOffset = 2, repairs, intentRepairs, allocationCount, reviewCount;
+        boolean modifyUnflagged, malformedGeneration, groundingRequired, slowGeneration, slowAllocation, readingVariants, changeCore, useAlternative;
+        PlanProposal originalPlan;
+        String patchMode = "valid";
         String source = "조용한"; List<String> lastReplacementIds;
-        Function<PlanProposal, AllocationReview> allocationFunction = plan -> allocation(plan.intents().stream().map(ActivityIntent::id).toList());
+        Function<PlanProposal, AllocationReview> allocationFunction = plan -> allocation(plan, plan.intents().stream().map(ActivityIntent::id).toList());
         BiFunction<Batch, Integer, Review> reviewFunction = (batch, count) -> new Review(Verdict.PASS, Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
         @Override public StageResult<PlanProposal> plan(GenerationInput input, List<CandidateEngine.Preference> history, Instant time, CallContext call) {
             var intents = IntStream.rangeClosed(1, input.size() + intentCountOffset)
                     .mapToObj(i -> new IntentSpec("i" + i, "핵심 활동 " + i, "합성 적합성 설명")).toList();
-            calls.add(call.stage()); return new StageResult<>(new PlanProposal(Decision.READY, "취미", true, groundingRequired,
+            calls.add(call.stage()); originalPlan = new PlanProposal(Decision.READY, "취미", true, groundingRequired,
                     List.of(new ConstraintSpec("quiet", "조용해야 한다", source, VerificationMode.SEMANTIC_ESTIMATE)),
                     readingVariants ? List.of(new BucketSpec("reading", "독서", intents.subList(0, 3)), new BucketSpec("broad", "합성 테스트 활동", intents.subList(3, intents.size())))
-                            : List.of(new BucketSpec("broad", "합성 테스트 활동", intents)), List.of()), "fake-plan");
+                            : List.of(new BucketSpec("broad", "합성 테스트 활동", intents)), List.of());
+            return new StageResult<>(originalPlan, "fake-plan");
         }
         @Override public StageResult<AllocationReview> allocate(GenerationInput input, Instant time, PlanProposal proposal, CallContext call) {
+            allocationCount++;
+            if (slowAllocation) clock.time = clock.time.plusSeconds(300);
             calls.add(call.stage()); return new StageResult<>(allocationFunction.apply(proposal), "independent-allocation");
+        }
+        @Override public StageResult<IntentRepairs> repairIntents(GenerationInput input, Instant time, PlanProposal original,
+                                                               List<IntentRejection> rejections, CallContext call) {
+            calls.add(call.stage()); intentRepairs++;
+            var patch = new ArrayList<>(rejections.stream().map(r -> new ActivityIntent(r.intentId(), original.coverage().getFirst().id(),
+                    "교체 활동 " + r.intentId(), "합성 교체 적합성")).toList());
+            switch (patchMode) {
+                case "missing" -> patch.removeFirst();
+                case "duplicate" -> patch.add(patch.getFirst());
+                case "retained" -> patch.add(original.intents().getFirst());
+                case "unknown-bucket" -> patch.set(0, new ActivityIntent(patch.getFirst().id(), "unknown", "교체", "적합"));
+            }
+            return new StageResult<>(new IntentRepairs(patch), "fake-intent-repair");
         }
         @Override public StageResult<Batch> generate(FixedPlan plan, CallContext call) {
             calls.add(call.stage()); seenPlans.add(plan);

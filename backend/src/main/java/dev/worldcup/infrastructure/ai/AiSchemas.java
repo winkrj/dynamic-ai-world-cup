@@ -16,8 +16,17 @@ final class AiSchemas {
                 "softPreferences", array(string(300), 0, 12)));
     }
     static Map<String, Object> allocation(int size, List<String> intentIds) {
+        var id = choice(intentIds.toArray(String[]::new));
         return object(Map.of("planFaithful", verdict(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
-                "feasible", verdict(), "approvedIntentIds", array(choice(intentIds.toArray(String[]::new)), 0, size + 4)));
+                "feasible", verdict(), "approvedIntentIds", array(id, 0, size + 4),
+                "rejections", array(object(Map.of("intentId", id, "reason", string(300))), 0, size + 4)));
+    }
+    static Map<String, Object> intentRepairs(dev.worldcup.generation.engine.EngineModels.PlanProposal plan,
+                                           List<dev.worldcup.generation.engine.EngineModels.IntentRejection> rejections) {
+        return object(Map.of("replacements", array(object(Map.of(
+                "id", choice(rejections.stream().map(r -> r.intentId()).toArray(String[]::new)),
+                "bucketId", choice(plan.coverage().stream().map(b -> b.id()).toArray(String[]::new)),
+                "coreActivity", string(120), "fit", string(300))), rejections.size(), rejections.size())));
     }
     static Map<String, Object> batch(dev.worldcup.generation.engine.EngineModels.FixedPlan plan) {
         int size = plan.input().size();

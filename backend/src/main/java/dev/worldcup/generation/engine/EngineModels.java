@@ -31,9 +31,14 @@ public final class EngineModels {
         }
     }
     /** Ranked, jointly distinct feasible intents; rejected items never enter the fixed allocation. */
+    public record IntentRejection(String intentId, String reason) {}
     public record AllocationReview(Verdict planFaithful, Verdict comparable, Verdict noSemanticDuplicates,
-                                   Verdict feasible, List<String> approvedIntentIds) {
-        public AllocationReview { approvedIntentIds = List.copyOf(approvedIntentIds); }
+                                   Verdict feasible, List<String> approvedIntentIds, List<IntentRejection> rejections) {
+        public AllocationReview { approvedIntentIds = List.copyOf(approvedIntentIds); rejections = List.copyOf(rejections); }
+    }
+    /** Only rejected activities can be replaced; interpretation fields are not part of this output. */
+    public record IntentRepairs(List<ActivityIntent> replacements) {
+        public IntentRepairs { replacements = List.copyOf(replacements); }
     }
     public record FixedPlan(GenerationInput input, Instant referenceTime, PlanProposal specification, Plan gatePlan,
                             List<ActivityIntent> approvedIntents) {

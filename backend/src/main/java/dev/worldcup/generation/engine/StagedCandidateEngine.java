@@ -40,6 +40,13 @@ public final class StagedCandidateEngine implements CandidateEngine {
             var proposed = stages.plan(input, context.recentDirectChoices().stream().limit(50).toList(), now, run.call("PLAN")).value();
             validateProposal(input, proposed);
             var allocation = stages.allocate(input, now, proposed, run.call("ALLOCATE")).value();
+            validateAllocation(proposed, allocation);
+            if (allocation.approvedIntentIds().size() < input.size()) {
+                var patch = stages.repairIntents(input, now, proposed, allocation.rejections(), run.repairCall("REPAIR_INTENTS"));
+                proposed = applyIntentRepairs(proposed, allocation.rejections(), patch.value());
+                validateProposal(input, proposed);
+                allocation = stages.allocate(input, now, proposed, run.call("ALLOCATE_REPAIRED")).value();
+            }
             var fixed = freeze(input, now, proposed, allocation);
             Batch original;
             String generationVersion;
@@ -53,7 +60,7 @@ public final class StagedCandidateEngine implements CandidateEngine {
             if (inspection.validated() != null) return finish(input, inspection, generationVersion, run);
 
             var replacementIds = replacementIds(input.size(), original, inspection.findings());
-            var repaired = stages.repair(fixed, original, replacementIds, inspection.findings(), run.call("REPAIR"));
+            var repaired = stages.repair(fixed, original, replacementIds, inspection.findings(), run.repairCall("REPAIR"));
             preserveUnchanged(original, repaired.value(), replacementIds);
             var checked = inspect(fixed, repaired.value(), run, "REPAIRED");
             if (checked.validated() == null) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
@@ -90,13 +97,41 @@ public final class StagedCandidateEngine implements CandidateEngine {
         if (specification.softPreferences().stream().anyMatch(s -> blank(s) || s.length() > 300)) throw new InvalidModelOutput();
     }
 
-    private FixedPlan freeze(GenerationInput input, Instant now, PlanProposal specification, AllocationReview review) {
+    private void validateAllocation(PlanProposal specification, AllocationReview review) {
         if (review.planFaithful() != Verdict.PASS || review.comparable() != Verdict.PASS
-                || review.noSemanticDuplicates() != Verdict.PASS || review.feasible() != Verdict.PASS
-                || review.approvedIntentIds().size() < input.size()) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+                || review.noSemanticDuplicates() != Verdict.PASS || review.feasible() != Verdict.PASS) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+        var poolIds = specification.intents().stream().map(ActivityIntent::id).collect(java.util.stream.Collectors.toSet());
+        Set<String> assessed = new HashSet<>(review.approvedIntentIds());
+        if (assessed.size() != review.approvedIntentIds().size() || !poolIds.containsAll(assessed)) throw new InvalidModelOutput();
+        for (var rejection : review.rejections()) {
+            if (!poolIds.contains(rejection.intentId()) || !assessed.add(rejection.intentId())
+                    || blank(rejection.reason()) || rejection.reason().length() > 300) throw new InvalidModelOutput();
+        }
+        if (!assessed.equals(poolIds)) throw new InvalidModelOutput();
+    }
+
+    private PlanProposal applyIntentRepairs(PlanProposal original, List<IntentRejection> rejections, IntentRepairs patch) {
+        var expected = rejections.stream().map(IntentRejection::intentId).collect(java.util.stream.Collectors.toSet());
+        var bucketIds = original.coverage().stream().map(BucketSpec::id).collect(java.util.stream.Collectors.toSet());
+        var intents = new java.util.LinkedHashMap<String, ActivityIntent>();
+        original.intents().forEach(intent -> intents.put(intent.id(), intent));
+        Set<String> replaced = new HashSet<>();
+        for (var replacement : patch.replacements()) {
+            if (!expected.contains(replacement.id()) || !replaced.add(replacement.id()) || !bucketIds.contains(replacement.bucketId())) throw new InvalidModelOutput();
+            intents.put(replacement.id(), replacement);
+        }
+        if (!replaced.equals(expected)) throw new InvalidModelOutput();
+        var coverage = original.coverage().stream().map(bucket -> new BucketSpec(bucket.id(), bucket.description(),
+                intents.values().stream().filter(i -> bucket.id().equals(i.bucketId()))
+                        .map(i -> new IntentSpec(i.id(), i.coreActivity(), i.fit())).toList())).toList();
+        return new PlanProposal(original.decision(), original.unit(), original.hobby(), original.groundingRequired(),
+                original.constraints(), coverage, original.softPreferences());
+    }
+
+    private FixedPlan freeze(GenerationInput input, Instant now, PlanProposal specification, AllocationReview review) {
+        validateAllocation(specification, review);
+        if (review.approvedIntentIds().size() < input.size()) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
         var pool = specification.intents().stream().collect(java.util.stream.Collectors.toMap(ActivityIntent::id, i -> i));
-        if (new HashSet<>(review.approvedIntentIds()).size() != review.approvedIntentIds().size()
-                || !pool.keySet().containsAll(review.approvedIntentIds())) throw new InvalidModelOutput();
         var approved = review.approvedIntentIds().stream().map(pool::get).toList();
         var counts = approved.stream().limit(input.size()).collect(java.util.stream.Collectors.groupingBy(
                 ActivityIntent::bucketId, java.util.LinkedHashMap::new, java.util.stream.Collectors.counting()));
@@ -203,10 +238,17 @@ public final class StagedCandidateEngine implements CandidateEngine {
     private record Inspection(CandidateQualityGate.ValidatedSet validated, List<Finding> findings, String reviewerVersion) {}
     private final class Run {
         private final Context context; private final Instant deadline;
+        private boolean repairUsed;
         private Run(Context context, Instant deadline) { this.context = context; this.deadline = deadline; }
         private CallContext call(String stage) {
             if (Thread.currentThread().isInterrupted() || !clock.instant().isBefore(deadline)) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
             return new CallContext(context.jobId(), context.attempt(), stage, deadline);
+        }
+        private CallContext repairCall(String stage) {
+            if (repairUsed) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+            var context = call(stage);
+            repairUsed = true;
+            return context;
         }
     }
 }
