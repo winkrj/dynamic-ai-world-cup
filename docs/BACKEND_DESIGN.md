@@ -42,7 +42,7 @@ Google AIP 완전 준수 구현은 아니다. 기존 프론트 계약을 호환�
 - idempotency 예약 → business mutation → 응답 JSON 저장을 하나의 transaction으로 처리한다. 동시 같은 key는 DB에서 직렬화되고 실패는 예약·quota와 함께 rollback된다.
 - 생성 속도는 actor와 실제 socket peer IP 각각 5회/최근 10분이다. IP는 hash만 저장한다. forwarding header를 신뢰하지 않으며 reverse proxy 도입 시 신뢰 경계를 별도로 설정해야 한다.
 - worker는 DB에서 QUEUED를 SKIP LOCKED로 하나 claim한다. provider 실행 중에는 DB transaction을 열어두지 않는다. 두 실행 슬롯, 메모리 대기 queue 없음. 단일 프로세스 운영 기준이다.
-- attempt/60초 lease를 검사한 현재 worker만 결과를 저장한다. 만료 작업은 같은 job에서 최대 두 attempt까지 복구한다. 이후 FAILED, 재생성이라면 기존 READY를 복원한다. 이는 crash recovery이며 엔진 내부 Repair 1회와 다르다.
+- attempt/lease를 검사한 현재 worker만 결과를 저장한다. 기본/dev lease는 60초, CE-002 `live`는 300초다([설정 근거](CANDIDATE_ENGINE.md)). 만료 작업은 같은 job에서 최대 두 attempt까지 복구한다. 이후 FAILED, 재생성이라면 기존 READY를 복원한다. 이는 crash recovery이며 엔진 내부 Repair 1회와 다르다.
 - deadline이 지난 provider 결과는 버린다. 실제 adapter는 네트워크 timeout/interrupt를 지켜야 한다. 무한 대기하는 adapter를 Java thread에서 강제 종료한다고 보장하지 않으며, 이런 adapter는 연결하지 않는다.
 - 재생성 성공 transaction에서만 후보/초기 순서 교체, version+1, used=1. 실패하면 기존 내용 전체를 유지한다.
 - start는 draft row lock 아래에서 버전을 검사하고 snapshot+원본 session+FROZEN을 함께 저장한다. source_draft 유일성으로 다른 key의 재시도도 같은 원본 session을 반환한다.

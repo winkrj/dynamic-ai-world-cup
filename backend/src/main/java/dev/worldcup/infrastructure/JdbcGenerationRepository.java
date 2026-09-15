@@ -11,12 +11,18 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.beans.factory.annotation.Value;
 
 @Repository
 public class JdbcGenerationRepository implements GenerationRepository {
     private final JdbcTemplate jdbc;
     private final JsonCodec json;
-    public JdbcGenerationRepository(JdbcTemplate jdbc, JsonCodec json) { this.jdbc = jdbc; this.json = json; }
+    private final int leaseSeconds;
+    public JdbcGenerationRepository(JdbcTemplate jdbc, JsonCodec json,
+            @Value("${worldcup.worker.lease-seconds:60}") int leaseSeconds) {
+        if (leaseSeconds < 5 || leaseSeconds > 300) throw new IllegalArgumentException("Bounded worker lease required");
+        this.jdbc = jdbc; this.json = json; this.leaseSeconds = leaseSeconds;
+    }
 
     @Override public Job create(String actor, String draftId, GenerationInput input) {
         String id = UUID.randomUUID().toString();
@@ -43,7 +49,7 @@ public class JdbcGenerationRepository implements GenerationRepository {
                 """, this::job);
         if (jobs.isEmpty()) return Optional.empty();
         Job pending = jobs.getFirst();
-        Instant lease = now.plusSeconds(60);
+        Instant lease = now.plusSeconds(leaseSeconds);
         jdbc.update("UPDATE generation_job SET state = 'RUNNING', attempt = attempt + 1, lease_until = ? WHERE id = ?",
                 Timestamp.from(lease), pending.id());
         return Optional.of(new Job(pending.id(), pending.actorId(), pending.draftId(), "RUNNING", pending.input(), pending.attempt() + 1, lease, null));

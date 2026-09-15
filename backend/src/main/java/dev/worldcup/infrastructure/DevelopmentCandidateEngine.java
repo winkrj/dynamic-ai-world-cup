@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 /** Deliberately synthetic data for local integration. Does NOT interpret the user's concern. */
 @Component
-@Profile("dev & !prod")
+@Profile("dev & !prod & !live")
 public class DevelopmentCandidateEngine implements CandidateEngine {
     @Override public Generated generate(GenerationInput input, Context context) {
         var plan = new Plan(input.size(), "개발용 합성 후보", false, List.of(), List.of(new CoverageBucket("synthetic", input.size())));

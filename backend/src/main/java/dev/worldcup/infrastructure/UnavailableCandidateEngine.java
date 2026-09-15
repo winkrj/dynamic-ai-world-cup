@@ -6,8 +6,10 @@ import dev.worldcup.shared.Failure;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration
+@Profile("!live")
 public class UnavailableCandidateEngine {
     @Bean @ConditionalOnMissingBean(CandidateEngine.class)
     CandidateEngine unavailableEngine() {

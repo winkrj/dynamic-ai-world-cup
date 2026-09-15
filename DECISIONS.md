@@ -31,5 +31,8 @@
 | TD-16 | 구현 기준 | 엔진 port는 ValidatedSet·안전한 공개 제목·버전을 반환. dev 합성 대역은 명확히 표시, 기본/운영 provider 미연결은 실패. 실제 Grounding/Repair/품질 eval과 유료 호출은 이번 API 목표에서 제외 |
 | TD-17 | 구현 기준 | idempotency는 24시간 성공 응답 재현. worker lease 복구는 같은 job에서 최대 두 attempt. terminal FAILED 이후 재생성 의사는 새 key로 표현하며 성공 회수는 미소모. 기존 TD-08의 같은 operation 재시도와 사용자 새 시도를 구별 |
 | TD-18 | 구현 기준 | job/draft 24시간, session/선택 30일 주기 정리. snapshot/share는 MVP 유지. 만료 private source ID는 FK cascade 없이 보존하며 share에 champion을 사본 저장해 원본 session 삭제 뒤에도 결과 보존. AC-09/14/15/16 DB 테스트 대상 |
+| TD-19 | 구현 기준 (2026-09-15) | CE-002는 기존 CandidateEngine 뒤에서 OpenAI Responses의 별도 plan/생성/선택적 검색/독립 검토/Repair 1회를 연결. 새 agent framework/SDK 없이 JDK HTTP와 기존 Jackson 사용. strict JSON은 품질 판정이 아니며 Java gate와 독립 검토를 함께 통과해야 공개 |
+| TD-20 | 개발 설정, 최종 모델 선정 아님 | 16강 A 선호와 A16 억지 후보 지적을 반영해 Terra를 변경 가능한 개발 기본값으로 사용. 익숙함+접근 가능한 새로움, 핵심 활동 구분, 취미 지속성을 검토. 단일 선호를 2명 품질 평가나 32강 통과로 대체하지 않음 |
+| TD-21 | 구현 기준 | 실제 요청의 30~53초 관측에 따라 live만 lease 300초/전체 280초/호출 90초로 제한. 자동 HTTP 재시도 없음, crash recovery와 Repair는 구별. 기본/dev 60초는 유지. DB 누적 비용 예약으로 두 worker와 미확인 호출 비용을 통제하며 기본 예산은 0. 자동 충전 OFF와 승인된 실험 누적 $5 범위 유지. AC/공개 DTO 변경 없음 |
 
 변경은 `문제 → 대안 → 결정 → 영향받는 AC/계약 → 검증`을 기록한다. 확정된 제품 규칙 변경은 사용자 결정이 필요하다.

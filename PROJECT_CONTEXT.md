@@ -1,6 +1,6 @@
 # 프로젝트 컨텍스트
 
-갱신일: 2026-09-14.
+갱신일: 2026-09-15.
 
 목적: 좋은 후보군과 빠른 A/B 선택으로 결정 비용을 줄이는 Dynamic AI World Cup. Candidate Quality가 우선이다.
 
@@ -11,8 +11,9 @@
 - `contracts/openapi.json` v1.0.0, 공유 fixture, 자동생성 TS, Java preview 직렬화 비교 테스트.
 - CE-001 구현: fixed plan, candidate count/duplicate/unit/coverage, hard assessment, grounded evidence validity, independent semantic-review gate. 검증 통과 타입만 preview mapper에 넘긴다.
 - 실제 HTTP 구현: health, 익명 생성 job/preview/전체 재생성, freeze/snapshot, 선택 batch, 공유/새 세션 API. cookie 소유권, idempotency, rate limit, worker lease/복구, 보존 정리 포함.
-- 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다. 실제 provider/search, 게임/공유 화면과 배포는 미구현이다.
-- `CandidateEngine` port로 엔진과 서버를 분리했다. dev의 합성 데이터는 개발용 표시, 기본/운영 미연결 엔진은 실패 처리한다. 개인화는 직접 선택 기록 최대 50건을 읽는 경계까지이며 실제 가중치 품질은 CE-003에서 평가한다.
+- 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다. 게임/공유 화면과 배포는 미구현이다.
+- `CandidateEngine` port 뒤에 CE-002의 OpenAI plan/생성/선택적 hosted search/독립 검토/Repair 최대 1회를 연결했다. `live`는 명시적 키/누적 예산이 필요하며 dev 혼용은 금지한다. dev 합성 후보는 개발용 표시, 기본 profile은 계속 실패 처리한다. 구현과 실제 검증 범위는 `docs/CANDIDATE_ENGINE.md`를 따른다.
+- 직접 선택 history 최대 50건 중 관련 있는 선택만 계획에 반영하도록 했다. 이 호출 경계 구현과 실제 개인화 가중치 품질(CE-003)은 구별한다.
 
 ## 검증
 
@@ -26,9 +27,13 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
+2026-09-15 CE-002 실제 연결 체크포인트: 최종 v4 합성 취미 입력에서 8강 READY(46.479초), 16/32강은 Repair 후 품질 미달로 FAILED. 누적 API 실험 추정 $0.7802948 / 승인 $5, 자동 충전 OFF. 엔진/API 연결 구현과 전체 후보 품질 완료를 구별하며, Goal은 아직 완료 처리하지 않는다. 근거와 다음 설계 문제는 `docs/CANDIDATE_ENGINE.md`에 모았다.
+
+이 체크포인트의 일반 `verify` 통과: Java 119개 실행/실패 0, opt-in paid test 1개 제외, handoff 6개, 기존 HTTP 응답 102개, 웹 build/bootJar. 별도 실제 AI HTTP 13개는 schema 적합 확인(그중 terminal FAILED도 포함). 독립 리뷰 최종 Critical 0 / High 0 / 남은 finding 0. 실서비스 품질 통과를 의미하지 않는다.
+
 - A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
-- B: `feat/engine/ce-002-generation`에서 실제 plan/생성/grounding/독립 assessment/Repair adapter와 eval.
-- 모델/검색 제공자와 API 자격정보는 CE-002 실행 전 선택한다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
+- B: `feat/engine/ce-002-generation`의 연동 결과를 기준으로 16/32강 및 외부 사실 사례의 평가 범위를 확장한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.
+- OpenAI API는 별도 사용자 결제/키와 기존 누적 실험 예산 $5 범위에서 사용한다. 자동 충전 OFF. 저장소에 키나 실제 비공개 평가 원문을 추가하지 않는다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
 - GitHub collaborator 초대는 역할별 실제 계정이 정해진 뒤 한다. 현 단계에서 팀원 초대/branch protection을 완료했다고 주장하지 않는다.
 - 외부 공유 개발 API/Swagger UI와 최종 화면 시안은 아직 없다. OpenAPI JSON·생성 TS 타입·fixture가 전달물이며, `npm run api:smoke`는 로컬 dev API의 생성부터 공유 replay까지 연결을 확인한다. 실제 AI 품질이나 프론트 완주 UI 테스트를 대신하지 않는다.
 

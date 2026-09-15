@@ -32,6 +32,8 @@ Context/Constraint → Candidate Unit → Historical Preference → Coverage Pla
 
 모델 호출은 기본 생성 1회, 실패 Repair 1회, 선택적 검색이다. operation 전체 timeout 60초, 모델 attempt 25초, 검색 attempt 5초를 초기 config로 둔다. 429/5xx 재시도는 같은 전체 deadline 안에서 최대 1회, Retry-After를 존중한다. 안전하게 구분 불가/품질 미달은 실패로 끝낸다. 라이브 수치 측정 전 latency 목표 달성 주장을 하지 않는다.
 
+2026-09-15 CE-002의 실제 호출 관측으로 위 초기 제공자 설정을 변경했다(TD-21). `live`는 전체 280초/호출 90초/worker lease 300초이며 자동 HTTP 재시도는 없다. 기본/dev lease 60초는 유지한다. 고정 계획·독립 검토·Repair·비용 예약의 구현 기준은 [Candidate Engine](docs/CANDIDATE_ENGINE.md)을 따른다.
+
 ## 3. 상태와 불변성
 
 GenerationJob: `QUEUED → RUNNING → READY | FAILED`. READY에서 검증 완료 Draft를 참조한다. 중간 후보는 API에 노출하지 않는다. worker lease/attempt를 DB에 기록하고 재시작 시 만료 작업을 복구한다. 초기 단일 프로세스의 bounded executor, 동시 provider 실행 상한 2부터 시작한다.
