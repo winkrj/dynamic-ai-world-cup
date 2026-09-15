@@ -2,7 +2,13 @@
 
 2026-09-16 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
 
-## 현재 구현: 한 후보의 선택 경계
+## 현재 구현: 조건을 먼저 쓰는 계획 응답
+
+v15 실제 요청에서 PLAN의 속성 순서가 실행마다 달랐고, solo/32는 unit→coverage→…→constraints 순서로 후보를 먼저 생성했다. 서버의 `Map.of`로 만든 속성 목록이 원인이며 응답도 같은 순서를 따랐다. [Structured Outputs의 속성 순서 규칙](https://developers.openai.com/api/docs/guides/structured-outputs#key-ordering)에 맞춰 v16(`ce002-v16-context-first`)은 PLAN 최상위 속성을 constraints→softPreferences→unit→hobby→groundingRequired→decision→coverage로 고정한다. 문장별 임시 분류 규칙이나 별도 모델 호출을 추가하지 않고 기존 Context/Constraint→Unit→Coverage 설계를 출력 구조에 반영한다.
+
+기존 필드·중첩 schema·개수/길이 한도·required·엄격 파싱·DB·공개 계약은 그대로다. 응답 읽기는 이름 기준이며 이전 필드 순서도 허용한다. 이 변경은 순서 불안정의 제거이지 제외 조건 오분류의 원인이 증명됐거나 의미 판단이 정확해졌다는 주장이 아니다. 다른 단계와 중첩 객체의 속성 순서는 이번 변경 대상이 아니다.
+
+## v15 구현: 한 후보의 선택 경계
 
 v14 solo/16의 ‘체스 또는 바둑’은 생성 전 계획부터 묶여 있었고 최종 검토도 통과했다. v15(`ce002-v15-single-choice`)는 생성 단계에만 있던 단일 선택 기준을 계획·배정·생성·양쪽 Repair·최종 검토의 공통 품질 지침으로 옮긴다. 카드 하나가 독립적인 대안 메뉴가 되지 않도록 실제 선택을 정하되, 하나의 활동에 속한 예시·장르·보완 단계나 문장부호를 일괄 금지하지 않는다. 체스와 바둑을 반드시 둘 다 후보로 넣거나 논리 퍼즐의 세부 유형을 각각 후보로 나누라는 규칙이 아니다. 공개 계약·도메인 gate·모델·호출/Repair/비용 한도는 유지한다.
 
@@ -248,4 +254,14 @@ home/32는 가죽 공예의 소음·준비 문제로 사전 Repair를 사용해 
 
 v15 비용 합계 **$0.393268**, 누적 **$3.4827758 / 승인 $5**, 제공자 **118회**(생성-only 4회 + pipeline 29작업), 미확인 비용 예약 없음. seed 고유 **11/18세트** 최초 실행 READY 5/FAILED 6. 일반 취미 9세트는 모두 처음 실행했으며 외부 사실 7세트와 2명 독립 사람 평가는 미완료다. 자동 충전 OFF는 변경하지 않았다. **잔여 $1.5172242 < 검색 예약 $2.00**이므로 추가 유료 검색을 보류하고 승인 한도/예약을 임의로 완화하지 않는다. 남은 우선순위는 제외 조건 해석 누락과 큰 후보군의 사람 기준, 외부 근거 확보다. 엔진/API 기술 연결과 이 품질 문제의 해결을 구별하여 Goal은 미완료로 유지한다.
 
-공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting·Structured outputs의 의미 오류 한계는 2026-09-16 재확인.
+## v16 체크포인트 — 계획 출력 순서와 제외 조건
+
+`hobby-solo/32`를 순서 수정 후 같은 원문으로 한 번 비교했다. **READY·preview 32개**, 217.268초, 제공자 6회/사전 Repair 1회, **$0.249958**. 실제 전송 schema와 PLAN 응답 모두 constraints→softPreferences→unit→hobby→groundingRequired→decision→coverage 순서였다. 비운동 제외와 월 10만원 예산은 각각 SEMANTIC_ESTIMATE 필수 조건, 혼자 선호는 softPreferences로 기록됐다. 최종 검토는 중복/누락 없이 후보 32×조건 2=64개 assessment를 모두 PASS로 반환했다. v15에서 빠진 제외 조건을 이번 실행에서는 보존했지만, 한 번의 비교로 순서와 오분류의 인과나 정확도 개선율을 확정하지 않는다.
+
+초기 35개 제안에는 독서 장르/그림 재료 분할이 있었고 사전 검토는 14개를 거절했다. 한 번에 그 활동만 교체하고 전체를 새로 검토한 뒤 32개를 승인했다. 두 번째 검토는 라디오 드라마(오디오북 중복), 종이 오리기(종이접기 중복), 탄산수 맛 비교(약한 지속성)를 탈락시켰다. **최종 감상·필사·퍼즐 세분화는 여전히 사람 대조가 필요하다.** 사전 검토가 미확인 컴퓨터·작업 공간·오븐·채광을 이유로 일부 후보를 거절하면서 비슷한 기기/환경 전제를 가진 다른 후보는 허용한 일관성 문제도 남는다. 자동 통과를 후보 품질 최종 승인으로 바꾸지 않는다.
+
+집중 테스트 120개 후 독립 리뷰 1회 Critical 0 / High 0 / actionable 0. 코드 변경 없이 최종 `verify`: **Java 171개 실행/실패·오류 0, 유료 1개 제외**, handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 별도 live HTTP **69개/preview 9개**도 공개 schema 적합했다. 8/16/32 wire schema 순서와 기존 필드 순서의 역직렬화 테스트를 통과했지만 실제 v16 비교는 위 32강 1회뿐이다. API·DB·프론트 코드·모델·기존 호출/Repair/시간/비용 한도는 바꾸지 않았다.
+
+누적 사용량 기반 추정 **$3.7327338 / 승인 $5**, 제공자 **124회**(생성-only 4회 + pipeline 30작업), 미확인 비용 예약 없음. seed 최초 실행은 여전히 **11/18, READY 5/FAILED 6**이고 이번 후속 비교로 덮어쓰지 않는다. 자동 충전 OFF를 변경하지 않았으며 **잔여 $1.2672662 < 검색 예약 $2.00**로 유료 검색 보류를 유지한다. 큰 후보군의 품질, 외부 사실 7세트, 2명 독립 사람 평가가 남아 Goal은 미완료다. 동일 입력을 추가로 재추첨하지 않았다.
+
+공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting·Structured outputs의 의미 오류 한계와 속성 순서는 2026-09-16 재확인.

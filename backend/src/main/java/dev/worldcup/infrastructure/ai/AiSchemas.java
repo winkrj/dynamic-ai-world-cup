@@ -2,18 +2,25 @@ package dev.worldcup.infrastructure.ai;
 
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
 
 /** Schema definitions stay next to the provider boundary, not in the public API contract. */
 final class AiSchemas {
     private AiSchemas() {}
     static Map<String, Object> plan(int size) {
-        return object(Map.of("decision", choice("READY", "CLARIFICATION_REQUIRED", "UNSUPPORTED_REQUEST"),
-                "unit", string(120), "hobby", Map.of("type", "boolean"), "groundingRequired", Map.of("type", "boolean"),
-                "constraints", array(object(Map.of("id", identifier(), "description", string(300), "sourceText", string(500),
-                        "mode", choice("SEMANTIC_ESTIMATE", "GROUNDED_FACT"))), 0, 12),
-                "coverage", array(object(Map.of("id", identifier(), "description", string(300),
-                        "intents", array(object(Map.of("id", identifier(), "coreActivity", string(120), "fit", string(300))), 0, size + 4))), 0, size),
-                "softPreferences", array(string(300), 0, 12)));
+        // Structured Outputs follows property order: interpret the request before filling activity slots.
+        var properties = new LinkedHashMap<String, Object>();
+        properties.put("constraints", array(object(Map.of("id", identifier(), "description", string(300), "sourceText", string(500),
+                "mode", choice("SEMANTIC_ESTIMATE", "GROUNDED_FACT"))), 0, 12));
+        properties.put("softPreferences", array(string(300), 0, 12));
+        properties.put("unit", string(120));
+        properties.put("hobby", Map.of("type", "boolean"));
+        properties.put("groundingRequired", Map.of("type", "boolean"));
+        properties.put("decision", choice("READY", "CLARIFICATION_REQUIRED", "UNSUPPORTED_REQUEST"));
+        properties.put("coverage", array(object(Map.of("id", identifier(), "description", string(300),
+                "intents", array(object(Map.of("id", identifier(), "coreActivity", string(120), "fit", string(300))), 0, size + 4))), 0, size));
+        return object(Collections.unmodifiableMap(properties));
     }
     static Map<String, Object> allocation(int size, List<String> intentIds) {
         var id = choice(intentIds.toArray(String[]::new));

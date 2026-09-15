@@ -224,11 +224,17 @@ class OpenAiResponsesClientTest {
         response = completed(json.writeValueAsString(proposal));
         var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
         var input = new GenerationInput("매주 두 사람이 30분씩 할 활동 " + size + "개, 회당 2만원 이내", size, "ko-KR", "Asia/Seoul");
-        stages.plan(input, List.of(), Instant.now(), new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)));
+        assertThat(stages.plan(input, List.of(), Instant.now(), new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)))
+                .value()).isEqualTo(proposal);
         var sent = json.readTree(request.path("input").asString());
         assertThat(sent.path("request")).isEqualTo(json.valueToTree(input));
         assertRequestScopeInstructions();
-        var coverage = request.path("text").path("format").path("schema").path("properties").path("coverage");
+        var schema = request.path("text").path("format").path("schema");
+        var orderedFields = List.of("constraints", "softPreferences", "unit", "hobby", "groundingRequired", "decision", "coverage");
+        assertThat(schema.path("properties").propertyNames()).containsExactlyElementsOf(orderedFields);
+        assertThat(schema.path("required")).isEqualTo(json.valueToTree(orderedFields.stream().sorted().toList()));
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        var coverage = schema.path("properties").path("coverage");
         assertThat(coverage.path("maxItems").asInt()).isEqualTo(size);
         assertThat(coverage.path("items").path("properties").path("intents").path("maxItems").asInt()).isEqualTo(size + 4);
         assertThat(calls).hasValue(1);
