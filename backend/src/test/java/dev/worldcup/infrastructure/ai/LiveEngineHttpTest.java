@@ -40,10 +40,11 @@ class LiveEngineHttpTest extends PostgresSupport {
     }
     @Test void realProviderPassesThroughWorkerAndUnchangedHttpPreviewContract() throws Exception {
         int size = Integer.parseInt(System.getenv().getOrDefault("CANDIDATE_LIVE_SIZE", "8"));
-        assertThat(size).isIn(8, 16, 32);
+        var selected = LiveEvalCase.select(System.getenv().getOrDefault("CANDIDATE_LIVE_CASE", "hobby-calibration"), size,
+                json.read(Files.readString(Path.of("../evals/cases.json")), JsonNode.class));
         Path output = Path.of("../reports/local/live-engine", Instant.now().toString().replace(':', '-') + "-size" + size);
         Files.createDirectories(output);
-        String prompt = "집에서 혼자 조용히 하루 30분씩 꾸준히 할 취미를 고르고 싶어";
+        String prompt = selected.prompt();
         var samples = new ArrayList<Map<String, Object>>();
         long start = System.nanoTime();
         try (var http = HttpClient.newHttpClient()) {
@@ -71,6 +72,7 @@ class LiveEngineHttpTest extends PostgresSupport {
             Files.writeString(output.resolve("ledger.json"), json.write(jdbc.queryForList("SELECT * FROM provider_call ORDER BY created_at, id")));
             Files.writeString(output.resolve("http-samples.json"), json.write(samples));
             Files.writeString(output.resolve("run.json"), json.write(Map.of("size", size, "prompt", prompt,
+                    "caseId", selected.id(), "datasetVersion", selected.datasetVersion(),
                     "latencyMs", (System.nanoTime() - start) / 1_000_000, "promptVersion", OpenAiResponsesClient.PROMPT_VERSION,
                     "scope", "single synthetic end-to-end case; not a formal human quality evaluation")));
             System.out.println("Live eval artifacts: " + output.toAbsolutePath().normalize());

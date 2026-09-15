@@ -38,7 +38,9 @@ public final class StagedCandidateEngine implements CandidateEngine {
         var run = new Run(context, deadline);
         try {
             var proposed = stages.plan(input, context.recentDirectChoices().stream().limit(50).toList(), now, run.call("PLAN")).value();
-            var fixed = freeze(input, now, proposed);
+            validateProposal(input, proposed);
+            var allocation = stages.allocate(input, now, proposed, run.call("ALLOCATE")).value();
+            var fixed = freeze(input, now, proposed, allocation);
             Batch original;
             String generationVersion;
             try {
@@ -61,11 +63,12 @@ public final class StagedCandidateEngine implements CandidateEngine {
         }
     }
 
-    private FixedPlan freeze(GenerationInput input, Instant now, PlanProposal specification) {
+    private void validateProposal(GenerationInput input, PlanProposal specification) {
         if (specification.decision() == Decision.CLARIFICATION_REQUIRED) throw Failure.of(Failure.Code.CLARIFICATION_REQUIRED);
         if (specification.decision() == Decision.UNSUPPORTED_REQUEST) throw Failure.of(Failure.Code.UNSUPPORTED_REQUEST);
         if (specification.decision() != Decision.READY || blank(specification.unit()) || specification.unit().length() > 120
-                || specification.constraints().size() > 12 || specification.coverage().isEmpty()
+                || specification.constraints().size() > 12 || specification.coverage().isEmpty() || specification.coverage().size() > input.size()
+                || specification.intents().size() < input.size() || specification.intents().size() > input.size() + 4
                 || specification.softPreferences().size() > 12) throw new InvalidModelOutput();
         Set<String> constraintIds = new HashSet<>(), bucketIds = new HashSet<>();
         for (var constraint : specification.constraints()) {
@@ -74,21 +77,37 @@ public final class StagedCandidateEngine implements CandidateEngine {
                     || blank(constraint.sourceText()) || !normalize(input.prompt()).contains(normalize(constraint.sourceText()))
                     || constraint.mode() == null) throw new InvalidModelOutput();
         }
-        long total = 0;
         for (var bucket : specification.coverage()) {
             if (!identifier(bucket.id()) || !bucketIds.add(bucket.id()) || blank(bucket.description())
-                    || bucket.description().length() > 300 || bucket.quota() <= 0 || bucket.quota() > input.size()) throw new InvalidModelOutput();
-            total += bucket.quota();
+                    || bucket.description().length() > 300) throw new InvalidModelOutput();
         }
-        if (total != input.size() || specification.softPreferences().stream().anyMatch(s -> blank(s) || s.length() > 300)) throw new InvalidModelOutput();
+        Set<String> intentIds = new HashSet<>();
+        for (var intent : specification.intents()) {
+            if (!identifier(intent.id()) || !intentIds.add(intent.id()) || !bucketIds.contains(intent.bucketId())
+                    || blank(intent.coreActivity()) || intent.coreActivity().length() > 120
+                    || blank(intent.fit()) || intent.fit().length() > 300) throw new InvalidModelOutput();
+        }
+        if (specification.softPreferences().stream().anyMatch(s -> blank(s) || s.length() > 300)) throw new InvalidModelOutput();
+    }
+
+    private FixedPlan freeze(GenerationInput input, Instant now, PlanProposal specification, AllocationReview review) {
+        if (review.planFaithful() != Verdict.PASS || review.comparable() != Verdict.PASS
+                || review.noSemanticDuplicates() != Verdict.PASS || review.feasible() != Verdict.PASS
+                || review.approvedIntentIds().size() < input.size()) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
+        var pool = specification.intents().stream().collect(java.util.stream.Collectors.toMap(ActivityIntent::id, i -> i));
+        if (new HashSet<>(review.approvedIntentIds()).size() != review.approvedIntentIds().size()
+                || !pool.keySet().containsAll(review.approvedIntentIds())) throw new InvalidModelOutput();
+        var approved = review.approvedIntentIds().stream().map(pool::get).toList();
+        var counts = approved.stream().limit(input.size()).collect(java.util.stream.Collectors.groupingBy(
+                ActivityIntent::bucketId, java.util.LinkedHashMap::new, java.util.stream.Collectors.counting()));
         var plan = new Plan(input.size(), specification.unit(), specification.groundingRequired(),
                 specification.constraints().stream().map(c -> new HardConstraint(c.id(), c.mode())).toList(),
-                specification.coverage().stream().map(b -> new CoverageBucket(b.id(), b.quota())).toList());
-        return new FixedPlan(input, now, specification, plan);
+                counts.entrySet().stream().map(e -> new CoverageBucket(e.getKey(), Math.toIntExact(e.getValue()))).toList());
+        return new FixedPlan(input, now, specification, plan, approved.stream().filter(i -> counts.containsKey(i.bucketId())).toList());
     }
 
     private Inspection inspect(FixedPlan plan, Batch batch, Run run, String phase) {
-        var findings = basicFindings(plan, batch);
+        var findings = basicFindings(plan, batch, "INITIAL".equals(phase));
         if (!findings.isEmpty()) return new Inspection(null, findings, "not-reviewed");
         Grounding grounding = plan.specification().groundingRequired()
                 || plan.specification().constraints().stream().anyMatch(c -> c.mode() == VerificationMode.GROUNDED_FACT)
@@ -118,10 +137,12 @@ public final class StagedCandidateEngine implements CandidateEngine {
         return new Inspection(findings.isEmpty() ? checked.validated().orElse(null) : null, findings, result.version());
     }
 
-    private List<Finding> basicFindings(FixedPlan plan, Batch batch) {
+    private List<Finding> basicFindings(FixedPlan plan, Batch batch, boolean initial) {
         var findings = new ArrayList<Finding>();
         Set<String> expected = new HashSet<>(allIds(plan.input().size()));
         Set<String> ids = new HashSet<>();
+        Set<String> usedIntents = new HashSet<>();
+        var approved = plan.approvedIntents().stream().collect(java.util.stream.Collectors.toMap(ActivityIntent::id, i -> i));
         for (var proposal : batch.candidates()) {
             if (proposal == null || !expected.contains(proposal.id()) || !ids.add(proposal.id())) {
                 findings.add(new Finding("INVALID_CANDIDATE_IDS", List.of(), "Use each fixed candidate ID exactly once")); break;
@@ -132,6 +153,13 @@ public final class StagedCandidateEngine implements CandidateEngine {
                     || proposal.coreActivity().length() > 120 || proposal.description().length() > 240
                     || proposal.repeatability().length() > 240 || proposal.requirements().length() > 300) {
                 findings.add(new Finding("INVALID_CANDIDATE", List.of(proposal.id()), "Candidate fields missing or too long"));
+            }
+            var intent = approved.get(proposal.intentId());
+            if (intent == null || !usedIntents.add(proposal.intentId()) || !intent.bucketId().equals(proposal.bucketId())
+                    || !intent.coreActivity().equals(proposal.coreActivity())
+                    || initial && !plan.approvedIntents().get(allIds(plan.input().size()).indexOf(proposal.id())).id().equals(proposal.intentId())) {
+                findings.add(new Finding("INVALID_ACTIVITY_INTENT", List.of(proposal.id()),
+                        "Use a distinct independently approved intent, preserving its bucket and core activity"));
             }
         }
         if (!ids.equals(expected)) findings.add(new Finding("COUNT_OR_IDS", List.of(), "Exact requested count and fixed IDs required"));

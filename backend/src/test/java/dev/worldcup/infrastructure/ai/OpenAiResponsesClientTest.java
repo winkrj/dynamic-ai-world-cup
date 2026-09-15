@@ -134,9 +134,9 @@ class OpenAiResponsesClientTest {
         assertThatThrownBy(() -> call(true)).isInstanceOf(InvalidModelOutput.class);
     }
     @Test void grounderDowngradesClaimNotBoundToAnActualToolSource() {
-        var proposal = new PlanProposal(Decision.READY, "장소", false, true, List.of(), List.of(new BucketSpec("places", "장소", 8)), List.of());
+        var proposal = new PlanProposal(Decision.READY, "장소", false, true, List.of(), List.of(new BucketSpec("places", "장소", List.of())), List.of());
         var fixed = new FixedPlan(new GenerationInput("갈 장소", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
-                new Plan(8, "장소", true, List.of(), List.of(new CoverageBucket("places", 8))));
+                new Plan(8, "장소", true, List.of(), List.of(new CoverageBucket("places", 8))), List.of());
         response = completed(json.writeValueAsString(new FactChecks(List.of(
                 new FactCheck("c1", "availability", Verdict.PASS, "https://fabricated.example/place", "exists", "today"),
                 new FactCheck("c2", "availability", Verdict.PASS, "https://official.example/place", "exists", "today")))));
@@ -150,6 +150,33 @@ class OpenAiResponsesClientTest {
         assertThat(result.facts().get(1).verdict()).isEqualTo(Verdict.PASS);
         assertThat(result.facts().get(1).validUntil()).isAfter(result.facts().get(1).checkedAt());
         // This is source binding only; content truth remains a separate model/human evaluation.
+    }
+    @Test void planningSchemaUsesContainmentInsteadOfAnUnverifiableBucketReference() {
+        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
+                List.of(new BucketSpec("community", "함께 하는 활동", List.of(new IntentSpec("volunteering", "정기 봉사", "팀으로 함께 참여")))), List.of());
+        response = completed(json.writeValueAsString(proposal));
+        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+        var result = stages.plan(new GenerationInput("함께 할 취미", 8, "ko-KR", "Asia/Seoul"), List.of(), Instant.now(),
+                new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)));
+        assertThat(result.value().intents()).containsExactly(new ActivityIntent("volunteering", "community", "정기 봉사", "팀으로 함께 참여"));
+        var properties = request.path("text").path("format").path("schema").path("properties");
+        assertThat(properties.has("intents")).isFalse();
+        var intentProperties = properties.path("coverage").path("items").path("properties").path("intents").path("items").path("properties");
+        assertThat(intentProperties.has("bucketId")).isFalse();
+        assertThat(intentProperties.has("coreActivity")).isTrue();
+        assertThat(request.path("input").asString()).doesNotContain("sk-test-only");
+    }
+    @Test void laterStageSchemasAllowOnlyExistingIntentAndBucketIds() {
+        var allocation = json.valueToTree(AiSchemas.allocation(8, List.of("known-intent")));
+        assertThat(allocation.path("properties").path("approvedIntentIds").path("items").path("enum").toString())
+                .isEqualTo("[\"known-intent\"]");
+        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(), List.of(), List.of());
+        var fixed = new FixedPlan(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
+                new Plan(8, "취미", false, List.of(), List.of(new CoverageBucket("active-bucket", 8))),
+                List.of(new ActivityIntent("approved-intent", "active-bucket", "합성 활동", "합성 적합성")));
+        var fields = json.valueToTree(AiSchemas.batch(fixed)).path("properties").path("candidates").path("items").path("properties");
+        assertThat(fields.path("intentId").path("enum").toString()).isEqualTo("[\"approved-intent\"]");
+        assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"active-bucket\"]");
     }
     @Test void badUsageAndUnrequestedToolsFailClosed() {
         response.put("usage", Map.of("input_tokens", -1));

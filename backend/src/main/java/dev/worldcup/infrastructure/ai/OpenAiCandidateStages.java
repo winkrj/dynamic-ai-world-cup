@@ -48,40 +48,56 @@ public final class OpenAiCandidateStages implements EngineStages {
     }
     @Override public StageResult<PlanProposal> plan(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call) {
         var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
-                PLAN ONLY; do not generate candidate names yet. First interpret context and all explicit hard constraints;
-                then define one candidate unit; then consider ONLY related direct historical choices; finally assign dynamic coverage.
+                PLAN ONLY; no display cards yet. First interpret context and all explicit hard constraints;
+                then define one candidate unit; then consider ONLY related direct historical choices; finally propose feasible activity intents.
                 History must not override current conditions or erase diversity. Ignore unrelated/weak evidence.
                 Constraint sourceText must be a verbatim excerpt from the original prompt, with concise description and unique id.
                 Use GROUNDED_FACT for externally verifiable current prices, availability, venue location/accessibility/hours;
                 SEMANTIC_ESTIMATE for activity-level contextual fit. Mark groundingRequired for specific real-world entities.
                 Capture all explicit exclusions, time, place, budget and participant conditions; do not label a hard constraint soft.
-                For READY: create distinct core-activity coverage buckets with quotas totaling the requested size exactly.
-                Bucket ids are short lowercase identifiers. Broad hobby buckets must not all be drawing/crafts/logging subtypes.
-                Do not make N copies of vague buckets. Keep candidate-level diversity possible within each bucket.
-                Before freezing quotas, check that every bucket supports its quota AND a meaningful alternative core activity
-                under ALL hard constraints, so a later replacement is feasible without changing the plan.
-                Do not reserve a domain just for diversity when its normal activity conflicts with the requested routine;
-                a plan that can only fill a slot by inventing chores, forced schedules or documentation is a bad plan.
-                Buckets should group several comparable core activities, not predetermine a single candidate's identity.
-                Coverage is NOT a checklist of conventional hobby domains that must all be represented.
-                For a broad request with restrictive conditions, prefer a few broad experience-based buckets with multiple slots,
-                not one topic bucket per candidate. Derive these groups from feasible choices for THIS request.
-                Omit an unsuitable domain entirely; diversity across eligible activities is better than forcing every domain in.
-                Ensure different buckets do not require the same core activity under different subject matter to become feasible.
+                For READY: propose N to N+4 compact, concretely different activity intents. Each has a stable lowercase id,
+                coreActivity (what the user actually does/chooses), a concise fit explanation including obstacles,
+                nested directly inside one request-specific broad experience group in coverage. Across all groups combined,
+                there must be N to N+4 intents, each with a globally unique ID. Do not assign numeric quotas or cross-reference buckets.
+                No conventional domain must be represented. Derive groups from eligible activities, not activities from empty quotas.
+                Across ALL buckets, do not pad with materials/styles/genres of one activity. Do not force an unsuitable domain
+                into the request by inventing chores or artificial schedules. Extra intents are optional repair options, never filler.
+                For entity requests, each intent must identify the specific entity/experience whose facts will later be checked.
+                An independent allocation reviewer will reject intents; fewer than N suitable distinct intents means failure, not padding.
                 If one comparison unit cannot safely be inferred, return CLARIFICATION_REQUIRED (not a made-up assumption).
                 If a request cannot responsibly be served, return UNSUPPORTED_REQUEST. These decisions may use empty coverage.
                 """, Map.of("request", input, "referenceTime", referenceTime, "history", history), AiSchemas.plan(input.size()), PlanProposal.class, false, call);
+        return new StageResult<>(reply.value(), reply.version());
+    }
+    @Override public StageResult<AllocationReview> allocate(GenerationInput input, Instant referenceTime, PlanProposal proposal, CallContext call) {
+        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + """
+                INDEPENDENT ALLOCATION REVIEW before quota freeze or detailed generation. Compare the original request with the plan;
+                all explicit conditions, the unit, hobby interpretation and factual/semantic classification must be faithful.
+                Do not repair the interpretation, invent new intents, or trust the planner's fit statements as proof.
+                Filter the proposed intents for realistic contextual fit, comparable granularity, genuine appeal and sustained practice
+                where appropriate. Remove aliases, forced filler and core-activity variants, considering the entire pool jointly.
+                Return only jointly distinct eligible intent IDs, ranked: the first N form a balanced complete set, any remainder
+                must also be distinct from that set and each other. Do not approve a weak intent just to reach N.
+                The server derives coverage quotas from the first N, so rejecting a domain does not leave a mandatory empty slot.
+                comparable/noSemanticDuplicates/feasible judge the APPROVED pool, not the rejected intents. If fewer than N qualify,
+                return that shorter list; never copy rejected IDs to fill it. Unknown contextual fit is not feasible.
+                Current entity facts are only provisionally plausible here, never verified: require the appropriate grounding
+                classification in the plan and leave proof of current prices/accessibility/availability to the later web verifier.
+                """, Map.of("request", input, "referenceTime", referenceTime, "proposal", proposal),
+                AiSchemas.allocation(input.size(), proposal.intents().stream().map(ActivityIntent::id).toList()), AllocationReview.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public StageResult<Batch> generate(FixedPlan plan, CallContext call) {
         var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
                 GENERATE from the immutable plan. Do not redefine its unit, constraints, bucket ids or quotas.
                 Fill each fixed ID exactly once and preserve its order c1..cN. Each candidate belongs to one existing bucket.
-                coreActivity states the actual activity, not its material/style. description explains what one does and its appeal.
+                Assign the first N approvedIntents in order to c1..cN. Copy its intentId, bucketId and coreActivity exactly.
+                Do not use rejected intents from the original proposal. The display name and details must faithfully express that intent.
+                description explains what one does and its appeal.
                 repeatability describes sustained practice for hobbies; for other domains describe the appropriate experience instead.
                 requirements states concrete prerequisites and fit, not invented guarantees. Do not emit valid/pass/self-scores.
                 A single candidate must not bundle two independent hobbies with 'or' to escape the requested size.
-                """, generationData(plan), AiSchemas.batch(plan.input().size()), Batch.class, false, call);
+                """, generationData(plan), AiSchemas.batch(plan), Batch.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public Grounding ground(FixedPlan plan, Batch candidates, CallContext call) {
@@ -125,6 +141,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 For GROUNDED_FACT rely only on supplied verified facts; evaluate whether their excerpts actually support the condition.
                 Mark candidateQuality FAIL for forced filler, chores posing as hobbies, weak sustained appeal, padding or fit issues.
                 Comparable units and noSemanticDuplicates must be assessed separately. Renamed subtypes and broad parent/child overlap fail.
+                Names/descriptions/requirements must express the linked approved intent, not disguise another activity behind its ID.
+                Allocation approval is not proof: independently check the actual detailed candidates and their facts.
                 List actionable findings with fixed candidate IDs and brief reasons, identifying only candidates needing replacement.
                 Use an empty candidateIds list only for a truly set-wide issue. No findings means every quality dimension passed.
                 Do not invent numerical preference scores. Unknown is not pass.
@@ -137,10 +155,13 @@ public final class OpenAiCandidateStages implements EngineStages {
                 ONE REPAIR ATTEMPT. Return the full candidate set using the immutable plan and exact fixed IDs.
                 Only candidates in replacementIds may change. Copy all other candidate objects exactly, preserving every field.
                 Correct the supplied failure reasons and ensure the repaired set is distinct from retained candidates.
+                Each replacement must use its current approved intent or an unused approved intent in the same frozen coverage plan;
+                copy that intentId/bucketId/coreActivity exactly. Rejected or invented intents are forbidden, even if plausible.
+                If no approved alternative can fix the issue, do not disguise it with different wording; the final gate will fail closed.
                 Never relax constraints, change coverage/unit/N, rename a duplicate without changing the activity, or claim a pass.
                 If the original set was malformed, replacementIds may contain every ID; reconstruct the set under the same plan.
                 """, Map.of("plan", plan, "fixedIds", StagedCandidateEngine.allIds(plan.input().size()), "original", original,
-                        "replacementIds", replacementIds, "findings", findings), AiSchemas.batch(plan.input().size()), Batch.class, false, call);
+                        "replacementIds", replacementIds, "findings", findings), AiSchemas.batch(plan), Batch.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
     private Map<String, Object> generationData(FixedPlan plan) { return Map.of("plan", plan, "fixedIds", StagedCandidateEngine.allIds(plan.input().size())); }

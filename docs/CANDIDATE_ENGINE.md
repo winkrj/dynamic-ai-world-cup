@@ -6,11 +6,11 @@
 
 기존 `GenerationWorker → CandidateEngine → ValidatedSet → DraftContent` 경계를 유지한다. Spring/HTTP/JDBC를 순수 후보 도메인에 넣지 않는다. 새로운 SDK·agent framework·큐·서비스는 추가하지 않는다. Java 21 HTTP client, 기존 Jackson 3와 PostgreSQL을 사용한다.
 
-1. **계획**: 원 입력의 context/constraint와 비교 단위를 먼저 정하고 관련 직접 선택 history만 참고한 뒤 동적 coverage quota를 만든다. 명시 조건의 원문 근거, 의미 추정/외부 사실 구분, 핵심 활동 수준, 지속성 기준을 내부 DTO로 보존한다. quota 합은 N이다. 계획의 누락·모호함은 실패로 닫으며 생성/Repair 중 바꾸지 않는다.
-2. **생성**: 고정 계획의 슬롯을 채운다. 후보별 활동·지속 방법·필요한 조건을 내부 검토용으로 받는다. 후보 ID/공개 title은 서버가 관리하며 이미지 URL을 모델에게 생성시키지 않는다. 취미를 도구/재료/스타일로 쪼개거나 기록·잡일을 덧붙여 개수를 채우지 않는다.
+1. **계획·사전 배정**: 원 입력의 context/constraint와 비교 단위를 먼저 정하고 관련 직접 선택 history만 참고한다. 질문별 폭넓은 경험 그룹과 N~N+4개의 짧은 활동 의도(`ActivityIntent`: 핵심 활동·적합성·그룹)를 제안하되 숫자 quota는 만들지 않는다. 별도 ALLOCATE 요청이 원 조건의 충실성과 활동 간 구분·실현 가능성을 독립 검토한다. 승인된 순서의 첫 N개에서 서버가 그룹별 quota를 계산한다. N개 미만이면 상세 생성/Repair 전에 실패하며, 탈락한 활동이나 중복 ID로 수를 채우지 않는다. 명시 조건의 원문 근거와 의미 추정/외부 사실 구분은 고정하고 실제 외부 사실의 증명은 뒤의 grounding에서 한다.
+2. **생성**: 고정 계획의 슬롯을 채운다. 첫 N개의 승인된 활동을 c1..cN에 연결하고 내부 intentId·bucketId·coreActivity는 서버가 일치 검사한다. 후보별 설명·지속 방법·필요한 조건을 내부 검토용으로 받으며, 독립 최종 검토는 그 설명이 승인된 핵심 활동을 실제로 표현하는지도 확인한다. 공개 title은 서버가 관리하고 이미지 URL을 모델에게 생성시키지 않는다. 취미를 도구/재료/스타일로 쪼개거나 기록·잡일을 덧붙여 개수를 채우지 않는다.
 3. **선택적 근거 확인**: 실제 장소·가격·운영·접근성 등이 필요하면 별도의 OpenAI hosted web-search 요청으로 후보와 조건을 대조한다. 생성기의 URL이나 자기 선언은 근거가 아니다. 실제 tool-call 출처에 결합된 별도 fact assessment만 받아들이고 날짜/신선도와 미확인 상태를 확인한다. 수집 실패나 근거 부족은 UNKNOWN이다. 애플리케이션이 모델이 만든 URL을 직접 요청하지 않아 SSRF 경로를 만들지 않는다. 이 방식은 제공자 보조 사실 판정이며 출처의 진실성을 수학적으로 보장하거나 사람의 정확도 평가를 대신하지 않는다.
 4. **독립 검토**: 생성 요청과 conversation을 공유하지 않는 별도 요청이 원 입력/고정 계획/후보/근거를 보고 계획의 충실성, 모든 hard 조건, 비교 단위, 의미 중복, 취미 지속성·개수 채우기를 판정한다. 생성기의 점수를 그대로 PASS로 복사하지 않는다. 사실 확인 필요성을 계획이 빠뜨렸어도 이 단계에서 거절한다.
-5. **집행과 Repair**: 기존 Java gate와 추가 내부 품질 판정을 모두 통과해야 `ValidatedSet`을 반환한다. 실패 후보만 최대 1회 교체하며 계획·N·정상 후보는 유지한다. 수정된 전체 집합을 다시 근거 확인/독립 검토한다. 전역 실패·구조 파싱 실패는 전체 후보가 수리 대상일 수 있다. 계획 자체가 원 입력을 누락했다면 후보 Repair로 덮지 않고 실패한다. 32→16 축소나 무한 재생성은 없다.
+5. **집행과 Repair**: 기존 Java gate와 추가 내부 품질 판정을 모두 통과해야 `ValidatedSet`을 반환한다. 실패 후보만 최대 1회 교체하며 계획·N·quota·정상 후보는 유지한다. 교체는 기존 승인 활동의 설명 수정 또는 고정 quota 안의 미사용 승인 활동으로 한정한다. 승인된 대안이 부족하면 실패한다. 이 내부 계획용 대안은 공개 bracket의 reserve/리롤 기능이 아니며 preview·경기·공유에 남기지 않는다. 수정된 전체 집합은 다시 근거 확인/독립 검토한다. 이전 PASS를 복사하여 재검토의 실패를 숨기지 않는다. 전역 실패·구조 파싱 실패는 전체 후보가 수리 대상일 수 있다. 계획 자체의 원 입력 누락을 후보 Repair로 덮거나 32→16 축소·무한 재생성을 하지 않는다.
 
 ## 모델·비용·실행 시간
 
@@ -19,6 +19,8 @@
 - 요청마다 `store=false`, standard tier, 제한된 출력, 별도의 instructions/data, 자동 HTTP 재시도 없음. refusal/incomplete/알 수 없는 모델·사용량·비정상 JSON은 성공으로 취급하지 않는다. 네트워크 실패로 과금 여부가 불명확하면 예산 예약을 해제하지 않는다.
 - 실제 생성 30~53초에 맞춰 기존 v1의 초기 60초 job/25초 호출 가정은 **live 한정** 설정으로 분리한다. live job lease 기본 300초, 엔진 전체 280초, 개별 요청 최대 90초이며 항상 남은 deadline이 우선한다. 기존 dev/test lease 기본 60초와 attempt fencing/최대 두 crash-recovery attempt는 유지한다. 기존 공개 job polling 계약은 바뀌지 않는다. 빠른 완료를 달성했다는 수치는 실제 측정 전 주장하지 않는다.
 - 기존 worker 동시성 2를 유지한다. 단계별 호출 전에 DB에 비용을 보수적으로 예약하고 완료 usage를 기록한다. DB 잠금으로 두 worker의 잔여 예산 초과를 막고 재시작 후에도 내역을 보존한다. 기술적 예약 추정은 제공자의 확정 청구 hard cap이 아니며 외부 과금 지연/미확인 비용을 0으로 만들지 않는다.
+- `ce002-v5-allocation`은 정상 경로에 짧은 사전 배정 검토 1회를 추가한다. 구체 활동 없는 quota가 생성과 Repair를 강제했던 구조를 바꾸는 것으로, 모델의 자기 확신을 올리거나 품질 기준을 완화하는 변경이 아니다. 추가 호출의 비용/지연을 기존 280초 전체 제한 안에서 측정하며 lease나 예산을 늘려 숨기지 않는다. 사전 승인은 최종 후보 품질이나 사실 정확도 인증이 아니다.
+- `ce002-v6-nested-allocation`은 계획의 활동을 그룹 안에 직접 담는다. 서버가 포함 관계로 bucketId를 붙이므로 모델이 존재하지 않는 그룹 ID를 참조할 수 없다. 뒤의 allocation/생성/Repair schema도 이미 존재하는 intent/bucket ID만 enum으로 허용하며 서버 검사를 함께 유지한다.
 - 예산 기본값 0(명시적 허용 필요). 이 Goal의 실제 실험에서는 이전 누적 $0.0725468을 포함해 $5 이내가 되도록 추가 예산을 보수적으로 설정한다. 자동 충전 OFF를 유지한다. 배포용 무제한 과금이나 자동 충전은 추가하지 않는다.
 - 모델/프롬프트/검토 버전, 단계·attempt, 토큰·비용·지연·안전한 실패 code를 내부 기록한다. 원문/응답을 남기는 live eval은 합성 사례에 한해 gitignored `reports/local/`로 제한하고 일반 서버 로그와 분리한다.
 
@@ -48,7 +50,7 @@ cd backend
 
 모델 설정 `CANDIDATE_MODEL`, `CANDIDATE_REVIEW_MODEL`은 `gpt-5.6-terra` 또는 `gpt-5.6-luna`다. 가격 표에 없는 모델은 호출하지 않는다. `provider_call`에는 원문/키 없이 단계, 모델, 사용량, 추정 비용만 남는다. `accounted_usd` 합계에는 진행 중·미확인 비용 예약도 포함된다. 이 DB를 교체해도 계정의 과금이 사라지는 것은 아니므로 새 DB/평가 실행은 기존 계정 사용액을 포함해 남은 예산을 정한다. 실패 예약을 임의로 지우거나 예산을 올리지 않는다.
 
-일반 `test`/`verify`는 실제 제공자를 호출하지 않는다. 별도 승인 예산 안의 합성 입력 평가만 `CANDIDATE_LIVE_TEST=true`, 남은 `CANDIDATE_BUDGET_USD`, 서버 키를 환경에 설정하고 아래를 실행한다. `CANDIDATE_LIVE_SIZE`는 8(기본)/16/32이며 한 번에 한 입력만 호출한다. 유료 테스트 DB는 매 실행 격리되므로 **재실행 전** `reports/local/live-engine/*/ledger.json`과 이전 계정 실험 사용액을 합산해야 한다.
+일반 `test`/`verify`는 실제 제공자를 호출하지 않는다. 별도 승인 예산 안의 합성 입력 평가만 `CANDIDATE_LIVE_TEST=true`, 남은 `CANDIDATE_BUDGET_USD`, 서버 키를 환경에 설정하고 아래를 실행한다. `CANDIDATE_LIVE_SIZE`는 8(기본)/16/32이며 한 번에 한 입력만 호출한다. `CANDIDATE_LIVE_CASE`는 기존 입력을 보존한 `hobby-calibration`(기본) 또는 `evals/cases.json`의 정확한 ID다. 알 수 없는 ID는 거절하며 seed 질문은 원문 그대로 사용하고 caseId/datasetVersion을 기록한다. 유료 테스트 DB는 매 실행 격리되므로 **재실행 전** `reports/local/live-engine/*/ledger.json`과 이전 계정 실험 사용액을 합산해야 한다.
 
 ```sh
 ./gradlew --no-daemon test --tests '*LiveEngineHttpTest' --rerun-tasks
@@ -72,10 +74,35 @@ cd backend
 
 이번 6개 작업·제공자 24회 호출의 추정 비용은 **$0.707748**. 이전 4회 비교 실험 $0.0725468을 포함한 누적은 **$0.7802948 / 승인 $5**다. 실제 usage의 cached/cache-write/output(reasoning 포함)로 계산했으며 확정 청구서 금액은 아니다. 미확인 비용 상태는 없었다. 자동 충전은 앞서 OFF로 저장한 상태를 변경하지 않았다. 비공개 원본은 `reports/local/live-engine/`에 있으며 Git에 올리지 않는다.
 
-코드 전달 범위는 실제 엔진 adapter·기존 API 연결·비용/시간 제한·실패 차단이다. 후속 핵심은 **Coverage Plan의 quota가 서로 다른 핵심 활동으로 실현 가능한지 생성 전에 판별**하는 것, 16/32 품질과 지연 개선, 실제 검색 근거 정확도와 2명 독립 사람 평가다. 프론트 화면·배포는 A/배포 작업으로 남는다. 이 결과를 근거로 전체 Goal이나 CE-002 품질 평가를 완료 처리하지 않는다.
+코드 전달 범위는 실제 엔진 adapter·기존 API 연결·비용/시간 제한·실패 차단이다. 이 v4 체크포인트 이후 위의 사전 활동 배정 구조를 구현했으며 후속 실제 결과는 아래에 별도 기록한다. 16/32 품질과 지연, 실제 검색 근거 정확도와 2명 독립 사람 평가, A의 프론트 화면·배포는 이 체크포인트에서 완료하지 않았다.
 
 최종 일반 검증: Node 24의 `scripts/verify.sh` 통과. Java 119개 실행(실패/오류 0), opt-in 유료 테스트 1개는 의도적으로 제외. handoff 6개 테스트, 웹 build, bootJar, 공용 fixture 5개, 기존 실제 HTTP 응답 102개/8개 schema 통과. 별도 실제 AI 실행의 HTTP 응답 13개도 원 OpenAPI schema와 대조해 통과했으며 FAILED 응답을 READY 성공으로 세지 않았다. 첫 전체 검증의 Gradle cache 접근 권한 오류는 필요한 권한으로 재실행해 해소했다.
 
 읽기 전용 독립 리뷰는 2회 완료, 최종 Critical 0 / High 0 / 남은 코드 finding 0. 발견한 Medium ID schema 불일치는 수정과 집중 테스트로 확인했다. 외부 검색의 실제 사실 정확도와 제품 후보 품질이 이 코드 리뷰만으로 검증된 것은 아니다. `frontend/**`와 `contracts/**`는 변경하지 않았다.
+
+## 사전 배정 변경과 seed grounding 첫 실행
+
+v4 실패 원문을 대조하면 16강 계획이 독서 3개·음악 감상 2개를 예약한 뒤 최종 검토가 동일 핵심 활동의 분할이라고 거절했다. 고정 quota 안에서 이름을 바꿔 수리해도 해결할 수 없었다. 32강에는 변경하지 않은 논리 퍼즐/탈출 퍼즐이 재검토에서 새로 거절되는 판정 변동도 있었다. 숫자 계획을 먼저 고정하던 원인은 사전 활동 배정으로 변경하되, 이전 PASS를 정답으로 취급하거나 퍼즐의 분류 기준을 사용자 확인 없이 완화하지 않는다.
+
+`seed-v1/seoul-indoor/8`은 **v4 첫 실행**을 보존했다: 121.355초, 제공자 4회 호출(검색 요청 3회 포함), Repair 0회, $0.2142305. 실제 hosted search → source URL 결합 → 사실 검토 → 기존 HTTP의 `QUALITY_GATE_FAILED`까지 연결됐다. 토요일 조건의 사실/의미 분류 문제, 후보 장소·2인 필수 요금의 확인 부족, 영화관·보드게임의 장소만 다른 중복이 남아 preview를 발급하지 않았다. 검색의 기술 연결과 미확인 차단 증거이지 실제 장소 추천 품질 통과가 아니다. 검색기의 일부 PASS도 최종 검토가 조건을 충분히 증명하지 못한다고 UNKNOWN으로 판정했다.
+
+이 시점의 4회 생성 비교 + 7개 pipeline 실행 누적은 **$0.9945253 / 승인 $5**, 제공자 32회 호출이다. 미확인 비용 예약은 없었다. `evals/cases.json`의 18세트 중 실행한 것은 이 1세트(실패)이며, 별도 calibration과 생성-only 비교를 18세트 완료 수에 섞지 않는다.
+
+v5 사전 배정의 실제 첫 결과:
+
+| 사례 | 결과 | 호출 / 시간 / 비용 | 확인한 원인 |
+| --- | --- | --- | --- |
+| hobby-calibration/16 | QUALITY_GATE_FAILED, 상세 생성 전 | 2 / 31.605초 / $0.028580 | 제안 16개 중 승인 12개. 승인 부족을 새 후보나 quota 완화로 덮지 않음 |
+| seed-v1/hobby-social/16 | QUALITY_GATE_FAILED, allocation 전 | 1 / 27.197초 / $0.021304 | 활동이 존재하지 않는 bucketId를 참조. v6의 포함 관계 표현으로 구조 변경 |
+
+v5 2회까지 누적 **$1.0444093**, 제공자 35회 호출. 첫 실패와 후속 비교는 별개로 보존하며, 조기 차단 시간을 후보 생성 성공 latency로 제시하지 않는다. 같은 입력의 정상 완료 증거가 생기기 전에는 v5/v6 전체 연동 품질 성공을 주장하지 않는다.
+
+v6에서는 bucket 참조 오류를 제거한 뒤 같은 `hobby-social/16`을 1회 재확인하고, 별도 최초 `hobby-social/8`을 실행했다. 각각 27.446초/$0.023714, 23.124초/$0.0189095이며 둘 다 PLAN→ALLOCATE 2회 뒤 `QUALITY_GATE_FAILED`다. 16강은 제안 16개 중 운동에 해당하는 등산·댄스가 제외되어 14개만, 8강은 제안 8개 중 겹치는 테이블 게임 항목이 제외되어 7개만 남았다. 허용한 N~N+4 범위의 하한 N개만 제안하는 실제 경향 때문에 하나만 탈락해도 상세 생성에 도달하지 못했다. 이후 같은 질문을 통과할 때까지 반복 실행하지 않았다.
+
+**최신 v6의 실제 READY 증거는 아직 없다.** 앞서 성공한 8강은 v4의 별도 calibration 실행이다. 코드의 안전한 조기 실패와 후보 품질·정상 완료를 혼동하지 않는다. 미검증 후보를 노출하거나 판정을 완화하지 않고, 후속 작업은 제안 단계부터 명백한 조건 위반을 제외하면서 충분한 서로 다른 활동을 확보하는 전략과 사람 기준의 일치를 먼저 다뤄야 한다. 승인 부족 판정을 없애거나 기존 PASS를 캐시해 통과시키는 방법은 사용하지 않는다. 퍼즐의 세부 규칙 차이를 별개 취미로 볼지에 관한 사용자 판단은 아직 대기 중이다.
+
+이번 변경의 최종 체크포인트: 이전 비교를 포함한 누적 **$1.0870328 / 승인 $5**, 제공자 39회 호출(4회 생성-only 비교 + 11개 pipeline 작업). 미확인 비용 예약 없음. 자동 충전 OFF 설정과 기존 API 계약, frontend 소유 경로를 유지했다. 원본/키는 gitignored 로컬 자료이며 commit 대상이 아니다. seed 18세트 중 고유 3세트의 첫 실행이 모두 실패했고 15세트와 2명 독립 사람 평가는 남아 있다.
+
+새 구조 변경의 독립 리뷰 2회 완료: Critical 0 / High 0 / actionable finding 0. 일반 전체 verify에서 Java 129개 실행/실패·오류 0, opt-in 유료 테스트 1개 제외, handoff 6개, fixture 5개, 기존 HTTP 102개/8개 schema, 웹 build와 bootJar를 확인했다. 유료 실험의 실패는 이 일반 테스트 통과와 별도로 위에 기록한다. 전체 Goal과 실제 후보 품질 완료로 처리하지 않는다.
 
 공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna). 2026-09-15 확인.

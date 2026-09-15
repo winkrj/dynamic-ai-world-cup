@@ -29,6 +29,8 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 2026-09-15 CE-002 실제 연결 체크포인트: 최종 v4 합성 취미 입력에서 8강 READY(46.479초), 16/32강은 Repair 후 품질 미달로 FAILED. 누적 API 실험 추정 $0.7802948 / 승인 $5, 자동 충전 OFF. 엔진/API 연결 구현과 전체 후보 품질 완료를 구별하며, Goal은 아직 완료 처리하지 않는다. 근거와 다음 설계 문제는 `docs/CANDIDATE_ENGINE.md`에 모았다.
 
+후속 최신 v6 체크포인트: 추상 quota 대신 그룹 안의 구체 활동을 별도 ALLOCATE로 검토하고 승인된 첫 N개에서 서버가 quota를 계산한다. 승인 부족이면 상세 생성 전에 실패, 생성/Repair는 승인 활동·고정 quota에 묶인다. 실제 v6 hobby-social 8/16강은 각각 승인 7/14개로 조기 실패했으며 **v6 READY 증거는 아직 없다**. seed grounding 8강도 실제 검색은 연결됐지만 사실/중복 기준 미달로 실패했다. 누적 추정 비용은 $1.0870328 / 승인 $5이며 미확인 비용 예약 없음. 이번 구조의 일반 verify는 Java 129개 실행/실패 0(유료 1개 제외), 독립 리뷰 2회 최종 Critical/High 0. 구체적 원인과 버전별 증거는 `docs/CANDIDATE_ENGINE.md`를 따른다. 32강 후보 구분의 사람 판단과 제안 품질 개선은 남아 있으며 반복 호출로 성공을 만들지 않는다.
+
 이 체크포인트의 일반 `verify` 통과: Java 119개 실행/실패 0, opt-in paid test 1개 제외, handoff 6개, 기존 HTTP 응답 102개, 웹 build/bootJar. 별도 실제 AI HTTP 13개는 schema 적합 확인(그중 terminal FAILED도 포함). 독립 리뷰 최종 Critical 0 / High 0 / 남은 finding 0. 실서비스 품질 통과를 의미하지 않는다.
 
 - A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.

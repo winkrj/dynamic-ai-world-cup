@@ -11,7 +11,11 @@ public final class EngineModels {
     private EngineModels() {}
     public enum Decision { READY, CLARIFICATION_REQUIRED, UNSUPPORTED_REQUEST }
     public record ConstraintSpec(String id, String description, String sourceText, VerificationMode mode) {}
-    public record BucketSpec(String id, String description, int quota) {}
+    public record IntentSpec(String id, String coreActivity, String fit) {}
+    public record BucketSpec(String id, String description, List<IntentSpec> intents) {
+        public BucketSpec { intents = List.copyOf(intents); }
+    }
+    public record ActivityIntent(String id, String bucketId, String coreActivity, String fit) {}
     public record PlanProposal(Decision decision, String unit, boolean hobby, boolean groundingRequired,
                                List<ConstraintSpec> constraints, List<BucketSpec> coverage,
                                List<String> softPreferences) {
@@ -20,9 +24,22 @@ public final class EngineModels {
             coverage = List.copyOf(coverage);
             softPreferences = List.copyOf(softPreferences);
         }
+        /** Ownership comes from containment; the planner cannot reference a nonexistent bucket. */
+        public List<ActivityIntent> intents() {
+            return coverage.stream().flatMap(bucket -> bucket.intents().stream()
+                    .map(intent -> new ActivityIntent(intent.id(), bucket.id(), intent.coreActivity(), intent.fit()))).toList();
+        }
     }
-    public record FixedPlan(GenerationInput input, Instant referenceTime, PlanProposal specification, Plan gatePlan) {}
-    public record Proposal(String id, String name, String bucketId, List<String> tags,
+    /** Ranked, jointly distinct feasible intents; rejected items never enter the fixed allocation. */
+    public record AllocationReview(Verdict planFaithful, Verdict comparable, Verdict noSemanticDuplicates,
+                                   Verdict feasible, List<String> approvedIntentIds) {
+        public AllocationReview { approvedIntentIds = List.copyOf(approvedIntentIds); }
+    }
+    public record FixedPlan(GenerationInput input, Instant referenceTime, PlanProposal specification, Plan gatePlan,
+                            List<ActivityIntent> approvedIntents) {
+        public FixedPlan { approvedIntents = List.copyOf(approvedIntents); }
+    }
+    public record Proposal(String id, String intentId, String name, String bucketId, List<String> tags,
                            String coreActivity, String description, String repeatability, String requirements) {
         public Proposal { tags = List.copyOf(tags); }
     }

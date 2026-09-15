@@ -12,12 +12,19 @@ final class AiSchemas {
                 "constraints", array(object(Map.of("id", identifier(), "description", string(300), "sourceText", string(500),
                         "mode", choice("SEMANTIC_ESTIMATE", "GROUNDED_FACT"))), 0, 12),
                 "coverage", array(object(Map.of("id", identifier(), "description", string(300),
-                        "quota", Map.of("type", "integer", "minimum", 1, "maximum", size))), 0, size),
+                        "intents", array(object(Map.of("id", identifier(), "coreActivity", string(120), "fit", string(300))), 0, size + 4))), 0, size),
                 "softPreferences", array(string(300), 0, 12)));
     }
-    static Map<String, Object> batch(int size) {
-        return object(Map.of("candidates", array(object(Map.of("id", candidateId(size), "name", string(100),
-                "bucketId", identifier(), "tags", array(string(40), 0, 2), "coreActivity", string(120),
+    static Map<String, Object> allocation(int size, List<String> intentIds) {
+        return object(Map.of("planFaithful", verdict(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
+                "feasible", verdict(), "approvedIntentIds", array(choice(intentIds.toArray(String[]::new)), 0, size + 4)));
+    }
+    static Map<String, Object> batch(dev.worldcup.generation.engine.EngineModels.FixedPlan plan) {
+        int size = plan.input().size();
+        return object(Map.of("candidates", array(object(Map.of("id", candidateId(size),
+                "intentId", choice(plan.approvedIntents().stream().map(i -> i.id()).toArray(String[]::new)), "name", string(100),
+                "bucketId", choice(plan.gatePlan().coverage().stream().map(b -> b.id()).toArray(String[]::new)),
+                "tags", array(string(40), 0, 2), "coreActivity", string(120),
                 "description", string(240), "repeatability", string(240), "requirements", string(300))), size, size)));
     }
     static Map<String, Object> review(int size, int constraints) {
