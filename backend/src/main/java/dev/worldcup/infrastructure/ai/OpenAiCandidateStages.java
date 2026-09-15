@@ -40,6 +40,18 @@ public final class OpenAiCandidateStages implements EngineStages {
             Preparation, waiting and cleanup count toward a requested time limit. A conditional escape clause is not proof.
             For general activities vs specific venues/products, keep units separate. No invented brands, images or facts.
             """;
+    private static final String REQUEST_SCOPE = """
+            Distinguish whole-set output rules from the eligibility of EACH candidate.
+            Request size N is the number of tournament candidates, enforced by the server, not a candidate constraint;
+            this remains true when the prompt also asks for N options. Never invent a source excerpt for that output rule.
+            Participant counts, time limits and budgets instead qualify the actual activity and remain binding conditions.
+            A hard constraint must follow from the user's words, not just be plausible in their situation.
+            Context may guide activity fit without creating extra mandatory conditions: 'after work' specifies timing,
+            not fatigue, beginner skill or effortless setup unless the user says so. Preserve the actual timing condition.
+            Preserve what each quantity modifies: a session duration does not imply a daily frequency or a completion deadline.
+            For example, '30분씩' limits each session, not '매일'; preserve an explicit daily/weekly frequency when present.
+            Sustained hobby practice requires repeatability, not an unstated daily schedule. Do not add or drop user conditions.
+            """;
     private static final String INTERPRETATION = """
             Review interpretation separately from the proposed activities or detailed candidates.
             Compare unit, hobby, constraints (including hard/soft and factual/semantic classification), softPreferences,
@@ -61,8 +73,8 @@ public final class OpenAiCandidateStages implements EngineStages {
         this.client = client; this.clock = clock; this.generationModel = generationModel; this.reviewModel = reviewModel;
     }
     @Override public StageResult<PlanProposal> plan(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call) {
-        var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
-                PLAN ONLY; no display cards yet. First interpret context and all explicit hard constraints;
+        var reply = client.complete(generationModel, BOUNDARY + QUALITY + REQUEST_SCOPE + """
+                PLAN ONLY; no display cards yet. First separate context from explicit hard constraints;
                 then define one candidate unit; then consider ONLY related direct historical choices; finally propose feasible activity intents.
                 History must not override current conditions or erase diversity. Ignore unrelated/weak evidence.
                 Constraint sourceText must be a verbatim excerpt from the original prompt, with concise description and unique id.
@@ -85,7 +97,7 @@ public final class OpenAiCandidateStages implements EngineStages {
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public StageResult<AllocationReview> allocate(GenerationInput input, Instant referenceTime, PlanProposal proposal, CallContext call) {
-        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + INTERPRETATION + """
+        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + """
                 INDEPENDENT ALLOCATION REVIEW before quota freeze or detailed generation.
                 Do not repair the interpretation, invent new intents, or trust the planner's fit statements as proof.
                 Filter the proposed intents for realistic contextual fit, comparable granularity, genuine appeal and sustained practice
@@ -163,7 +175,7 @@ public final class OpenAiCandidateStages implements EngineStages {
         return new Grounding(facts);
     }
     @Override public StageResult<Review> review(FixedPlan plan, Batch candidates, Grounding grounding, CallContext call) {
-        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + INTERPRETATION + """
+        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + """
                 INDEPENDENT REVIEW. You have no generator conversation or generator score. Judge the actual full set, not labels.
                 For every candidate x hard constraint return exactly one PASS/FAIL/UNKNOWN assessment; missing facts are UNKNOWN.
                 Do not treat the candidate's requirements field or conditional wording as independent evidence of compliance.

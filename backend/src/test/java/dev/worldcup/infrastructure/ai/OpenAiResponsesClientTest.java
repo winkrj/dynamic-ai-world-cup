@@ -166,6 +166,29 @@ class OpenAiResponsesClientTest {
         assertThat(intentProperties.has("coreActivity")).isTrue();
         assertThat(request.path("input").asString()).doesNotContain("sk-test-only");
     }
+    @ParameterizedTest @ValueSource(ints = {8, 16, 32})
+    void planningSeparatesOutputCountWithoutRewritingActivityConditions(int size) {
+        var proposal = new PlanProposal(Decision.READY, "활동", false, false, List.of(), List.of(), List.of());
+        response = completed(json.writeValueAsString(proposal));
+        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
+        var input = new GenerationInput("매주 두 사람이 30분씩 할 활동 " + size + "개, 회당 2만원 이내", size, "ko-KR", "Asia/Seoul");
+        stages.plan(input, List.of(), Instant.now(), new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)));
+        var sent = json.readTree(request.path("input").asString());
+        assertThat(sent.path("request")).isEqualTo(json.valueToTree(input));
+        assertRequestScopeInstructions();
+        var coverage = request.path("text").path("format").path("schema").path("properties").path("coverage");
+        assertThat(coverage.path("maxItems").asInt()).isEqualTo(size);
+        assertThat(coverage.path("items").path("properties").path("intents").path("maxItems").asInt()).isEqualTo(size + 4);
+        assertThat(calls).hasValue(1);
+    }
+    private void assertRequestScopeInstructions() {
+        assertThat(request.path("instructions").asString()).contains(
+                "not a candidate constraint", "Participant counts, time limits and budgets",
+                "Context may guide activity fit without creating extra mandatory conditions",
+                "Preserve the actual timing condition",
+                "a session duration does not imply a daily frequency or a completion deadline",
+                "preserve an explicit daily/weekly frequency when present", "Do not add or drop user conditions");
+    }
     @Test void laterStageSchemasAllowOnlyExistingIntentAndBucketIds() {
         var allocation = json.valueToTree(AiSchemas.allocation(8, List.of("known-intent")));
         assertThat(allocation.path("properties").path("approvedIntentIds").path("items").path("enum").toString())
@@ -230,6 +253,7 @@ class OpenAiResponsesClientTest {
         assertThat(fields.path("field").path("enum").size()).isEqualTo(InterpretationField.values().length);
         assertThat(fields.has("sourceText")).isTrue();
         assertThat(request.path("instructions").asString()).contains("An unsuitable candidate does not itself make the interpretation unfaithful");
+        assertRequestScopeInstructions();
         assertThat(request.toString()).doesNotContain("previous_response_id");
         assertThat(request.path("tools").size()).isZero();
     }

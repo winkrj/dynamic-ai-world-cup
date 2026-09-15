@@ -2,7 +2,13 @@
 
 2026-09-16 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
 
-## 현재 구현: 해석 판정 분리와 불투명한 활동 식별자
+## 현재 구현: 요청 수량과 조건의 범위
+
+v10은 v9에서 후보 개수 8을 개별 활동 조건으로 잘못 만든 실패와, v8에서 ‘30분씩’을 ‘매일 30분’으로 강화한 판정을 보완한다. PLAN·ALLOCATE·최종 REVIEW가 같은 해석 기준을 사용한다. 후보 N개는 서버가 집행하는 목록 전체의 출력 규칙이며, 인원·활동 시간·예산은 각 후보의 적합성 조건이다. 세션 길이와 실시 빈도·완료 기한을 구분하고 사용자가 말한 빈도는 유지한다. 요청 원문이나 조건을 서버에서 삭제/치환하지 않으며, 해석 FAIL/UNKNOWN을 통과시키는 예외도 추가하지 않는다. 모델·schema·공개 계약·Repair/시간/비용 한도는 그대로다. 프롬프트 적용 회귀 테스트와 실제 의미 판정의 정확도는 별개로 기록한다.
+
+v10 실제 비교에서는 ‘퇴근 후’를 ‘피곤해도 쉽게 시작해야 함’으로 바꿔 전체 생성이 실패했다. v11은 상황 맥락과 명시적인 필수 조건을 먼저 구분한다. 맥락은 적합성 판단에 참고할 수 있지만 사용자가 말하지 않은 피로도·초보 여부·준비 부담을 새 탈락 조건으로 만들지 않는다. 실제 퇴근 후 시간 조건과 명시 조건은 유지한다. 이 보완도 후보 품질 gate를 완화하거나 이전 검토의 PASS를 재사용하지 않는다.
+
+## v8/v9 구현: 해석 판정 분리와 불투명한 활동 식별자
 
 v7 social 실패에서 `planFaithful=FAIL`과 후보 부적합 사유만 함께 반환되어, 원 입력 누락인지 후보 문제인지 구분할 근거가 없었다. v8은 사전 배정과 최종 검토 모두 `InterpretationReview(verdict, findings)`를 사용한다. 해석 finding은 `UNIT/HOBBY/CONSTRAINTS/SOFT_PREFERENCES/GROUNDING_REQUIRED` 중 항목, 원 요청의 발췌, 불일치·불명확성 설명을 갖는다. 후보 ID와 품질 사유는 기존 intent rejection/candidate finding에만 둔다. 예를 들어 조용함 조건 자체를 누락한 계획과, 조건을 올바로 담았지만 시끄러운 후보가 생긴 경우를 구별한다.
 
@@ -155,4 +161,25 @@ v9(`ce002-v9-opaque-intents`)의 같은 `hobby-home/8` 수정 후 재확인 1회
 
 2026-09-16 누적 사용량 기반 추정 **$1.4823068 / 승인 $5**, 제공자 63회 호출(4회 생성-only 비교 + 17개 pipeline 작업), 미확인 비용 예약 없음. 자동 충전 OFF를 변경하지 않았다. seed 고유 **5/18세트**의 첫 실행은 READY 1/FAILED 4이며 13세트 미실행이다. 후속 회귀 비교는 첫 실행 결과를 덮어쓰지 않는다. 요청 크기와 개별 후보 조건의 혼동, 요청에 없는 빈도 가정, 시간 판정 변동과 취미 filler의 사람 기준 일치는 남은 품질 문제다. 16/32강·검색 사실 정확도·2명 사람 평가가 미완료이므로 Goal을 완료 처리하지 않는다. 공개 계약·frontend·DB는 그대로이고 키와 비공개 실행 원본은 commit하지 않는다.
 
-공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인.
+## v10/v11 체크포인트 — 요청 범위와 실제 8/32강 연결
+
+`seed-v1/hobby-home/8`을 같은 원문으로 비교했다. v10은 출력 수량·빈도 혼동 없이 후보 8개/모든 assessment/후보 품질은 PASS였지만, ‘퇴근하고’를 피곤해도 쉽게 시작해야 한다는 새 필수 조건으로 바꿔 최종 해석 검토에서 실패했다. v11은 상황 추측과 필수 조건의 경계를 보완한 뒤 한 번 다시 실행했다. 실패한 v10 결과를 보존했고 이 요청 해석 변경에서 추가 8강 재추첨은 하지 않는다.
+
+| 버전 / 사례 | 실제 결과 | 호출 / Repair | 시간 | 추정 비용 |
+| --- | --- | --- | --- | --- |
+| v10 / hobby-home/8 | QUALITY_GATE_FAILED (해석 확대) | 4 / 0 | 68.581초 | $0.0763285 |
+| v11 / hobby-home/8 | READY, 실제 preview 8개 | 4 / 0 | 65.505초 | $0.0685255 |
+| v11 / hobby-home/16 | QUALITY_GATE_FAILED (분류 판정·활동 부족) | 2 / 0 | 47.670초 | $0.0400065 |
+| v11 / hobby-social/32 (seed 첫 실행) | READY, 실제 preview 32개 | 4 / 0 | 117.055초 | $0.1526235 |
+
+v11의 후보는 책 읽기, 스케치, 손바느질, 스도쿠·논리퍼즐, 짧은 글 쓰기, 종이접기, 외국어 읽기·쓰기, 체스 퍼즐이다. 원래 퇴근 후/집/조용함/회당 30분 조건을 보존했고 사전·최종 해석, 비교 단위, 의미 중복, 후보 품질과 모든 조건 검토를 통과했다. 익명 생성 API→worker→READY→공개 preview 연결을 확인했다. 논리퍼즐과 체스 퍼즐의 중복 판단은 v10과 달랐고 수선 포함 손바느질의 취미 경계도 사람 평가가 남으므로 한 실행으로 판정 일관성이나 사람의 후보 승인까지 주장하지 않는다.
+
+16강 비교는 16개 중 10개만 승인됐다. 에세이·시·소설, 소설·시 읽기 등 장르로 활동을 쪼갠 중복과 독서 모임 준비 같은 약한 후보가 거절됐다. 동시에 해석 검토는 ‘집에서’와 ‘30분씩’이 명시 조건이라는 이유로 SEMANTIC_ESTIMATE를 잘못된 분류라고 했다. 현재 코드에서 `ConstraintSpec`은 모두 `HardConstraint`로 변환되며 mode는 hard/soft가 아닌 검증 방법이다. 이 판정 혼동과 큰 후보군의 분할 채우기는 아직 해결하지 않았고, 해석 FAIL 때문에 Repair·상세 생성 없이 종료했다. 이전 v8의 시간 판정 실패와 달라졌다는 사실만으로 16강 품질 개선을 주장하지 않는다.
+
+32강 social 첫 실행은 33개 활동 중 요리에 포함되는 베이킹 1개를 거절한 뒤 32개를 생성했다. 비운동·사람을 실제 만나 상호작용한다는 원 조건을 보존했고 모든 자동 검토를 통과하여 공개 preview 32개를 발급했다. 검색 없는 일반 활동 추천이며 실제 특정 모임의 존재·모집 여부를 확인한 것은 아니다. 보드게임/체스/바둑, 메이커/전자공작, 즉흥극/연극의 비교 단위·중복 경계는 사람에게 별도 확인해야 한다. 자동 PASS를 사람 승인이나 32강 일반 품질 보장으로 사용하지 않는다.
+
+최종 전체 verify는 **Java 152개 실행, 실패·오류 0, 유료 1개 제외**, handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build·bootJar 통과. 집중 테스트 후 독립 리뷰 2회, 최종 Critical 0 / High 0 / actionable finding 0이며 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 46개도 공개 schema 적합(실패 응답 포함)이다. 프론트/계약/DB는 변경하지 않았다.
+
+누적 사용량 기반 추정 **$1.8197908 / 승인 $5**, 제공자 77회(4회 생성-only 비교 + 21개 pipeline 작업), 미확인 비용 예약 없음. 이번 변경의 실제 실험 4회 비용은 $0.337484다. 자동 충전 OFF는 변경하지 않았다. seed 고유 **6/18세트**의 첫 실행 READY 2/FAILED 4, 12세트 미실행이며 2명 독립 사람 평가도 남아 있다. 다음 작업은 필수 조건과 검증 방법의 판정 혼동, 큰 후보군의 의미 중복·활동 분할 및 외부 사실 검증이다. 실제 연결 성공과 이 미완료 범위를 구별하며 Goal을 완료 처리하지 않는다.
+
+공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting 기준은 2026-09-16 재확인.
