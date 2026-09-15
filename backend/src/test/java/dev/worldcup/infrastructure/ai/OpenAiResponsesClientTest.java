@@ -150,6 +150,7 @@ class OpenAiResponsesClientTest {
         assertThat(result.facts().get(1).verdict()).isEqualTo(Verdict.PASS);
         assertThat(result.facts().get(1).validUntil()).isAfter(result.facts().get(1).checkedAt());
         assertVerificationInstructions();
+        assertEvidenceScopeInstructions();
         // This is source binding only; content truth remains a separate model/human evaluation.
     }
     @ParameterizedTest @ValueSource(booleans = {true, false})
@@ -158,10 +159,11 @@ class OpenAiResponsesClientTest {
         var result = groundingStages().ground(mixedGroundingPlan(availabilityRequired), new Batch(List.of()),
                 new CallContext("job", 1, "GROUND_INITIAL", Instant.now().plusSeconds(10)));
         var facts = request.path("text").path("format").path("schema").path("properties").path("facts");
-        var expected = availabilityRequired ? List.of("availability", "access") : List.of("access");
+        var expected = availabilityRequired ? List.of("availability", "access", "walking") : List.of("access", "walking");
         assertThat(facts.path("items").path("properties").path("claimKey").path("enum")).isEqualTo(json.valueToTree(expected));
         assertThat(facts.path("maxItems").asInt()).isEqualTo(8 * expected.size());
         assertThat(request.path("instructions").asString()).contains("SEMANTIC_ESTIMATE conditions belong to the later reviewer");
+        assertEvidenceScopeInstructions();
         assertThat(result.facts().getFirst().verdict()).isEqualTo(Verdict.UNKNOWN);
     }
     @ParameterizedTest @ValueSource(strings = {"parents", "availability", "unrequested"})
@@ -188,9 +190,10 @@ class OpenAiResponsesClientTest {
     }
     private FixedPlan mixedGroundingPlan(boolean availabilityRequired) {
         var constraints = List.of(new ConstraintSpec("parents", "부모님과 함께", "부모님과", VerificationMode.SEMANTIC_ESTIMATE),
-                new ConstraintSpec("access", "계단 없이", "계단 없이", VerificationMode.GROUNDED_FACT));
+                new ConstraintSpec("access", "계단 없이", "계단과 긴 도보 이동 없이", VerificationMode.GROUNDED_FACT),
+                new ConstraintSpec("walking", "긴 도보 이동 없이", "계단과 긴 도보 이동 없이", VerificationMode.GROUNDED_FACT));
         var proposal = new PlanProposal(Decision.READY, "장소", false, availabilityRequired, constraints, List.of(), List.of());
-        return new FixedPlan(new GenerationInput("부모님과 계단 없이", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
+        return new FixedPlan(new GenerationInput("부모님과 계단과 긴 도보 이동 없이", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
                 new Plan(8, "장소", availabilityRequired, constraints.stream().map(c -> new HardConstraint(c.id(), c.mode())).toList(), List.of()), List.of());
     }
     private void stubGroundingFacts(List<FactCheck> facts) {
@@ -237,7 +240,18 @@ class OpenAiResponsesClientTest {
                 "Context may guide activity fit without creating extra mandatory conditions",
                 "Preserve the actual timing condition",
                 "a session duration does not imply a daily frequency or a completion deadline",
-                "preserve an explicit daily/weekly frequency when present", "Do not add or drop user conditions");
+                "preserve an explicit daily/weekly frequency when present", "Do not add or drop user conditions",
+                "Give independently verifiable requirements separate constraint IDs", "share a verbatim sourceText",
+                "separate step-free and short-walking conditions", "one total-budget condition",
+                "Preserve logical alternatives", "Do not invent numerical cutoffs", "Never merge or omit requirements");
+    }
+    private void assertEvidenceScopeInstructions() {
+        assertThat(request.path("instructions").asString()).contains(
+                "Evidence must support the complete claim", "An elevator does not by itself establish",
+                "do not prove that a named workshop/experience operates inside it",
+                "Preserve source limitations, dates and applicable users",
+                "verify current operation/offering", "do not invent a same-day visit",
+                "Missing support for any required part remains UNKNOWN");
     }
     private void assertVerificationInstructions() {
         assertThat(request.path("instructions").asString()).contains(
@@ -302,6 +316,8 @@ class OpenAiResponsesClientTest {
                     new CallContext("job", 1, "REVIEW_INITIAL", Instant.now().plusSeconds(10))).value();
             assertThat(reviewed.interpretation()).isEqualTo(interpretation);
             assertThat(reviewed.findings()).hasSize(1);
+            assertEvidenceScopeInstructions();
+            assertThat(request.path("instructions").asString()).contains("their PASS labels are not proof", "Independently compare each excerpt");
         }
         var properties = request.path("text").path("format").path("schema").path("properties");
         assertThat(properties.has("planFaithful")).isFalse();
@@ -309,7 +325,8 @@ class OpenAiResponsesClientTest {
         assertThat(fields.has("candidateIds")).isFalse();
         assertThat(fields.path("field").path("enum").size()).isEqualTo(InterpretationField.values().length);
         assertThat(fields.has("sourceText")).isTrue();
-        assertThat(request.path("instructions").asString()).contains("An unsuitable candidate does not itself make the interpretation unfaithful");
+        assertThat(request.path("instructions").asString()).contains("An unsuitable candidate does not itself make the interpretation unfaithful",
+                "Bundling independently verifiable requirements in one constraint is a CONSTRAINTS interpretation issue");
         assertRequestScopeInstructions();
         assertThat(request.toString()).doesNotContain("previous_response_id");
         assertThat(request.path("tools").size()).isZero();

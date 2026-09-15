@@ -58,6 +58,11 @@ public final class OpenAiCandidateStages implements EngineStages {
             Preserve what each quantity modifies: a session duration does not imply a daily frequency or a completion deadline.
             For example, '30분씩' limits each session, not '매일'; preserve an explicit daily/weekly frequency when present.
             Sustained hobby practice requires repeatability, not an unstated daily schedule. Do not add or drop user conditions.
+            Give independently verifiable requirements separate constraint IDs, even when they share a verbatim sourceText.
+            For example, '계단과 긴 도보 이동 없이' requires separate step-free and short-walking conditions.
+            Keep each predicate's qualifiers together: 'two people together under 100000 won' is one total-budget condition.
+            Preserve logical alternatives; never turn 'A or B' into mandatory A AND B. Do not invent numerical cutoffs for vague terms.
+            Never merge or omit requirements to fit the constraint limit; the planner uses UNSUPPORTED_REQUEST if faithful representation is impossible.
             """;
     private static final String INTERPRETATION = """
             Review interpretation separately from the proposed activities or detailed candidates.
@@ -70,7 +75,17 @@ public final class OpenAiCandidateStages implements EngineStages {
             Example: omitting 'quiet' from a constrained request is an interpretation CONSTRAINTS issue;
             a noisy candidate under a correctly captured quiet constraint is a candidate issue instead.
             Missing required factual lookup is an interpretation issue even if every candidate claims to comply.
+            Bundling independently verifiable requirements in one constraint is a CONSTRAINTS interpretation issue; do not silently rewrite it.
             Independently reassess interpretation; earlier approval is not proof. Never convert uncertainty into PASS.
+            """;
+    private static final String FACT_SCOPE = """
+            Evidence must support the complete claim, not one convenient part or a neighboring claim.
+            An elevator does not by itself establish a complete step-free route or short walking distance.
+            A building's existence or facilities do not prove that a named workshop/experience operates inside it.
+            Preserve source limitations, dates and applicable users; do not promote a restricted or historic notice into a current guarantee.
+            For availability, verify the actual offered experience and any requested timing, not merely the parent venue.
+            Without requested timing, verify current operation/offering; do not invent a same-day visit or require a booking guarantee.
+            Missing support for any required part remains UNKNOWN; a candidate's promise to check later is not evidence.
             """;
     private final OpenAiResponsesClient client;
     private final Clock clock;
@@ -154,7 +169,7 @@ public final class OpenAiCandidateStages implements EngineStages {
         if (plan.specification().groundingRequired()) claimIds.add("availability");
         plan.specification().constraints().stream().filter(c -> c.mode() == VerificationMode.GROUNDED_FACT).forEach(c -> claimIds.add(c.id()));
         if (claimIds.isEmpty()) throw new InvalidModelOutput();
-        var reply = client.complete(reviewModel, BOUNDARY + """
+        var reply = client.complete(reviewModel, BOUNDARY + FACT_SCOPE + """
                 You are a separate factual verifier, NOT the candidate generator. Use actual web search/opened source content.
                 Verify each candidate's availability (claimKey=availability when required) and every GROUNDED_FACT constraint.
                 Return facts only for claim keys allowed by the schema; SEMANTIC_ESTIMATE conditions belong to the later reviewer.
@@ -183,11 +198,12 @@ public final class OpenAiCandidateStages implements EngineStages {
         return new Grounding(facts);
     }
     @Override public StageResult<Review> review(FixedPlan plan, Batch candidates, Grounding grounding, CallContext call) {
-        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + """
+        var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + FACT_SCOPE + """
                 INDEPENDENT REVIEW. You have no generator conversation or generator score. Judge the actual full set, not labels.
                 For every candidate x hard constraint return exactly one PASS/FAIL/UNKNOWN assessment; missing facts are UNKNOWN.
                 Do not treat the candidate's requirements field or conditional wording as independent evidence of compliance.
-                For GROUNDED_FACT rely only on supplied verified facts; evaluate whether their excerpts actually support the condition.
+                For GROUNDED_FACT use only supplied factual assessments; their PASS labels are not proof.
+                Independently compare each excerpt with the complete condition and return UNKNOWN when support is insufficient.
                 Mark candidateQuality FAIL for forced filler, chores posing as hobbies, weak sustained appeal, padding or fit issues.
                 Comparable units and noSemanticDuplicates must be assessed separately. Renamed subtypes and broad parent/child overlap fail.
                 Names/descriptions/requirements must express the linked approved intent, not disguise another activity behind its ID.

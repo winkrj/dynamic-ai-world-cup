@@ -132,6 +132,34 @@ class CandidateQualityGateTest {
         var availabilityOnly = ev.facts().stream().filter(f -> f.claimKey().equals("availability")).toList();
         rejects(groundedPlan(), candidates(8), new Evidence(ev.assessments(), availabilityOnly, Verdict.PASS, Verdict.PASS, "test"), GROUNDING_UNVERIFIED);
     }
+    @ParameterizedTest @ValueSource(strings = {"missing", "unknown", "review-reject", "pass"})
+    void stepFreeEvidenceCannotSubstituteForWalkingEvidence(String walkingState) {
+        var constraints = List.of(new HardConstraint("step-free", VerificationMode.GROUNDED_FACT),
+                new HardConstraint("short-walking", VerificationMode.GROUNDED_FACT));
+        var plan = new Plan(8, "취미 활동", false, constraints, plan(8).coverage());
+        var assessments = new ArrayList<Assessment>();
+        var facts = new ArrayList<GroundedFact>();
+        for (int i = 0; i < 8; i++) for (var constraint : constraints) {
+            boolean walking = constraint.id().equals("short-walking");
+            assessments.add(new Assessment("c-" + i, constraint.id(),
+                    walking && walkingState.equals("review-reject") ? Verdict.UNKNOWN : Verdict.PASS));
+            if (walking && walkingState.equals("missing")) continue;
+            facts.add(new GroundedFact("c-" + i, constraint.id(), walking && walkingState.equals("unknown") ? Verdict.UNKNOWN : Verdict.PASS,
+                    "https://example.invalid/fixture", walking ? "SYNTHETIC walking evidence" : "SYNTHETIC step-free evidence",
+                    NOW.minusSeconds(60), NOW.plusSeconds(3600)));
+        }
+        var result = gate.validate(plan, candidates(8), new Evidence(assessments, facts, Verdict.PASS, Verdict.PASS, "independent-test"), NOW);
+        if (walkingState.equals("pass")) {
+            assertThat(result.passed()).isTrue();
+        } else {
+            assertThat(result.validated()).isEmpty();
+            assertThat(result.issues()).allSatisfy(issue -> {
+                assertThat(issue.detail()).isEqualTo("short-walking");
+                assertThat(issue.code()).isEqualTo(walkingState.equals("review-reject") ? HARD_CONSTRAINT_UNVERIFIED : GROUNDING_UNVERIFIED);
+            });
+            assertThat(result.issues()).hasSize(8);
+        }
+    }
     @ParameterizedTest @ValueSource(strings = {"stale", "future", "expired", "unverified", "no-source", "no-excerpt", "http"})
     void rejectsUnusableGroundedEvidence(String problem) {
         var ev = groundedEvidence(); var facts = new ArrayList<>(ev.facts()); var f = facts.getFirst();

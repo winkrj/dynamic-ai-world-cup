@@ -186,6 +186,27 @@ class StagedCandidateEngineTest {
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
         assertThat(stages.repairs).isZero();
     }
+    @Test void separatelyAssessedPredicatesMayShareAVerbatimSourceExcerpt() {
+        var constraints = List.of(new ConstraintSpec("home", "집에서 가능", "집에서 조용한", VerificationMode.SEMANTIC_ESTIMATE),
+                new ConstraintSpec("quiet", "조용하게 가능", "집에서 조용한", VerificationMode.SEMANTIC_ESTIMATE));
+        stages.planTransform = p -> new PlanProposal(p.decision(), p.unit(), p.hobby(), p.groundingRequired(), constraints, p.coverage(), p.softPreferences());
+        stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS,
+                batch.candidates().stream().flatMap(c -> constraints.stream().map(condition -> new Assessment(c.id(), condition.id(), Verdict.PASS))).toList(), List.of());
+        var result = engine.generate(input(8), context());
+        assertThat(result.candidates().plan().hardConstraints()).containsExactly(
+                new HardConstraint("home", VerificationMode.SEMANTIC_ESTIMATE), new HardConstraint("quiet", VerificationMode.SEMANTIC_ESTIMATE));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
+    }
+    @Test void bundledInterpretationFindingStopsBeforeGenerationWithoutCandidateRepair() {
+        stages.planTransform = p -> new PlanProposal(p.decision(), p.unit(), p.hobby(), p.groundingRequired(),
+                List.of(new ConstraintSpec("home-quiet", "집에서 조용하게 가능", "집에서 조용한", VerificationMode.SEMANTIC_ESTIMATE)), p.coverage(), p.softPreferences());
+        stages.allocationFunction = p -> new AllocationReview(new InterpretationReview(Verdict.FAIL, List.of(new InterpretationFinding(
+                InterpretationField.CONSTRAINTS, "집에서 조용한", "장소와 소음 조건을 각각 검증해야 함"))),
+                Verdict.PASS, Verdict.PASS, Verdict.PASS, p.intents().stream().map(ActivityIntent::id).toList(), List.of());
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+        assertThat(stages.repairs + stages.intentRepairs).isZero();
+    }
     @ParameterizedTest @ValueSource(strings = {"allocation", "final"})
     void malformedOrContradictoryInterpretationEvidenceNeverAllowsRepair(String phase) {
         var finding = new InterpretationFinding(InterpretationField.CONSTRAINTS, "조용한", "해석 불일치");
@@ -301,6 +322,7 @@ class StagedCandidateEngineTest {
         String patchMode = "valid";
         String source = "조용한"; List<String> lastReplacementIds;
         VerificationMode constraintMode = VerificationMode.SEMANTIC_ESTIMATE;
+        Function<PlanProposal, PlanProposal> planTransform = Function.identity();
         Function<PlanProposal, AllocationReview> allocationFunction = plan -> allocation(plan, plan.intents().stream().map(ActivityIntent::id).toList());
         BiFunction<Batch, Integer, Review> reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
         @Override public StageResult<PlanProposal> plan(GenerationInput input, List<CandidateEngine.Preference> history, Instant time, CallContext call) {
@@ -310,6 +332,7 @@ class StagedCandidateEngineTest {
                     omitConstraints ? List.of() : List.of(new ConstraintSpec("quiet", "조용해야 한다", source, constraintMode)),
                     readingVariants ? List.of(new BucketSpec("reading", "독서", intents.subList(0, 3)), new BucketSpec("broad", "합성 테스트 활동", intents.subList(3, intents.size())))
                             : List.of(new BucketSpec("broad", "합성 테스트 활동", intents)), List.of());
+            originalPlan = planTransform.apply(originalPlan);
             return new StageResult<>(originalPlan, "fake-plan");
         }
         @Override public StageResult<AllocationReview> allocate(GenerationInput input, Instant time, PlanProposal proposal, CallContext call) {

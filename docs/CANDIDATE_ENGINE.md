@@ -2,7 +2,13 @@
 
 2026-09-16 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
 
-## 현재 구현: 검증 방법과 사실 확인 범위 분리
+## 현재 구현: 조건별 근거와 판정의 범위
+
+v13의 실제 응답은 ‘무계단·짧은 동선’을 하나의 조건으로 묶고 엘리베이터 근거만으로 둘 다 PASS 처리했다. v14는 기존 평면 constraint 목록을 그대로 사용하면서 독립적으로 확인할 조건마다 ID를 나눈다. 한 원문 발췌를 여러 조건이 공유할 수 있다. ‘두 사람 합계 10만원’의 인원·금액 수식 관계, A 또는 B의 선택 관계는 유지하고 임의의 거리/시간 수치를 만들지 않는다. 조건 수 제한을 맞추려고 합치거나 누락하지 않으며 충실한 표현이 불가능하면 계획 단계에서 지원 불가로 종료한다. 사전·최종 해석 검토는 조건 묶음을 CONSTRAINTS 문제로 보고하고 후보 Repair로 원 해석을 바꾸지 않는다.
+
+GROUND와 최종 REVIEW는 정확한 후보 경험·조건 전체·요청 시점·출처의 적용 대상과 제약을 대조한다. 엘리베이터를 짧은 보행의 근거로, 건물의 존재를 내부 공방 운영의 근거로 확대하지 않는다. 시점이 없으면 현재 운영·제공 여부를 확인하되 당일 방문이나 예약 보장을 새 조건으로 만들지 않는다. 최종 검토는 앞 단계의 PASS 표시도 근거 자체로 믿지 않고 excerpt와 조건을 다시 비교한다. Java gate의 각 ID별 assessment/fact 의무는 유지하며 API·저장 JSON·모델·호출 수·Repair·비용 한도는 바꾸지 않는다. 이 수정이 실제 조건 분리와 사실 판단 정확도를 보장하는지는 아래 실제 평가로 구분한다.
+
+## v12/v13 구현: 검증 방법과 사실 확인 범위 분리
 
 v11의 16강 검토는 ‘집에서/30분씩’이 명시 조건이라는 이유로 SEMANTIC_ESTIMATE를 거절했다. 서버에서 모든 constraints는 모드와 관계없이 HardConstraint이고, 모드는 증거를 얻는 방법이다. v12는 PLAN에만 있던 모드 정의를 모든 단계의 공통 지침으로 옮긴다. 일반 활동의 집에서 수행/조용함/회당 시간 적합성은 의미 판단이 가능하지만, 실제 장소의 가격·운영·접근성·요청 시점 이용 여부는 외부 근거가 필요하다. 명시/숫자 조건이라는 사실만으로 검색을 요구하거나, 근거가 없다고 실제 사실을 의미 판단으로 낮추지 않는다. 두 방식 모두 누락/FAIL/UNKNOWN은 차단한다. enum·내부 저장 JSON·공개 계약·DB·Repair/시간/비용 한도는 변경하지 않는다.
 
@@ -206,4 +212,16 @@ v11의 후보는 책 읽기, 스케치, 손바느질, 스도쿠·논리퍼즐, �
 
 누적 사용량 기반 추정 **$2.4654548 / 승인 $5**, 제공자 92회(4회 생성-only 비교 + 24개 pipeline 작업), 미확인 비용 예약 없음. 이번 v12/v13의 실제 실험 3회 비용은 $0.645664이며 자동 충전 OFF는 변경하지 않았다. seed 고유 **7/18세트**, 첫 실행 READY 2/FAILED 5, 11세트 미실행이다. 버전별 후속 성공이 첫 실행 실패를 덮지 않는다. 취미 분할·filler의 사람 기준, 외부 사실 정확도, 2명 독립 사람 평가가 남아 있어 Goal은 미완료다. 다음 우선순위는 결합된 조건의 일부 근거를 전체 PASS로 확장하는 오류와 장소의 실재·이용 가능성 확보이며, 조건 완화·추가 과금 한도·새 제공자를 임의로 도입하지 않는다.
 
-공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting 기준은 2026-09-16 재확인.
+## v14 체크포인트 — 실제 조건 분리와 근거 부족 처리
+
+`seoul-parent/8`을 같은 원문으로 한 번 비교했다. **QUALITY_GATE_FAILED**, 261.253초, 제공자 8회/상세 Repair 1회, $0.5165575. PLAN은 부모님 동반/서울/실내/무계단/긴 도보 없음의 5개 조건을 만들었고 마지막 두 조건은 같은 원문 발췌를 공유하면서 별도 ID로 유지했다. 사전·최종 해석 검토는 모두 PASS였다. 초기/재검토의 사실 응답은 각각 40개였고 모든 후보의 보행 조건은 UNKNOWN이었다. 재검색에서 두 공연장의 무계단 항목이 PASS가 되어도 보행 항목은 계속 UNKNOWN으로 남았다. 이번 실행에서는 부분 근거를 다른 조건의 PASS로 확장하던 문제가 나타나지 않았지만, 무계단 판정 자체의 동선·이용 대상 적용까지 정확하다고 인증한 것은 아니다.
+
+8곳을 실제 이용 가능한 후보셋으로 검증하는 데에는 실패했다. 여유 승인 활동 없이 만든 세트라 Repair는 같은 장소의 확인 필요 문구만 보완했고, 새 독립 검색/검토도 근거 부족을 해결하지 못했다. 추가 Repair·강수 축소·preview 발급 없이 종료했다. 조건 분리/차단의 실제 동작과 사실 확보 능력은 별개이며, 같은 사례의 추가 재추첨은 하지 않았다. 다음 사실 품질 보완에서는 후보 선정 시점의 검증 가능성과 유효한 대체 활동 확보를 검토해야 한다.
+
+미실행이었던 `seed-v1/hobby-solo/16` 첫 실행은 **READY·preview 16개**, 97.283초, 제공자 4회/Repair 0회, $0.1074955였다. 비운동과 월 총비용 10만원 조건은 각각 SEMANTIC_ESTIMATE로 유지했고, ‘혼자 하는 걸 좋아한다’는 선호로 처리하여 혼자 가능한 활동을 구성했다. 사전·최종 해석, 후보 품질·중복, 모든 조건의 자동 검토를 통과했다. 일반 활동 제안이며 특정 서비스의 실제 가격을 검색해 확인한 것은 아니다. 독서, 창작 글쓰기, 외국어, 온라인 체스·바둑, 논리퍼즐, 드로잉, 종이공예, 뜨개질, 자수, 점토, 직소, 식물, 요리 실험, 음반 감상, 웹페이지 만들기, 사진 산책이 포함됐다. 한 카드의 체스·바둑 묶음과 기존 기기/주방을 전제한 초기 비용·월 비용 해석은 사람 기준과 추가 대조해야 하며 자동 PASS를 최종 품질 승인으로 사용하지 않는다.
+
+v14 최종 전체 verify: **Java 165개 실행, 실패·오류 0, 유료 1개 제외**, handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build·bootJar 통과. 집중 테스트 114개 후 독립 리뷰 1회, Critical 0 / High 0 / actionable 0이며 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 58개도 공개 schema 적합(실패 응답 포함). 공개 계약·프론트 코드·DB·모델/호출 한도는 변경하지 않았고 키/비공개 응답은 gitignored 상태를 확인했다.
+
+누적 사용량 기반 추정 **$3.0895078 / 승인 $5**, 제공자 104회(4회 생성-only 비교 + 26개 pipeline 작업), 미확인 비용 예약 없음. v14의 실제 실험 2회 비용은 $0.624053이다. seed 고유 **8/18세트**, 첫 실행 READY 3/FAILED 5, 10세트 미실행이며 2명 독립 사람 평가도 남아 있다. 자동 충전 OFF를 변경하지 않았다. **현재 잔여 $1.9104922는 검색 호출의 기존 보수적 예약액 $2.00보다 작아 추가 유료 검색은 시작할 수 없다.** 이는 승인액을 전부 소비했다는 뜻이 아니며 예약 정책이나 승인 한도를 임의로 완화하지 않는다. 일반 활동 실험과 비용 없는 구현/분석은 계속할 수 있다. 사실 정확도·취미 후보의 사람 기준·미실행 평가가 남아 Goal은 미완료다.
+
+공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting·Structured outputs의 의미 오류 한계는 2026-09-16 재확인.
