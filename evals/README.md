@@ -18,6 +18,10 @@ runId, caseId, size, startedAt, timezone, strategy, model/provider/prompt/schema
 
 API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/local/`(gitignore)에 보관하고 제출용 익명화 결과만 review 후 commit한다. 오류와 실패 결과도 유지한다.
 
+## 사람 검토 자료
+
+[후보 평가 R](review/R.md)는 기존 실제 미리보기 한 세트의 이름·태그·순서를 옮긴 검토용 자료다. 평가자에게는 이 시트만 전달하고 두 사람의 답변을 별도로 받는다. 공개 자료와 앞선 대화를 이미 본 경우 그 노출을 기록하며 완전한 눈가림을 주장하지 않는다. 원 실행 대응과 한계는 `docs/CANDIDATE_ENGINE.md`의 ‘사람 검토 인계’에 남긴다. 아직 사람 점수나 품질 승인은 없다.
+
 ## 실행 현황과 구분
 
 2026-09-16: `seed-v1` 고유 **11/18세트**를 처음 실행했다. 첫 결과는 READY 5세트(home/8, social/32, solo/8·16·32), `QUALITY_GATE_FAILED` 6세트(social/8·16, home/16·32, seoul-indoor/8, seoul-parent/8)다. 일반 취미 9세트의 최초 실행을 마쳤고 외부 사실이 필요한 7세트는 미실행이다. 후속 비교는 첫 결과를 덮어쓰지 않는다. v15 solo/32는 사전 Repair 후 preview까지 연결됐지만 퍼즐·그림·독서 분할과 비운동 제외 조건의 soft 분류를 자동 검토가 통과시켜 사람 기준을 충족했다고 보지 않는다. home/32는 시간 조건 해석과 포괄적인 강좌 후보 문제로 차단됐다. 이전 Terra/Luna 생성-only 4회와 별도 `hobby-calibration`은 seed 완료로 세지 않는다. 버전별 실행·비용·검색 예약 제약은 `docs/CANDIDATE_ENGINE.md`에 통합 기록한다. 2명 독립 사람 평가는 미완료다.

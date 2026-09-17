@@ -264,4 +264,12 @@ v15 비용 합계 **$0.393268**, 누적 **$3.4827758 / 승인 $5**, 제공자 **
 
 누적 사용량 기반 추정 **$3.7327338 / 승인 $5**, 제공자 **124회**(생성-only 4회 + pipeline 30작업), 미확인 비용 예약 없음. seed 최초 실행은 여전히 **11/18, READY 5/FAILED 6**이고 이번 후속 비교로 덮어쓰지 않는다. 자동 충전 OFF를 변경하지 않았으며 **잔여 $1.2672662 < 검색 예약 $2.00**로 유료 검색 보류를 유지한다. 큰 후보군의 품질, 외부 사실 7세트, 2명 독립 사람 평가가 남아 Goal은 미완료다. 동일 입력을 추가로 재추첨하지 않았다.
 
+## 사람 검토 인계
+
+[후보 평가 R](../evals/review/R.md)은 위 v16 `seed-v1/hobby-solo/32`의 실제 preview를 사람이 검토하도록 옮긴 자료다. 원본은 gitignored `reports/local/live-engine/2026-09-15T16-38-06.656128Z-size32/preview.json`이다. 번호 1–32는 원본 순서의 c1–c32이며 이름·태그를 수정하지 않았다. 이미지 값은 모두 null이다. 공개 seed 질문과 preview의 이름·태그만 옮겼으며 내부 설명·조건 근거·자동 판정·비공개 실행 식별자는 시트에 넣지 않았다.
+
+평가자에게는 시트만 전달한다. 이 기록을 읽으면 버전을 알 수 있고 이전 대화도 있으므로 엄밀한 눈가림을 보장하지 않으며, 사전 노출을 기록한다. 미리보기 정보만으로 예산이나 실행 가능성을 확인할 수 없다면 UNKNOWN을 유지한다. 이 자료는 사용자에게 실제 보이는 후보의 검토이지, 내부 근거 전체에 대한 사실 인증이 아니다. 두 사람의 독립 답변과 필요한 추가 근거가 아직 없으며, 18세트 평가나 모델 선정 완료로 집계하지 않는다.
+
+사람 평가와 명확한 통과/실패 기준을 함께 사용하는 [OpenAI 평가 지침](https://developers.openai.com/api/docs/guides/evaluation-best-practices)을 참고했다. 기존 평가 축·기준은 유지한다. 이번 인계는 기존 결과를 재사용했으며 추가 유료 호출은 없다. 같은 후보를 계속 재생성하거나 사람 의견을 AI 점수로 대신하지 않는다. 다음 판단은 후보 경계·지속성에 대한 두 사람의 독립 피드백이고, 외부 사실 7세트의 유료 실행은 기존 검색 예약액과 남은 예산 때문에 별도 보류한다.
+
 공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting·Structured outputs의 의미 오류 한계와 속성 순서는 2026-09-16 재확인.
