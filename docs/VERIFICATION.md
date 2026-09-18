@@ -1,5 +1,15 @@
 # 검증 기록
 
+## 2026-09-18 조건 해석 단일 진단 도구 — 유료 실행 전 준비
+
+test-only `RecordedAllocation`/`LiveInterpretationDiagnosticTest`와 오프라인 테스트를 추가했다. 고정 v20 첫 ALLOCATE의 원본 hash·요청·기준 시각·계획을 보존하고 v21 검토기만 1회 호출하도록 분리했다. PLAN/후보 생성/Repair/검색은 없다. 별도 opt-in, 기존 full live test OFF, 고정 경로의 원자적 생성, 정확한 누적 장부 대조, $0.50 예약/$6 전체 한도, 중단 시 보수적 장부 보존으로 범위를 제한한다. production/API/모델/품질 기준 변경은 없다.
+
+- 관련 오프라인 검증 **68개 PASS**: 새 진단 지원 12개, 기존 client 52개·DB ledger 4개. 유료 진단 1개는 제외했다. 원본 입력을 고치지 않고 allocate만 한 번 호출, 다른 verdict/엉뚱한 근거를 검출 성공으로 세지 않음, 미확인 비용 합산과 잘못된 장부 차단을 확인했다.
+- 독립 리뷰 1차 Critical 0/High 0/Medium 1: 비용 장부를 직접 덮어쓰면 중단 시 기존 예약이 손상될 수 있었다. 임시 파일 완성 후 원자적으로 교체하도록 수정하고 관련 회귀를 재실행했다. 2차 **Critical 0 / High 0 / 남은 actionable 0**.
+- 리뷰 이후 최종 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false ./scripts/verify.sh` 종료 0: **Java 325개 실행/실패·오류 0/유료 2개 제외(총 327)**, frontend 60개, handoff 6개, release 13개, fixture 5개·생성 TS, HTTP 166개/9 schemas, 웹 build·bootJar·appJar PASS. JAR는 production 변경이 없어 동일 입력 UP-TO-DATE, Java 테스트는 실제 재실행했다.
+
+원본 v20 hash와 누적 장부 $4.8498083을 읽기 전용으로 재확인했다. 실제 진단은 미승인·미실행이며 추가 provider 호출/비용 0, 자동 충전 OFF 설정 변경 없음이다. 실제 파일 교체 중 프로세스 강제 종료나 전원 장애 실험은 하지 않았다. 검토기가 오류를 발견하는지와 전체 32강 품질은 미검증 상태로 남긴다. 실행 전제와 결과 해석은 `evals/README.md`의 단일 진단 절을 따른다.
+
 ## 2026-09-18 TD-47 — 제외 조건 분류 지침, 추가 유료 호출 없음
 
 v20에서 비운동 제외가 soft로 내려간 경로를 read-only Explorer와 별도로 대조했다. 서버의 구조/원문 포함 검사와 해석 verdict 집행은 의미 오분류 자체를 판별하지 않는다는 한계를 확인했다. 공통 프롬프트에 직접 거부·상대적 선호·부정문의 대조 기준과 독립 검토의 CONSTRAINTS finding 지침만 추가하고 v21로 버전 관리했다. 정책 v3-engine-v21은 이전 기준의 DB 승인 세트를 자동 재사용하지 않도록 분리한다. 모델/schema/API/Repair/시간·비용 예약/프론트/게임 규칙 변경은 없다.

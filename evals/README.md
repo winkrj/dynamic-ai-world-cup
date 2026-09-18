@@ -33,3 +33,14 @@ API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/loc
 2026-09-16: `seed-v1` 고유 **11/18세트**를 처음 실행했다. 첫 결과는 READY 5세트(home/8, social/32, solo/8·16·32), `QUALITY_GATE_FAILED` 6세트(social/8·16, home/16·32, seoul-indoor/8, seoul-parent/8)다. 일반 취미 9세트의 최초 실행을 마쳤고 외부 사실이 필요한 7세트는 미실행이다. 후속 비교는 첫 결과를 덮어쓰지 않는다. v15 solo/32는 사전 Repair 후 preview까지 연결됐지만 퍼즐·그림·독서 분할과 비운동 제외 조건의 soft 분류를 자동 검토가 통과시켜 사람 기준을 충족했다고 보지 않는다. home/32는 시간 조건 해석과 포괄적인 강좌 후보 문제로 차단됐다. 이전 Terra/Luna 생성-only 4회와 별도 `hobby-calibration`은 seed 완료로 세지 않는다. 버전별 실행·비용·검색 예약 제약은 `docs/CANDIDATE_ENGINE.md`에 통합 기록한다. 2명 독립 사람 평가는 미완료다.
 
 유료 harness는 `CANDIDATE_LIVE_CASE`로 이 파일의 사례 ID를 선택하며 질문 원문을 변경하지 않는다. 기본 `hobby-calibration`은 datasetVersion `calibration-2026-09-15`로 별도 표시한다. `CANDIDATE_LIVE_SIZE=8|16|32`; 일반 검증에서는 `CANDIDATE_LIVE_TEST=false`로 실제 과금을 막는다. 정확한 실행 환경·키/예산 주입·누적 비용 대조는 `docs/CANDIDATE_ENGINE.md`를 따른다.
+
+## 재생성 없는 조건 해석 진단 — 준비 완료, 유료 실행 미승인
+
+`LiveInterpretationDiagnosticTest`는 기록된 v20의 첫 ALLOCATE 입력만 v21 검토기에 보내는 별도 진단이다. 원래 요청·기준 시각·잘못 분류된 계획을 그대로 보존하고, PLAN/후보 생성/Repair/검색/preview를 실행하지 않는다. 목적은 비운동 제외 조건이 softPreferences에만 들어간 오류를 검토기가 발견하는지 확인하는 것이다. 중복 해결이나 32강 품질 승인, seed 첫 실행으로 집계하지 않는다.
+
+일반 검증에서는 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false`를 유지한다. **별도 명시 승인 후에만** 후자를 `true`로 바꾸고 `./gradlew --no-daemon test --tests '*LiveInterpretationDiagnosticTest'` 한 클래스를 실행한다. 전자는 반드시 `false`여야 한다. 키는 기존 비공개 환경으로만 주입하며, 승인·자동 충전 OFF·전체 누적 장부를 먼저 확인한다. 환경 플래그나 잔여 예산 자체는 승인이 아니다.
+
+- 고정 v20 기록의 SHA-256과 누적 장부 $4.8498083이 맞아야 실행한다. 과거 생성-only 4회 $0.0725468 및 미확인 비용을 포함한다. 1회 예약 $0.50/전체 $6 이내이며 다른 실험으로 장부가 달라졌다면 재검토 없이 기준값을 바꾸지 않는다.
+- 고정 로컬 경로 `reports/local/live-engine/interpretation-v20-allocate-v21-once`를 원자적으로 생성해 재실행을 차단한다. 실패·중단돼도 지우거나 이름을 바꿔 재시도하지 않는다. 호출 전 미확인 예약을 기록하고 응답/DB 장부로 갱신한다. 장부는 같은 디렉터리의 임시 파일 완성 후 원자적으로 교체하며 기존 예약 파일을 먼저 비우지 않는다. 테스트 실패를 이유로 자동 재호출하지 않는다.
+- 해석 FAIL과 원문에 연결된 CONSTRAINTS finding을 함께 확인한다. PASS/UNKNOWN, 후보 중복만 지적한 결과, 엉뚱한 필드의 FAIL은 검출 성공이 아니다. 검출 표시는 사람의 이유 검토가 필요하며 후보 품질 PASS로 승격하지 않는다.
+- 원시 기록과 비용은 gitignore인 로컬 경로에만 보존한다. 아직 실제 진단은 실행하지 않았고 추가 비용은 없다.
