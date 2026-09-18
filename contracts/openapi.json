@@ -3,7 +3,7 @@
   "info": {
     "title": "Dynamic AI World Cup API",
     "version": "1.0.0",
-    "description": "Contract baseline. Only health is implemented in CE-001. See docs/API_CONTRACT.md for ownership, idempotency and cross-field invariants."
+    "description": "Backend endpoints are implemented on the server/engine branches; main may lag until integration. See docs/API_CONTRACT.md for ownership, idempotency and cross-field invariants, and docs/INTEGRATION_SPEC.md for UI integration. Endpoint implementation does not imply candidate-quality or frontend completion."
   },
   "servers": [
     {

@@ -1,6 +1,6 @@
 # 백엔드 API 설계와 작업 경계
 
-2026-09-14, B-002/003/004 서버 범위. 기존 Technical Design v1.0과 공개 DTO/경로는 유지한다. 실제 Candidate Engine은 별도 품질 개발 작업이며 이 문서의 합성 테스트를 실제 추천 성능으로 해석하지 않는다.
+2026-09-14, B-002/003/004 서버 범위. 기존 Technical Design v1.0과 공개 DTO/경로는 유지한다. 실제 Candidate Engine은 별도 품질 개발 작업이며 이 문서의 합성 테스트를 실제 추천 성능으로 해석하지 않는다. 아래 엔진 미구현 설명은 당시 체크포인트다. 이후 실제 adapter 연결은 [엔진 문서](CANDIDATE_ENGINE.md), 시안 4와 현재 서버의 연결·동일 origin 산출물은 [제품 통합 Spec](INTEGRATION_SPEC.md)을 따른다.
 
 ## Google API 원칙의 적용 범위
 

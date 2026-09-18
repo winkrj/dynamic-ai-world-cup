@@ -35,3 +35,30 @@ tasks.named('test') {
 }
 
 sourceSets.test.resources.srcDir('../contracts/fixtures')
+
+// The frontend build is an explicit input only to the combined application artifact.
+// Keep backend tests, processResources and the default bootJar independent of dist.
+tasks.register('appJar', org.springframework.boot.gradle.tasks.bundling.BootJar) {
+	group = 'build'
+	description = 'Packages the backend with the prebuilt frontend/dist web application.'
+	archiveClassifier = 'app'
+	mainClass = tasks.named('bootJar').flatMap { it.mainClass }
+	targetJavaVersion = tasks.named('bootJar').flatMap { it.targetJavaVersion }
+	classpath = sourceSets.main.runtimeClasspath
+	def webDist = layout.projectDirectory.dir('../frontend/dist')
+	from(webDist) {
+		into 'BOOT-INF/classes/static'
+		include 'index.html'
+		// Only public build artifacts; omit source maps, source files and dotfiles.
+		include 'assets/**/*.js', 'assets/**/*.css'
+		include 'assets/**/*.png', 'assets/**/*.jpg', 'assets/**/*.jpeg', 'assets/**/*.gif'
+		include 'assets/**/*.svg', 'assets/**/*.webp', 'assets/**/*.avif', 'assets/**/*.ico'
+		include 'assets/**/*.woff', 'assets/**/*.woff2', 'assets/**/*.ttf', 'assets/**/*.otf'
+		exclude '**/.*', '**/.*/**'
+	}
+	doFirst {
+		if (!webDist.file('index.html').asFile.isFile()) {
+			throw new GradleException('frontend/dist/index.html is missing. Run npm run build:web from the repository root before appJar.')
+		}
+	}
+}

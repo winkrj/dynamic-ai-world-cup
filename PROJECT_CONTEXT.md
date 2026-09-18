@@ -1,6 +1,6 @@
 # 프로젝트 컨텍스트
 
-갱신일: 2026-09-16.
+갱신일: 2026-09-18.
 
 목적: 좋은 후보군과 빠른 A/B 선택으로 결정 비용을 줄이는 Dynamic AI World Cup. Candidate Quality가 우선이다.
 
@@ -26,6 +26,8 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 2026-09-14 API Goal 브랜치 `feat/server/backend-api`: 구현·최종 verify·독립 review 완료. Java 78개, 실제 HTTP 응답 102개/8개 schema, 기존 fixture 5개, 웹 build, bootJar 통과. 리뷰 1회차 Medium 2개를 수정했고 2회차 Critical 0 / High 0 / 남은 finding 0. 실제 dev 서버의 자동 worker·8강 기록·공유 replay도 확인했다. 아직 main에 병합한 상태는 아니며 실제 엔진/프론트 완성·배포 완료를 의미하지 않는다. 상세는 `docs/VERIFICATION.md`다.
 
 ## 다음 작업
+
+현재 우선순위는 **시안 4 기반 제품 통합**이다. 사용자가 대결 A(상하 카드)를 선택했다. [제품 통합 Spec](docs/INTEGRATION_SPEC.md)에 기획·화면·공개 API·실제 코드 차이와 A/B 소유 경계를 묶었다. 후보 엔진의 추가 수정/유료 실험은 보류하고 통합용 현재 버전을 사용하되 운영 품질 승인을 의미하지 않는다. `feat/server/design-integration`에서 B는 동일 origin app jar와 공유 deep-link 진입을 구현한다. A의 실제 화면·전체 완주는 별도이며, GitHub 프론트 브랜치는 아직 초기 shell이다. 아래는 보존된 엔진 체크포인트다.
 
 2026-09-16 최신 CE-002/v16: 실행마다 PLAN schema 속성 순서가 달라 후보를 조건보다 먼저 쓰던 구조적 불일치를 고쳤다. 조건·선호→비교 단위/성격·grounding→결정→coverage 순서를 고정한다. 새 필드·모델 호출 없이 기존 Context/Constraint→Unit→Coverage 설계를 반영한다. v15의 단일 선택 기준, 조건별 근거/독립 검토, 사전·상세 Repair **합계 최대 1회**, 시간/비용 한도와 공개 API는 그대로다.
 

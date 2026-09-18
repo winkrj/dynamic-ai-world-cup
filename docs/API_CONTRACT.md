@@ -1,6 +1,6 @@
 # API contract v1.0
 
-`contracts/openapi.json`이 DTO source of truth다. 아래 endpoint의 서버·저장 경로를 구현했다. 실제 AI 엔진은 미연결이며 개발용 합성 provider 또는 기본 fail-closed provider로 동작한다. 구현/검증 경계는 `BACKEND_DESIGN.md`와 `VERIFICATION.md`를 함께 읽는다.
+`contracts/openapi.json`이 DTO source of truth다. 아래 endpoint의 서버·저장 경로를 구현했다. 현재 엔진 브랜치에는 실제 AI adapter도 연결되어 있으며 `live`는 명시적 키·예산이 필요하다. `dev`는 합성 provider, 기본 profile은 fail-closed다. 실제 연결과 운영 품질 승인은 별개이며 `CANDIDATE_ENGINE.md`를 따른다. 시안과 API의 조정 기준은 [제품 통합 Spec](INTEGRATION_SPEC.md), 서버 구현/검증 경계는 `BACKEND_DESIGN.md`와 `VERIFICATION.md`를 함께 읽는다.
 
 프론트 담당자의 시작점은 [인수인계 안내](FRONTEND_HANDOFF.md)다. dev 서버를 켠 뒤 `npm run api:smoke`로 전체 HTTP 연결을 확인할 수 있다. 이 명령은 로컬 데이터와 생성 작업 2개를 만들며 실제 AI/프론트 UI 검증은 아니다.
 

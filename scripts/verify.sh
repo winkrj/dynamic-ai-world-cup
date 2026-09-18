@@ -7,6 +7,6 @@ npm run contracts:check
 npm run test:handoff
 npm run build:web
 cd backend
-./gradlew --no-daemon test bootJar
+./gradlew --no-daemon test bootJar appJar
 cd "$task_root"
 node scripts/check-contracts.mjs --http
