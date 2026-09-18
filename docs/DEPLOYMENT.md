@@ -10,6 +10,16 @@
 
 현재는 구현·검증·자원 설정 중이며 아직 공개 완료 기록이 아니다. 최종 URL·소스 revision·image digest·실제 호스트 smoke·첫 백업/격리 복원 결과는 실행 후 추가한다. 아래 2026-09-18 미배포 설명은 당시 기록이다.
 
+### 실제 설정 진도 — 서비스 시작 전
+
+- 전용 foundation 생성 완료. 새 호스트 EC2 status checks/SSM Online, 별도 EBS의 ext4 mount, Docker의 data mount 의존성과 checksum 고정 Compose 설치를 확인했다. 기존 타 프로젝트 자원은 변경하지 않았다.
+- 운영 앱 소스는 `a917a482534ae8c32461c463ac1971df4060e2a3`. 실행 이미지 `release-a917a48-app`의 digest는 `sha256:a7cf6219da1d034298db3ecf8bea4a873a6f11519520dd13c5ce7300edf88382`이며 실제 x86 호스트 pull·Java 21 실행을 확인했다. Spring 시작/READY 검증은 아직 아니다.
+- 최초 `release-a917a48` 태그는 attestation manifest가 먼저 점유해 앱 manifest가 불변 태그 오류로 실패했다. 그 태그를 운영에 사용하지 않는다. 새 실행 태그는 부가 attestation 없이 패키징했으며 소스 label과 digest를 보존했다. 불변 정책은 완화하지 않았다.
+- 앱 앞 nginx는 `nginx:stable-alpine@sha256:89956b8306b7db851b00cc78b32292cc32a848dcc0c48e65ebe20526c9a36019`, DB는 `postgres:17-alpine@sha256:aa90e97ee862e558111d34cfb8b2c4bec768c2b039fb791341686928560263b3`로 고정해 호스트에 pull했다.
+- 새 호스트 SG의 ingress는 AWS 생성 CloudFront VPC-origin service SG의 TCP 80 하나로 좁혔다. 변경 계획이 해당 SG Modify/replacement false뿐인 것을 확인했고 실제 규칙도 대조했다. 공개 IPv4/IPv6 ingress와 앱/DB/SSH 포트는 허용하지 않았다.
+- VPC-origin의 계정 미지원 선택 속성을 제거한 후속 `13e55a1`은 AWS template validation/정적 12개 PASS다. 기존 2차 리뷰 뒤 발생한 수정이므로 추가 독립 리뷰 1회 승인을 요청했다. 첫 실패 edge 스택은 자원 없음 확인 후 정리했고 두 번째 HTTPS/VPC-origin 생성은 진행 중이다.
+- API 키를 AWS로 전달하는 명시 승인이 아직 없어 기존 키는 전송하지 않았다. app.env·서비스 시작·실제 백업/복원·공개 smoke·운영 AI 호출은 보류 중이며, 생성한 인프라는 대기 중에도 크레딧을 소비할 수 있다. 공개 서비스 완료나 운영 AI 사용액 발생으로 보고하지 않는다.
+
 2026-09-18 기준, 저장소에는 웹을 포함한 실행 JAR와 컨테이너 빌드 경로가 있다. **외부 서비스는 아직 배포하지 않았고 공개 운영 주소도 없다.** 패키지 빌드·로컬 점검 통과와 실제 공개 배포, 실제 후보 품질 승인은 각각 다른 결과다. 최신 검증 결과는 [검증 기록](VERIFICATION.md)과 함께 확인한다.
 
 로컬에서는 같은 소스의 **linux/amd64** 이미지로 prod 시작·readiness·웹 전달·패키지 운영자 CLI와 별도 dev 합성 API 흐름을 확인했다. 격리 DB의 논리 백업·별도 DB 복원도 통과했다. 로컬 ARM 이미지에서는 Java 파일 0바이트로 시작하지 못하는 계층 문제가 남았으므로, 단순한 `docker build` 종료 0을 실행 성공으로 해석하지 않는다. 실제 배포 호스트의 아키텍처에 맞는 이미지와 digest를 선택해 다시 시작 검증한다. 운영 백업/장애 복구나 AWS 설정 완료는 아니다.

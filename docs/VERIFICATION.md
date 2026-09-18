@@ -9,6 +9,10 @@
 - linux/amd64 배포 후보 이미지를 빌드했고 실제 Java 21 실행을 확인했다. 새 AWS foundation 생성과 EC2 status checks/SSM Online 확인 완료, HTTPS edge 생성 진행 중이다. 운영 컨테이너·공개 smoke·DB 백업/복원은 아직 미검증이다.
 - 보안 검토가 기존 로컬 API 키의 AWS 전달을 중지했다. 해당 키를 읽거나 전송하지 않았으며 목적/수신지/접근 주체를 명시해 별도 승인을 요청했다. 신규 배포 DB·origin용 난수는 기존 키와 분리해 암호화 저장했다. 이는 운영 AI 호출·후보 품질 통과 증거가 아니다.
 
+후속 실제 호스트 검증: 별도 EBS mount·Docker mount 의존성·공식 checksum Compose 5.5.1 설치 PASS, 실제 x86 host에서 최종 앱 digest pull·Java 21.0.12 실행 PASS, 앱/DB 서비스는 미시작이다. 새 SG는 CloudFront VPC-origin service SG의 80만 허용하고 외부 CIDR ingress 없음, foundation UPDATE_COMPLETE다. 원래 이미지 push는 attestation이 불변 태그를 점유해 실패했으며 CloudTrail/manifest로 원인을 확인했다. 실행 앱 manifest만 새 태그로 push한 뒤 ECR digest와 호스트 pull을 대조했다. 잘못된 이전 태그와 정책을 덮지 않았다.
+
+실제 AWS가 VPC-origin의 선택 속성 IpAddressType을 거절해 `13e55a1`에서 그 속성만 생략했다. 후속 정적 12개·AWS template validation PASS, 앱 소스/게임/예산 불변. 이 변경은 독립 리뷰 상한 뒤에 발생했으므로 기존 리뷰 결과로 덮지 않고 추가 1회 승인을 요청했다. 빈 실패 edge 스택은 DELETE_COMPLETE 확인 후 같은 이름으로 다시 생성 중이다. 공개 서비스·DB backup/restore·API 키 전송·운영 AI 호출은 아직 실행하지 않았다.
+
 ## 2026-09-18 TD-51 후속 — 변경 없는 v23 실제 32강 1회
 
 `fc35557` 그대로 `LiveEngineHttpTest`만 별도 실행했다. **1개 FAIL/오류·제외 0, Gradle 종료 1**, `seed-v1/hobby-solo/32`는 QUALITY_GATE_FAILED다. 185.026초/4회 HTTP 200/Repair 1회/검색 0/$0.221852. 첫 검토에서 c30 식물 접근 UNKNOWN만 수정했고 나머지 31개 카드는 불변이었다. 재검토가 그대로인 그림 3개를 중복으로 거절해 preview·완주·공유 검사는 실행되지 않았다. 출력 잘림/시간 초과는 관측되지 않았다.
