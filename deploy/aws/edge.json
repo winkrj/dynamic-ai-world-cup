@@ -1,0 +1,191 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "World Cup HTTPS edge for an already-running EC2 VPC origin. No custom domain, caching or error-page rewriting.",
+  "Parameters": {
+    "InstanceArn": {
+      "Type": "String",
+      "AllowedPattern": "^arn:aws[a-z-]*:ec2:[a-z0-9-]+:[0-9]{12}:instance/i-[0-9a-f]+$",
+      "Description": "Foundation InstanceArn; create this stack only after EC2 is running."
+    },
+    "InstancePrivateDnsName": {
+      "Type": "String",
+      "AllowedPattern": "^[a-zA-Z0-9.-]+$",
+      "Description": "Foundation InstancePrivateDnsName, never the public IPv4 address."
+    },
+    "OriginVerifySecret": {
+      "Type": "String",
+      "NoEcho": true,
+      "MinLength": 32,
+      "MaxLength": 128,
+      "AllowedPattern": "^[A-Za-z0-9_-]+$",
+      "Description": "Random private value also installed in proxy.env. Never place the value in a checked-in parameter file or Outputs."
+    }
+  },
+  "Resources": {
+    "VpcOrigin": {
+      "Type": "AWS::CloudFront::VpcOrigin",
+      "Properties": {
+        "VpcOriginEndpointConfig": {
+          "Arn": {
+            "Ref": "InstanceArn"
+          },
+          "Name": {
+            "Fn::Sub": "${AWS::StackName}-origin"
+          },
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "http-only",
+          "OriginSSLProtocols": [
+            "TLSv1.2"
+          ],
+          "IpAddressType": "ipv4"
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "dynamic-ai-world-cup"
+          }
+        ]
+      }
+    },
+    "Distribution": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Enabled": true,
+          "Comment": "Dynamic AI World Cup single-origin application",
+          "IPV6Enabled": true,
+          "HttpVersion": "http2",
+          "Origins": [
+            {
+              "Id": "worldcup-app",
+              "DomainName": {
+                "Ref": "InstancePrivateDnsName"
+              },
+              "VpcOriginConfig": {
+                "VpcOriginId": {
+                  "Fn::GetAtt": [
+                    "VpcOrigin",
+                    "Id"
+                  ]
+                },
+                "OriginReadTimeout": 30,
+                "OriginKeepaliveTimeout": 5
+              },
+              "OriginCustomHeaders": [
+                {
+                  "HeaderName": "X-Origin-Verify",
+                  "HeaderValue": {
+                    "Ref": "OriginVerifySecret"
+                  }
+                }
+              ]
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "TargetOriginId": "worldcup-app",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "AllowedMethods": [
+              "DELETE",
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "PATCH",
+              "POST",
+              "PUT"
+            ],
+            "CachedMethods": [
+              "GET",
+              "HEAD"
+            ],
+            "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+            "OriginRequestPolicyId": "b689b0a8-53d0-40ab-baf2-68738e2966ac"
+          },
+          "CustomErrorResponses": [
+            {
+              "ErrorCode": 400,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 403,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 404,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 405,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 414,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 416,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 500,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 501,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 502,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 503,
+              "ErrorCachingMinTTL": 0
+            },
+            {
+              "ErrorCode": 504,
+              "ErrorCachingMinTTL": 0
+            }
+          ],
+          "ViewerCertificate": {
+            "CloudFrontDefaultCertificate": true
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Project",
+            "Value": "dynamic-ai-world-cup"
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "DistributionId": {
+      "Value": {
+        "Ref": "Distribution"
+      }
+    },
+    "DistributionDomainName": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Distribution",
+          "DomainName"
+        ]
+      }
+    },
+    "PublicOrigin": {
+      "Value": {
+        "Fn::Sub": "https://${Distribution.DomainName}"
+      }
+    },
+    "VpcOriginId": {
+      "Value": {
+        "Fn::GetAtt": [
+          "VpcOrigin",
+          "Id"
+        ]
+      }
+    }
+  }
+}

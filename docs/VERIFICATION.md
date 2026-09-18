@@ -1,5 +1,14 @@
 # 검증 기록
 
+## 2026-09-19 TD-52 — 배포 패키지·보호 경계
+
+- opt-in proxy 실제 HTTP/config 33개 PASS. 기본 forwarding 무시는 유지하고 정확한 단일 peer, 실제 오른쪽 client IP, 위조 헤더·독립 quota·공유 URL을 검증했다. 독립 proxy 리뷰 Critical/High/actionable 0.
+- AWS 템플릿 12개, runtime 16개 PASS. runtime은 실제 Compose 설정 해석과 격리 ECR 인증의 성공/실패 mock 검증을 포함한다. 두 CloudFormation template의 AWS validate-template PASS, host 준비 스크립트 bash parse PASS.
+- 독립 인프라 리뷰 2회 내 완료, 최종 Critical/High/actionable 0. 첫 리뷰의 ECR 인증 갱신 전제를 임시 Docker config·stdin 토큰 전달·실패 차단·정리로 보완했다.
+- 최종 verify 종료 0: Java 391개 실행/유료 2개 제외(총 393), frontend 60, handoff 6, release 13, 배포 28, fixture 5, HTTP 166/9 schemas, 웹/bootJar/appJar PASS. 최종 Java 단계는 직전 전체 통과 결과를 UP-TO-DATE로 재사용했다. 유료 플래그 false.
+- linux/amd64 배포 후보 이미지를 빌드했고 실제 Java 21 실행을 확인했다. 새 AWS foundation 생성과 EC2 status checks/SSM Online 확인 완료, HTTPS edge 생성 진행 중이다. 운영 컨테이너·공개 smoke·DB 백업/복원은 아직 미검증이다.
+- 보안 검토가 기존 로컬 API 키의 AWS 전달을 중지했다. 해당 키를 읽거나 전송하지 않았으며 목적/수신지/접근 주체를 명시해 별도 승인을 요청했다. 신규 배포 DB·origin용 난수는 기존 키와 분리해 암호화 저장했다. 이는 운영 AI 호출·후보 품질 통과 증거가 아니다.
+
 ## 2026-09-18 TD-51 후속 — 변경 없는 v23 실제 32강 1회
 
 `fc35557` 그대로 `LiveEngineHttpTest`만 별도 실행했다. **1개 FAIL/오류·제외 0, Gradle 종료 1**, `seed-v1/hobby-solo/32`는 QUALITY_GATE_FAILED다. 185.026초/4회 HTTP 200/Repair 1회/검색 0/$0.221852. 첫 검토에서 c30 식물 접근 UNKNOWN만 수정했고 나머지 31개 카드는 불변이었다. 재검토가 그대로인 그림 3개를 중복으로 거절해 preview·완주·공유 검사는 실행되지 않았다. 출력 잘림/시간 초과는 관측되지 않았다.

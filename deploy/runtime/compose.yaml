@@ -1,0 +1,156 @@
+name: worldcup
+services:
+  app:
+    image: ${APP_IMAGE:?A release digest is required}
+    platform: linux/amd64
+    user: "10001:10001"
+    read_only: true
+    init: true
+    restart: unless-stopped
+    mem_limit: 768m
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file:
+      - path: ${SECRET_DIR:?}/app.env
+        format: raw
+    environment:
+      SPRING_PROFILES_ACTIVE: prod,live,proxy
+      SERVER_PORT: "8080"
+      PUBLIC_ORIGIN: https://${PUBLIC_HOST:?}
+      TRUSTED_PROXY_ADDRESS: 172.30.52.2
+      DATABASE_URL: jdbc:postgresql://postgres:5432/worldcup
+      DATABASE_USERNAME: worldcup
+      CANDIDATE_MODEL: gpt-5.6-terra
+      CANDIDATE_REVIEW_MODEL: gpt-5.6-terra
+      CANDIDATE_BUDGET_USD: ${CANDIDATE_BUDGET_USD:?Explicit 0 or approved 5 is required}
+      GENERATION_DAILY_LIMIT: "2"
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:MaxDirectMemorySize=64m -XX:+ExitOnOutOfMemoryError
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=10001,gid=10001,mode=1770
+    volumes:
+      - type: bind
+        source: ./check-ready.sh
+        target: /app/check-ready.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bash, /app/check-ready.sh]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    stop_grace_period: 30s
+    networks:
+      edge:
+        ipv4_address: 172.30.52.3
+      database:
+        ipv4_address: 172.30.53.3
+    logging: &bounded_logs
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+  nginx:
+    image: ${NGINX_IMAGE:?An official nginx digest is required}
+    platform: linux/amd64
+    user: "101:101"
+    read_only: true
+    restart: unless-stopped
+    mem_limit: 64m
+    pids_limit: 32
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file:
+      - path: ${SECRET_DIR:?}/proxy.env
+        format: raw
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?}
+    entrypoint: [/bin/sh, /opt/worldcup/nginx-start.sh]
+    ports:
+      - "80:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=1770
+    volumes:
+      - type: bind
+        source: ./nginx-start.sh
+        target: /opt/worldcup/nginx-start.sh
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./nginx.conf.template
+        target: /opt/worldcup/nginx.conf.template
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      edge:
+        ipv4_address: 172.30.52.2
+    logging: *bounded_logs
+  postgres:
+    image: ${POSTGRES_IMAGE:?An official PostgreSQL 17 alpine digest is required}
+    platform: linux/amd64
+    user: "70:70"
+    read_only: true
+    restart: unless-stopped
+    mem_limit: 384m
+    shm_size: 64m
+    pids_limit: 96
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file:
+      - path: ${SECRET_DIR:?}/postgres.env
+        format: raw
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command: [postgres, -c, shared_buffers=64MB, -c, max_connections=30, -c, work_mem=2MB, -c, maintenance_work_mem=32MB]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,uid=70,gid=70,mode=1770
+      - /var/run/postgresql:rw,noexec,nosuid,size=8m,uid=70,gid=70,mode=3770
+    volumes:
+      - type: bind
+        source: /var/lib/worldcup/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./init-worldcup.sh
+        target: /docker-entrypoint-initdb.d/10-worldcup.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d worldcup"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 60s
+    networks:
+      database:
+        ipv4_address: 172.30.53.2
+    logging: *bounded_logs
+networks:
+  edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.52.0/24
+  database:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.53.0/24

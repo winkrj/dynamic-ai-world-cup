@@ -6,6 +6,8 @@ node -e 'if (Number(process.versions.node.split(".")[0]) !== 24) { console.error
 npm run contracts:check
 npm run test:handoff
 npm run test:release
+node --test scripts/check-deployment-runtime.test.mjs scripts/check-aws-deployment.test.mjs
+bash -n scripts/prepare-worldcup-host.sh
 npm run test:web
 npm run build:web
 cd backend

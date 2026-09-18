@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily World Cup database backup (RPO target 24 hours)
+
+[Timer]
+OnCalendar=*-*-* 18:00:00 UTC
+Persistent=true
+Unit=worldcup-backup.service
+
+[Install]
+WantedBy=timers.target
