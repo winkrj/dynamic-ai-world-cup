@@ -1,5 +1,7 @@
 # B — 후보 품질과 서버
 
+2026-09-18 최신 평가 승인: 수정된 v17 엔진의 검색 없는 실제 32강 평가 **1회**만 기존 누적 $5 한도 내에서 허용했다. 첫 PLAN이 401/expired_secret_key로 종료되어 해당 시도는 사용했다. 새 키/재개 전 추가 호출 금지. 실행 전 이전 ledger/생성 비교 비용을 합산하고 잔여액을 격리 평가 DB의 한도로 주입한다. 실패 재추첨·추가 검색·예약액 완화 금지. $0.50 미확인 비용 예약은 보존한다.
+
 루트 AGENTS와 TECH_DESIGN, API_CONTRACT를 따른다. 책임은 Candidate Engine/grounding/eval/history, API/DB, snapshot/session/share 데이터, 운영이다. frontend 경험 내부를 변경하지 않는다.
 
 Java 21 records와 순수 Java domain부터 시작한다. LLM/검색 adapter는 generation/assessment/grounding 책임을 구분하고 generated metadata를 독립 검증 결과로 간주하지 않는다. 첫 CE-001은 판정 집행이며 사실 검증기 구현 완료가 아니다.
