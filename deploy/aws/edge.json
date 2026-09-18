@@ -37,8 +37,7 @@
           "OriginProtocolPolicy": "http-only",
           "OriginSSLProtocols": [
             "TLSv1.2"
-          ],
-          "IpAddressType": "ipv4"
+          ]
         },
         "Tags": [
           {

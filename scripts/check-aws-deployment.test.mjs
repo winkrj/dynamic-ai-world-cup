@@ -153,7 +153,8 @@ test('edge uses the running EC2 private VPC origin and an unexposed secret heade
   assert.deepEqual(origin.Arn, ref('InstanceArn'));
   assert.equal(origin.OriginProtocolPolicy, 'http-only');
   assert.equal(origin.HTTPPort, 80);
-  assert.equal(origin.IpAddressType, 'ipv4');
+  // The optional CFN property is not enabled on all accounts; use standard VPC-origin defaults.
+  assert(!Object.hasOwn(origin, 'IpAddressType'));
   assert.deepEqual(distribution.Origins[0].DomainName, ref('InstancePrivateDnsName'));
   assert.deepEqual(distribution.Origins[0].VpcOriginConfig.VpcOriginId, att('VpcOrigin', 'Id'));
   assert.equal('CustomOriginConfig' in distribution.Origins[0], false);
