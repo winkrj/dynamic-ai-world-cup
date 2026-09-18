@@ -1,5 +1,61 @@
 # 검증 기록
 
+## 2026-09-18 TD-47 — 제외 조건 분류 지침, 추가 유료 호출 없음
+
+v20에서 비운동 제외가 soft로 내려간 경로를 read-only Explorer와 별도로 대조했다. 서버의 구조/원문 포함 검사와 해석 verdict 집행은 의미 오분류 자체를 판별하지 않는다는 한계를 확인했다. 공통 프롬프트에 직접 거부·상대적 선호·부정문의 대조 기준과 독립 검토의 CONSTRAINTS finding 지침만 추가하고 v21로 버전 관리했다. 정책 v3-engine-v21은 이전 기준의 DB 승인 세트를 자동 재사용하지 않도록 분리한다. 모델/schema/API/Repair/시간·비용 예약/프론트/게임 규칙 변경은 없다.
+
+- 관련 검증: `CANDIDATE_LIVE_TEST=false`로 client 52개·engine 75개·reuse service 36개, **총 163개 PASS**. loopback 모의 provider만 사용했다.
+- 신규 4개 회귀: 제외 조건이 선호로만 남은 모의 계획에 대해 사전/최종 해석 FAIL·UNKNOWN은 후보 전체 PASS와 별개로 종료하고 Repair를 호출하지 않는다. 기존 6단계 지침 전달 테스트도 대조 예시를 확인한다.
+- 독립 read-only Reviewer cycle 1: **Critical 0 / High 0 / actionable 0**. 이후 production/test 코드 수정 없이 전체 verify.
+- 최종 `CANDIDATE_LIVE_TEST=false ./scripts/verify.sh` 종료 0: **Java 313개 실행/실패·오류 0/유료 1개 제외(총 314)**, frontend 60개, handoff 6개, release 13개, fixture 5개·생성 TS, HTTP 166개/9 schemas, 웹 build·bootJar·appJar PASS.
+
+실제 v21 provider 호출 0회이며 원시 장부 재합산은 $4.8498083/$6·총 시도 143회로 TD-46 이후 변하지 않았다. 자동 충전 OFF 설정을 변경하지 않았다. 새 실제 평가 승인/사람 품질 판정/32강 중복 해결은 없다. 보존된 v20 실패를 PASS로 덮지 않고 동일 실패 수정 루프를 버전명으로 초기화하지 않는다. v20 소스의 x86 runtime 검증 기록은 아래에 보존하며 이번 v21은 JAR까지 검증했고 새 runtime image·AWS 배포는 실행하지 않았다. 관련 문서의 diff/비밀값 노출 검사를 별도로 수행하며 코드 리뷰를 문서만 바뀐 뒤 반복하지 않는다.
+
+## 2026-09-18 TD-46 — 실제 단일 평가와 추가 호출 없는 완주 검사
+
+변경 범위는 test-only 공통 `PostPreviewHttpFlow` 및 이를 사용하는 기존 Worldcup/LiveEngine HTTP 테스트, 결과 문서다. production·OpenAPI·프롬프트·모델·비용 예약 정책은 변경하지 않았다. 실제 READY가 나오면 같은 preview의 freeze, N−1 선택 저장, Champion, 동일 snapshot 공유/새 익명 session을 검증하고 provider 장부/호출 수 및 생성 job 1개가 유지되는지 확인하도록 했다. 브라우저 timer/난수 품질 테스트는 아니다.
+
+실행 전 focused 테스트에서 preview에 없는 initialOrder를 비교하던 새 테스트 오류가 8/16/32에서 드러났다. 공개 계약은 그대로 두고 frozen order가 유일한 후보 ID 전체와 일치하도록 검사 대상을 수정했다(동일 실패 수정–재검증 1회). 이후 WorldcupHttpTest 14개 PASS/유료 1개 제외, HTTP 166개/9 schemas PASS. read-only Reviewer 최초 1회 Critical 0/High 0/actionable 0, 그 뒤 전체 `CANDIDATE_LIVE_TEST=false ./scripts/verify.sh` 종료 0: Java 309개 실행/유료 1개 제외, 프론트 60개, handoff 6개, release 13개, fixture 5개·생성 TS, 웹/bootJar/appJar, HTTP 166개/9 schemas PASS.
+
+사용자 승인 후 별도로 `LiveEngineHttpTest`만 실제 provider를 켜서 **1회 실행**했다. 이전 전체 장부를 다시 합산하고 격리 DB에 잔여 $1.2376317만 허용했다. `hobby-solo/32`, v20, Terra, 75.395초/4회 HTTP 200, 검색 0/사전 Repair 1회/$0.08744. Repair 재검토에서 그림 중복과 포괄적 학습 활동을 거절해 승인 30/32, **QUALITY_GATE_FAILED**로 종료했다. READY 기대 불충족으로 실제 테스트 **1개 FAIL**이며 사전 오프라인 회귀 PASS와 구별한다. 상세 생성/최종 feasibility/preview/완주·공유 검사는 실행되지 않았다. 원인 세부는 `CANDIDATE_ENGINE.md` TD-46 절에 기록했다.
+
+실행의 QUEUED/FAILED HTTP 응답 2개는 기존 GenerationJob schema PASS다. 원시 응답과 비용 장부는 gitignored `reports/local/live-engine/2026-09-18T07-33-51.503430Z-size32/`에만 보존했다. provider 요청 4개 모두 tools 빈 배열이고 장부 search_calls=0을 대조했다. 현재 누적 장부 **$4.8498083/$6**(미확인 예약 $0.50 포함), 잔여 $1.1501917. 자동 충전 OFF를 실행 전에 다시 확인했고 변경하지 않았다. 승인 소진, 추가 유료 재시도 없음. 실패를 해결됐다고 보고하거나 기존 사람 FAIL을 변경하지 않는다. AWS 자원 생성/registry push/공개 배포도 하지 않았다.
+
+## 2026-09-18 TD-45 후속 — 승인된 Docker 복구·x86 실행 검증
+
+사용자가 강제 종료·재실행을 승인한 뒤 정확히 확인한 Docker Desktop 프로세스에만 종료 신호를 보냈다. 종료되지 않은 backend 프로세스 하나만 강제 종료했고 시스템 helper는 건드리지 않았다. 공식 시작 명령의 접수 응답만으로 성공을 판단하지 않았으며 앱 재실행 뒤 `_ping=OK`와 엔진 27.4.0 응답을 확인했다. 기존 프로젝트 DB와 재시작 정책이 있는 다른 프로젝트 컨테이너도 다시 실행 중임을 확인했다. 아래 이전 timeout 기록은 당시 결과로 보존한다.
+
+기존 빌더의 ARM 이미지는 빌드가 끝났지만 `exec format error`로 시작하지 못했다. CPU는 image/engine 모두 ARM64였고 `/opt/java/openjdk/bin/java`가 **0바이트**였다. 기존 캐시를 지우지 않고 별도 docker-container 빌더로 다시 받아도 로컬 적재 이미지에서 같은 현상이 남았다. 공유된 로컬 이미지 계층 손상이 의심되지만 Docker 내부 원인을 확정하지 않았고 ARM 실행 문제를 해결됐다고 처리하지 않는다. Dockerfile·앱 코드를 바꾸지 않고 같은 소스를 `linux/amd64`로 빌드한 대안은 실제 실행까지 통과했다.
+
+검증한 로컬 x86 이미지: `dynamic-ai-world-cup:verification-b73908a-amd64-20260918`, digest `sha256:f53233cc7924a81d0d56f5062f74f1801e8364c84ff43159cae0864895e8124a`. 소스는 `b73908a2d97329cb000217334e70f387dede1b6f`이며 변경 파일은 문서뿐이다. registry push나 AWS 아키텍처/사양 확정은 하지 않았다.
+
+| 실제 재실행 | 결과와 범위 |
+| --- | --- |
+| 백엔드 `CANDIDATE_LIVE_TEST=false ./gradlew --no-daemon test --rerun-tasks` | Java 309개 실행, 실패·오류 0, 유료 1개 제외(총 310). 캐시 재사용이 아닌 실제 격리 PostgreSQL 테스트 재실행 |
+| HTTP 계약 대조 | 생성 타입·fixture 5개, 실제 HTTP 응답 160개/9 schemas PASS |
+| x86 runtime | Java 21.0.12, UID/GID 10001:10001, 읽기 전용 root·쓰기 전용 `/tmp`·capability 제거·no-new-privileges 조건에서 시작 PASS |
+| `prod,live` 시작 | 임시 PostgreSQL 17.11에 V1~V3 적용, 웹 번들·worker·readiness PASS. 외부 통신 없는 internal network, 가짜 key, AI 예산 0 사용 |
+| 읽기 전용 release smoke | `/`, share deep link, JS/CSS 2개, health·ready, 없는 API/asset 404 PASS. 생성·세션·공유 요청 없음 |
+| 패키지 운영자 CLI | 같은 이미지의 `PropertiesLauncher`로 `CandidateReuseOperator pending` 실행·종료 0. 빈 목록이며 실제 후보 승인/사용은 하지 않음 |
+| 같은 이미지의 dev API smoke | 합성 8강 생성·재생성 1회·선택 7개·완료 저장·새 익명 세션의 같은 snapshot 공유 PASS. 실제 AI·브라우저 timer 검증 아님 |
+| 격리 DB 백업·복원 | 앱 중지 후 `pg_dump`를 새 빈 테스트 DB로 복원. snapshot 1개·share 1개·Flyway 3개·장부의 전체 행 hash 일치, snapshot UPDATE trigger 거절 확인 |
+
+prod/dev smoke 직후 `provider_call`은 **0건**이었다. 복원 검증에만 가짜 `FAILED_UNKNOWN_COST` 예약 1건/$0.50을 직접 넣어 금액·상태 보존을 확인했다. 이는 실제 provider 호출·지출·기존 실험 장부 변경이 아니다. 기존 누적 $4.7623683/$6와 유료 승인 소진 상태는 그대로다. 원본/복원 DB 모두 이번에 생성한 메모리 기반 테스트 DB이며 실제 사용자·개발자 DB는 테스트하지 않았다.
+
+관찰한 idle 메모리는 앱 약 342MiB, DB 약 99MiB(각 512MiB 제한)였다. Apple Silicon에서 x86 에뮬레이션 중의 단일 관찰이므로 운영 부하·AI 동시 생성·최소 AWS 사양의 근거로 일반화하지 않는다. 같은 호스트 내 논리 복원은 별도 호스트 장애 복구, 보관 백업, provider 장부 대조, RPO/RTO 달성을 대체하지 않는다.
+
+검증 후 이번에 만든 앱/DB 컨테이너와 internal network만 정리했다. 합성 테스트 데이터는 영구 보관하지 않았으며 테스트로 재생성할 수 있다. 기존 데이터·컨테이너·이미지·volume은 삭제하지 않았다. 전용 빌더는 중지하고 이미지·빌드 cache는 보존했다(기본 빌더 미변경). 런타임 코드 변경이 없어 독립 코드 Reviewer를 다시 돌리지 않았으며 앞선 코드 리뷰 결과와 구분한다.
+
+남은 사항: 로컬 ARM 계층 문제, AWS 무료 적용·자원 사양/HTTPS·trusted proxy/IP·운영 백업 구성, 실제 운영 호스트 검증과 공개 URL, 최신 v20 실제 후보 품질·사람 승인·운영 AI 예산. 로컬 x86 검증 성공은 공개 배포 완료나 Goal 전체 완료가 아니다.
+
+## 2026-09-18 TD-45 — 무료 배포 범위 정정·Docker 복구 시도
+
+실제 코드 기준은 `b73908a2d97329cb000217334e70f387dede1b6f`이며 이번 변경은 배포 비용·승인 범위와 실행 상태 문서뿐이다. AWS Free plan의 크레딧 소비와 실제 결제를 구분하고, 일반 가격표·월 $25 제안을 승인 예산으로 취급하지 않도록 AGENTS/Decision Log/배포 문서를 정리했다. AWS 자원 생성·유료 전환과 추가 AI 호출은 하지 않았다.
+
+디스크 여유 공간은 약 **16GiB**로 확인했으나 Docker 상태 API는 5초 안에 아무 응답을 주지 않았다. 사용자가 기존 컨테이너의 일시 중단 가능성을 확인하고 Docker Desktop 재시작을 승인했다. 공식 `docker desktop restart --timeout 120`은 기존 프로세스를 종료하지 못해 `processes still running ... context deadline exceeded`로 실패했다. 앱 상태 확인도 제어 도구의 timeout으로 종료됐다. 이후 같은 Docker 프로세스가 남아 있고 상태 API가 계속 무응답인 것을 재확인했다. Docker가 정상 재시작됐다고 판단하지 않는다. 컨테이너·이미지·volume 삭제, 공장 초기화, 강제 종료는 수행하지 않았다.
+
+Node 24로 `node --test scripts/smoke-release.test.mjs`를 재실행해 **13개 PASS**, `git diff --check`도 통과했다. 이는 읽기 전용 점검 도구의 합성 테스트이며 실제 컨테이너 기동·readiness smoke·운영자 CLI의 실제 DB 실행을 대신하지 않는다. 이번에는 런타임 코드 변경이 없어 별도 코드 Reviewer를 반복 실행하지 않았다. 최신 v20 실제 품질 평가·사람 승인·공개 배포는 미완료이며 추가 유료 승인도 없다.
+
 ## 2026-09-18 TD-42~44 — DB 재사용·서비스 보완·준비 가능성 기준
 
 현재 로컬 변경: 승인된 complete set의 exact-context 재사용, 원본 certificate와 승인/사용 감사 기록(V3), 취소/만료·동시 완료·재생성 동일 구성 차단, 초기 생성 보충 질문 1회, v20 장비 준비/외부 환경 구분, readiness·prod 시작 검사와 배포 패키지다. 모든 합성 검증은 `CANDIDATE_LIVE_TEST=false`이며 실제 승인된 공용 후보 세트는 아직 없다.

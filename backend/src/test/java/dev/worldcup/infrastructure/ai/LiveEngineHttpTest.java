@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import dev.worldcup.generation.GenerationWorker;
 import dev.worldcup.infrastructure.JsonCodec;
 import dev.worldcup.support.PostgresSupport;
+import dev.worldcup.support.PostPreviewHttpFlow;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.file.*;
@@ -67,6 +68,15 @@ class LiveEngineHttpTest extends PostgresSupport {
             assertThat(preview.path("candidates").size()).isEqualTo(size);
             assertThat(preview.toString()).doesNotContain("[개발용]", "assessments", "requirements", "sk-", prompt);
             Files.writeString(output.resolve("preview.json"), json.write(preview));
+            int calls = EXCHANGES.size();
+            int ledgerRows = jdbc.queryForObject("SELECT count(*) FROM provider_call", Integer.class);
+            var owner = new FlowBrowser(http, cookie, samples);
+            var outsider = new FlowBrowser(http, null, samples);
+            var played = PostPreviewHttpFlow.complete(preview, json, owner::request, outsider::request);
+            assertThat(EXCHANGES).hasSize(calls);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM provider_call", Integer.class)).isEqualTo(ledgerRows);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_job", Integer.class)).isEqualTo(1);
+            Files.writeString(output.resolve("playback.json"), json.write(played));
         } finally {
             Files.writeString(output.resolve("exchanges.private.json"), json.write(EXCHANGES));
             Files.writeString(output.resolve("ledger.json"), json.write(jdbc.queryForList("SELECT * FROM provider_call ORDER BY created_at, id")));
@@ -79,6 +89,27 @@ class LiveEngineHttpTest extends PostgresSupport {
         }
     }
     private String base() { return "http://localhost:" + port + "/api/v1"; }
+    private final class FlowBrowser {
+        private final HttpClient http;
+        private final List<Map<String, Object>> samples;
+        private String cookie;
+        FlowBrowser(HttpClient http, String cookie, List<Map<String, Object>> samples) {
+            this.http = http; this.cookie = cookie; this.samples = samples;
+        }
+        JsonNode request(String method, String path, Object body, String key, int status, String schema) throws Exception {
+            var request = HttpRequest.newBuilder(URI.create(base() + path)).timeout(Duration.ofSeconds(10));
+            if (cookie != null) request.header("Cookie", cookie);
+            if (key != null) request.header("Idempotency-Key", key).header("Origin", "https://worldcup.example");
+            if (body != null) request.header("Content-Type", "application/json");
+            request.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(json.write(body)));
+            var response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).describedAs("Post-preview %s %s", method, path).isEqualTo(status);
+            response.headers().firstValue("Set-Cookie").ifPresent(value -> cookie = value.split(";", 2)[0]);
+            var value = json.read(response.body(), JsonNode.class);
+            samples.add(Map.of("schema", schema, "value", value));
+            return value;
+        }
+    }
     private JsonNode get(HttpClient http, String path, String cookie) throws Exception {
         var response = http.send(HttpRequest.newBuilder(URI.create(base() + path)).header("Cookie", cookie).GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).isEqualTo(200);

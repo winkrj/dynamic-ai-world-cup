@@ -257,6 +257,26 @@ class StagedCandidateEngineTest {
         assertThat(stages.originalPlan.unit()).isEqualTo("혼자만 가능한 취미");
         assertThat(stages.repairs + stages.intentRepairs).isZero();
     }
+    @ParameterizedTest @CsvSource({"allocation,FAIL", "allocation,UNKNOWN", "final,FAIL", "final,UNKNOWN"})
+    void exclusionMisclassifiedAsPreferenceCannotBeRescuedByCandidatePasses(String phase, Verdict verdict) {
+        // Synthetic findings exercise enforcement only; they do not prove the live model identifies this mistake.
+        var request = new GenerationInput("혼자 하는 걸 좋아하고 운동은 싫어. 조용한 취미를 찾고 있어", 8, "ko-KR", "Asia/Seoul");
+        var preferences = List.of("혼자 하는 활동 선호", "운동은 싫어함");
+        stages.planTransform = p -> new PlanProposal(p.decision(), "반복 가능한 취미 활동", p.hobby(), p.groundingRequired(),
+                p.constraints(), p.coverage(), preferences);
+        var interpretation = new InterpretationReview(verdict, List.of(new InterpretationFinding(
+                InterpretationField.CONSTRAINTS, "운동은 싫어", "제외 조건을 선호로만 분류함")));
+        if (phase.equals("allocation")) stages.allocationFunction = p -> new AllocationReview(interpretation,
+                Verdict.PASS, Verdict.PASS, Verdict.PASS, p.intents().stream().map(ActivityIntent::id).toList(), List.of());
+        else stages.reviewFunction = (batch, count) -> new Review(interpretation, Verdict.PASS, Verdict.PASS,
+                Verdict.PASS, assessments(batch), feasibility(batch), List.of());
+        qualityFailure(() -> engine.generate(request, context()));
+        assertThat(stages.originalPlan.softPreferences()).isEqualTo(preferences);
+        assertThat(stages.originalPlan.constraints()).extracting(ConstraintSpec::id).containsExactly("quiet");
+        if (phase.equals("allocation")) assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+        else assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
+        assertThat(stages.repairs + stages.intentRepairs).isZero();
+    }
     @ParameterizedTest @ValueSource(strings = {"allocation", "final"})
     void malformedOrContradictoryInterpretationEvidenceNeverAllowsRepair(String phase) {
         var finding = new InterpretationFinding(InterpretationField.CONSTRAINTS, "조용한", "해석 불일치");

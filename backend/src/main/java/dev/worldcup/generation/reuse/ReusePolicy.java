@@ -13,7 +13,7 @@ import java.util.Locale;
 public final class ReusePolicy {
     private ReusePolicy() {}
     // Bump whenever request interpretation, quality requirements or certificate semantics change.
-    public static final String VERSION = "approved-complete-set-v2-engine-v20";
+    public static final String VERSION = "approved-complete-set-v3-engine-v21";
     public static final Duration MAX_EVIDENCE_AGE = Duration.ofDays(30);
     public static final Duration MAX_APPROVAL = Duration.ofDays(7);
     public static final Duration PENDING_RETENTION = Duration.ofDays(7);

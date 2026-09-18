@@ -1,44 +1,42 @@
 # 프론트엔드 시작 안내
 
-> 최신 작업(2026-09-18): 사용자가 프론트도 맡아 외부 인계 대기 없이 `feat/product/split-deck-flow`에서 전체 화면·게임·공유를 통합한다. 새 작업 지침은 루트/frontend AGENTS와 제품 통합 Spec을 따른다. 아래 서버 브랜치/초기 shell 설명은 최초 인수인계 시점의 기록이다. 현재 브랜치의 `npm run dev:web`는 고정 예제가 아니라 동일 origin API를 호출하므로 로컬 dev 서버가 필요하다. 프론트에 키를 넣거나 live API로 UI 테스트하지 않는다.
+> 기준일 2026-09-18. 현재 통합 작업 브랜치는 `feat/engine/context-feasibility`다. 사용자가 프론트도 맡았으며 시안 4/A 상하 카드 기반 입력·미리보기·게임·Champion·공유 화면과 기존 API 연결이 구현돼 있다. 새 프론트를 다시 만들거나 기존 작업을 덮어쓰지 말고 루트/frontend AGENTS와 [제품 통합 Spec](INTEGRATION_SPEC.md)을 따른다. 실제 AI 품질 승인과 공개 배포는 아직 완료되지 않았다.
 
-2026-09-18 추가: 사용자가 제공한 시안 4와 대결 A(상하 카드)의 최신 구현 기준은 [제품 통합 Spec](INTEGRATION_SPEC.md)입니다. `feat/server/design-integration`에는 기존 엔진/API와 이 Spec, 별도 app jar 및 공유 페이지 진입이 포함됩니다. 아래 서버 브랜치 시작 절차는 API 독립 개발 기준으로도 유효하며, 최신 통합 브랜치에서 시작하는 경우에는 그 브랜치를 PR base로 사용합니다. 기존 프론트 작업을 덮어쓰거나 main이 이미 통합됐다고 가정하지 마세요.
-
-이 문서부터 읽으면 됩니다. 담당은 **A — 플레이 경험 전체**, 첫 작업은 [FE-001 입력·강수·미리보기](tickets/FE-001.md)입니다. 서버 내부나 실제 AI 엔진을 구현하지 않아도 시작할 수 있습니다.
+이 문서는 현재 코드로 실행·유지보수할 때의 안내입니다. A는 `frontend/**`의 플레이 경험, B는 후보 품질과 서버를 담당합니다. [FE-001](tickets/FE-001.md)은 초기 착수 범위이고 현재 완료/잔여 상태는 [프로젝트 컨텍스트](../PROJECT_CONTEXT.md)와 [검증 기록](VERIFICATION.md)을 확인합니다.
 
 ## 전달 기준과 준비 상태
 
-2026-09-14 전달 기준은 `feat/server/backend-api` 브랜치와 [PR #1](https://github.com/winkrj/dynamic-ai-world-cup/pull/1)입니다. 전달 시점에는 main에 아직 병합하지 않았습니다. **지금 저장소 기본 main만 내려받으면 최신 서버와 이 안내가 없습니다.** 아래 명령으로 전달 브랜치에서 시작하세요. PR이 병합된 이후의 새 작업은 최신 main을 기준으로 합니다.
+현재 전달 브랜치는 [feat/engine/context-feasibility](https://github.com/winkrj/dynamic-ai-world-cup/tree/feat/engine/context-feasibility)입니다. **main은 아직 최신 통합 코드를 포함하지 않습니다.** 아래 명령으로 전달 브랜치에서 시작하세요. 초기 서버 인계는 `feat/server/backend-api`와 [PR #1](https://github.com/winkrj/dynamic-ai-world-cup/pull/1)의 과거 기록이며 현재 시작점과 구별합니다. main 병합 후에는 실제 병합 상태를 확인하고 안내를 갱신합니다.
 
-- 준비됨: 공개 OpenAPI, TS 타입, 예제 JSON, 생성/미리보기/재생성/시작/기록/공유 API, PostgreSQL 저장, 로컬 실행 및 연결 확인 명령.
-- 아직 없음: 외부에서 함께 쓰는 개발 API 주소, Swagger UI 서버, 완성된 화면. 시안 4는 제공됐으며 실제 React 화면 적용은 A 작업입니다.
+- 준비됨: 공개 OpenAPI, TS 타입, 예제 JSON, 생성/미리보기/재생성/시작/기록/공유 API, PostgreSQL 저장, React 전체 플레이 흐름, 로컬 실행 및 연결 확인 명령.
+- 아직 없음: 외부에서 함께 쓰는 개발 API 주소/Swagger UI 서버/공개 운영 URL, 최신 엔진 실제 품질 승인과 최신 실제 후보로의 완주 증거.
 - `dev` 서버의 후보는 **[개발용] 합성 후보**입니다. 실제 추천 품질을 테스트하는 모드가 아닙니다. 실제 AI는 아래 CE-002 브랜치의 명시적 `live` 모드에서만 사용하며 기본 모드는 계속 생성 실패로 닫혀 있습니다.
 - GitHub 링크는 문서/코드 주소입니다. API base URL이 아닙니다. 현재는 담당자 자신의 컴퓨터에서 서버를 실행합니다.
 
-### 실제 AI 연결 추가분 — 2026-09-16
+### 실제 AI 연결과 검증 범위 — 2026-09-18
 
-`feat/engine/ce-002-generation`은 서버 API 변경 위에 실제 OpenAI 엔진을 추가한 B의 브랜치입니다. **요청·응답 필드와 URL은 변경하지 않았습니다.** A는 기존 fixture/dev로 화면을 계속 구현할 수 있으며, 실제 후보 연결 때만 B와 이 브랜치 통합을 맞춥니다. 작업 중인 프론트 폴더를 reset하거나 엔진 브랜치로 덮어쓰지 않습니다.
+현재 통합 브랜치에는 Spring Boot `CandidateEngine` port 뒤의 실제 OpenAI 엔진이 포함됩니다. **생성·플레이 API의 요청·응답 필드와 URL은 기존 계약을 유지합니다.** A는 기존 fixture/dev로 화면·오류·복원 흐름을 작업할 수 있습니다. 프론트에 provider 키나 내부 평가 자료를 넣지 않으며 기본 실행을 live로 바꾸지 않습니다.
 
 실제 실행은 [Candidate Engine의 live 실행 안내](CANDIDATE_ENGINE.md#실제-ai를-켜는-방법)를 따릅니다. API 키·예산은 서버 담당자의 환경 설정이며 프론트에 키를 넣지 않습니다. 이 엔진은 생성 뒤 독립 품질 검토와 필요시 Repair를 수행하므로 수십 초~수 분이 걸릴 수 있습니다. `RUNNING`을 고정 30초/60초 뒤 실패로 간주하거나 생성 POST를 자동 반복하지 말고 terminal 상태를 확인합니다. live 엔진의 작업 예산은 280초, worker lease는 300초이며 장애 복구 시 더 길어질 수 있습니다. 게임의 **대진당 7초**와는 별개입니다.
 
 품질 미달은 `QUALITY_GATE_FAILED`, 예산 부족은 `RATE_LIMITED`, 제공자/시간 제한 문제는 `PROVIDER_UNAVAILABLE`로 기존 오류 처리 경로를 사용합니다. 아래 `api:smoke`는 **dev 합성 서버용**입니다. 실제 AI의 검증 범위와 한계는 [엔진 문서](CANDIDATE_ENGINE.md)에 기록합니다.
 
-**8/16/32강의 실제 READY·preview 연결 사례가 있습니다.** 최신 v16은 혼자·비운동·월 10만원 취미의 32강(약 217초)을 확인했고, 사전 활동 Repair 1회 후 연결됐습니다. 조건을 후보보다 먼저 출력하도록 고정했으며 이번 실행은 두 필수 조건에 대해 32개 후보 각각의 독립 검토를 받았습니다. 8강(v15 약 63초)·16강 등 이전 결과는 엔진 문서에 보존합니다. 사전·상세 Repair는 합쳐서 최대 1회이며 공개 API는 바뀌지 않았습니다.
+**이전 버전에는 8/16/32강 실제 READY·preview 연결 사례가 있지만 최신 품질 통과를 뜻하지 않습니다.** v20의 마지막 승인 32강은 Repair 후에도 활동 30/32만 승인돼 FAILED였고 preview가 없습니다. v21은 제외 조건 분류 지침을 보완했고 오프라인 검증만 마쳤습니다. 실제 v21 실행 승인은 없으며 누적 장부 $4.8498083/$6의 잔여액은 호출 권한이 아닙니다. 자동 충전 OFF를 유지합니다. 사전·상세 Repair는 합쳐서 최대 1회입니다.
 
-**실서비스 품질 확정은 아직 아닙니다.** v15 집에서 조용히 30분 취미/32강은 실패했고, 서울 접근성 사례도 근거 부족으로 실패합니다. 자동 통과한 solo/32에서도 감상·퍼즐 등의 세분화와 조건 해석의 일관성을 추가 점검해야 합니다. A는 dev로 전체 강수의 화면·오류 흐름을 구현하고 실제 AI 품질 확정은 B와 별도로 진행합니다. 외부 접속 가능한 API 서버가 배포된 것은 아닙니다.
+**회귀 검증과 후보 품질을 구별합니다.** 현재 Java 313개 실행/유료 1개 제외, 프론트 60개, 실제 HTTP 166개/9 schemas, 웹·두 JAR가 통과했고 독립 리뷰 Critical/High/actionable 0입니다. 여기서 HTTP는 격리 서버와 합성 후보 검증입니다. 실제 READY 결과를 추가 AI 호출 없이 freeze→N−1 선택→Champion→동일 snapshot 공유까지 검사하는 경로도 준비했지만 마지막 실제 실행에는 적용하지 못했습니다. 사람 평가의 비교 단위/실행 가능성 FAIL과 외부 사실 평가 미완료는 별도입니다.
 
 ## 1. 브랜치와 실행
 
 새로 내려받는 경우입니다. 기존 작업이 있는 폴더를 덮어쓰거나 reset하지 마세요.
 
 ```sh
-git clone --branch feat/server/backend-api https://github.com/winkrj/dynamic-ai-world-cup.git
+git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git
 cd dynamic-ai-world-cup
 git switch -c feat/play/fe-001-integration
 npm ci
 ```
 
-Node 24 LTS를 사용합니다. 화면만 먼저 만들 때는 `npm run dev:web`로 고정 8강 예제를 볼 수 있습니다. 이것은 완성된 mock API가 아니며, 상태별 mock/client 연결은 FE-001 범위입니다. `frontend/src/api/fixtures.ts`가 시작점입니다.
+Node 24 LTS를 사용합니다. `npm run dev:web`는 고정 예제가 아닌 실제 앱이며 아래 dev 서버가 필요합니다. 서버 없이 가능한 범위는 `npm run test:web`와 타입/웹 빌드, 공용 fixture를 사용하는 테스트입니다. 현재 API client와 상태 흐름은 `frontend/src/api/**`, `frontend/src/app/**`, 게임 규칙은 `frontend/src/play/**`에 있습니다.
 
 실제 API 연동에는 Java 21과 실행 중인 Docker가 추가로 필요합니다. 별도 터미널에서 저장소 루트 기준으로 실행합니다.
 
@@ -96,7 +94,7 @@ OpenAPI 파일은 다운로드해 OpenAPI 지원 도구에서 읽을 수 있습�
 | 공유 진입 | `GET /shares/{token}` → 만든 사람 champion + 원본 snapshot |
 | 같은 대진 해보기 | `POST /shares/{token}/sessions` → 새 sessionId + 같은 snapshot |
 
-공유 생성과 replay POST에는 `{}`나 `null` JSON도 보내지 말고 **본문을 생략**하세요. 그 외 정확한 body는 OpenAPI를 따릅니다. 공유 URL의 프론트 경로는 `/shares/{token}`입니다. 현재 shell에는 그 화면이 아직 없습니다.
+공유 생성과 replay POST에는 `{}`나 `null` JSON도 보내지 말고 **본문을 생략**하세요. 그 외 정확한 body는 OpenAPI를 따릅니다. 공유 URL의 프론트 경로 `/shares/{token}`은 현재 앱에 구현돼 있습니다.
 
 첫 생성 요청 예시입니다. cookie는 서버의 HttpOnly cookie이므로 JS로 읽거나 localStorage에 복사하지 않습니다.
 
@@ -117,7 +115,7 @@ const response = await fetch('/api/v1/generation-jobs', {
 // response.ok/status를 확인한 뒤 성공 DTO 또는 ApiError로 분기한다.
 ```
 
-이 예시는 첫 HTTP 요청만 설명합니다. 화면 상태 관리나 전체 client 구현 완료를 의미하지 않습니다.
+이 예시는 첫 HTTP 요청만 설명합니다. 실제 앱 수정은 기존 API client/상태 controller를 재사용하고 별도 요청 경로를 중복 구현하지 않습니다.
 
 ## 4. 연동 시 지킬 규칙
 
@@ -131,7 +129,7 @@ const response = await fetch('/api/v1/generation-jobs', {
 - 챔피언 화면은 로컬 완주와 서버 저장 완료를 구분합니다. 공유는 마지막 선택까지 서버가 수락한 뒤 가능합니다.
 - 오류는 message 문자열 비교 대신 code로 분기합니다. 버튼/안내의 구체적인 처리는 [FE-001 오류 표](tickets/FE-001.md#오류와-재시도)를 따릅니다.
 
-## 5. 첫 PR과 완료 확인
+## 5. 후속 PR과 완료 확인
 
 담당 경로는 `frontend/**`이며 생성된 `schema.d.ts`는 제외합니다. 서버와 공용 계약 변경이 필요하면 B에게 상태/필드 차이를 요청하세요. 계약에 맞추려고 backend 동작을 프론트 PR에서 임의 변경하지 않습니다.
 
@@ -142,14 +140,14 @@ npm run build:web
 
 본인이 추가한 화면/상태 테스트도 실행하고, 360px·키보드·이미지 fallback을 확인합니다. Java/Docker가 준비됐다면 `./scripts/verify.sh`와 `npm run api:smoke`로 실제 연동을 확인합니다. 검증하지 못한 항목은 PR에 남깁니다.
 
-전달 시점처럼 서버 PR이 미병합이면 프론트 PR의 base를 `feat/server/backend-api`로 설정해 프론트 변경만 검토합니다. 서버 PR이 먼저 main에 병합되면 프론트 PR의 base를 main으로 바꾸고 차이를 다시 확인합니다. 쓰기 권한이 없다면 [Fork 방식](COLLABORATION.md#초대-없이-작업하는-방법)을 사용합니다. 이 문서 전달만으로 collaborator 권한이 생기지는 않습니다.
+현재 통합 브랜치에서 파생한 PR은 `feat/engine/context-feasibility`를 base로 두고 본인 변경만 검토합니다. main 병합 후에는 실제 base와 diff를 다시 확인합니다. 쓰기 권한이 없다면 [Fork 방식](COLLABORATION.md#초대-없이-작업하는-방법)을 사용합니다. 이 문서 전달만으로 collaborator 권한이 생기지는 않습니다.
 
-## 6. 아직 결정하지 않은 것
+## 6. 남은 완료 조건
 
-시안 4의 색상·타이포·카드와 A 대결 배치를 적용합니다. 폰트 자산 사용 조건·한국어 fallback·360px 및 큰 후보군의 실제 레이아웃은 구현 시 확인합니다. 고정된 동작 규칙과 접근성 기준은 바꾸지 않습니다. 이전 기획 첨부 원문은 없으며 [현재 문서의 출처](SOURCE_PROVENANCE.md)를 따릅니다.
+시안 4/A 상하 카드의 합성 브라우저 검증 범위는 [제품 통합 Spec](INTEGRATION_SPEC.md)과 [검증 기록](VERIFICATION.md)에 있습니다. 실제 엔진 품질, 최신 실제 후보의 브라우저 완주, 준비/비용 판단에 미리보기 정보가 충분한지, 공개 운영 배포는 아직 별도 확인이 필요합니다. 이전 기획 첨부 원문은 없으며 [현재 문서의 출처](SOURCE_PROVENANCE.md)를 따릅니다.
 
-현재 API에는 생성 취소 endpoint와 실제 추가 질문 내용을 전달하는 계약이 없습니다. FE-001에서는 이를 구현 완료로 표시하지 않고 오류 안내와 입력 수정 경로까지만 연결합니다. 구체적인 보충 질문 대화·서버 취소는 엔진/계약 후속 합의에 남깁니다. 제품 요구를 폐기한 것이 아니라 이번 착수 범위를 구분한 것입니다.
+현재 API에는 생성 취소 endpoint와 모델이 작성한 추가 질문 내용을 전달하는 계약이 없습니다. 다만 초기 `CLARIFICATION_REQUIRED`에는 제품 고정 보충 질문 1개와 명시적 재제출 UI가 구현돼 있습니다. 원래 고민+답변을 새 생성으로 보내므로 하루 2회 한도에 포함됩니다. 재생성 실패는 기존 preview를 유지합니다. 화면 이탈을 서버 취소로 표시하지 않습니다.
 
-## AI에게 전달할 첫 요청
+## AI에게 전달할 후속 요청
 
-> AGENTS.md, frontend/AGENTS.md, docs/INTEGRATION_SPEC.md, docs/FRONTEND_HANDOFF.md, docs/tickets/FE-001.md를 읽고 A — 플레이 경험 역할로 FE-001을 구현해. 시안 4의 공통 화면과 확정된 A 대결 방향을 따르되 데모 동작 대신 통합 Spec과 OpenAPI를 사용해. frontend 내부만 소유하고 생성된 schema와 backend는 변경하지 마. 입력→생성 대기→전체 preview→재생성→start 결과 전달까지 연결하고, 예외 흐름과 360px/접근성을 검증해. 실제 후보 품질·추가 질문·완주 UI까지 완료했다고 가정하지 마. 공유 계약 변경이 필요하면 차이와 이유를 보고해.
+> AGENTS.md, frontend/AGENTS.md, PROJECT_CONTEXT.md, docs/INTEGRATION_SPEC.md, docs/FRONTEND_HANDOFF.md를 읽고 현재 구현과 배정된 후속 티켓의 차이를 먼저 확인해. A — 플레이 경험으로 frontend 내부만 소유하고 생성된 schema/backend를 임의 변경하지 마. 기존 입력·preview·게임·공유·복원 흐름을 재사용하고 관련 단위 테스트와 360px/접근성을 검증해. dev 합성 API를 사용하며 live 호출·키 사용·품질 승인·공개 배포는 하지 마. 계약 변경이 필요하면 차이와 서버 영향을 먼저 보고해.

@@ -33,6 +33,12 @@ public final class OpenAiCandidateStages implements EngineStages {
             Preferences must shape relevance and coverage without becoming automatic hard exclusions or erasing diversity.
             For example, 'I like doing things alone' guides solo-compatible choices; 'it must be possible alone' requires a constraint.
             Explicit exclusions and mandatory budget, time, location or participant conditions still belong in constraints and must not be softened.
+            A direct, unqualified rejection of a choice category in a recommendation request is an exclusion, even without the word 'must'.
+            For example, '운동은 싫어. 취미를 찾고 있어' excludes exercise: preserve non-exercise as a constraint with the user's verbatim sourceText.
+            By contrast, '비운동 취미가 더 좋지만 가벼운 운동도 괜찮아' expresses a relative preference, not an exercise exclusion.
+            Interpret the full clause, including negation and exceptions: '운동이 싫은 건 아니야' does not exclude exercise.
+            Do not classify by a dislike keyword alone or turn a positive preference into exclusion of everything else.
+            If eligibility-changing intent is genuinely ambiguous, do not silently choose weaker conditions; the planner can request clarification and reviewers use UNKNOWN.
             SEMANTIC_ESTIMATE evaluates general activity fit, such as doing a hobby at home, quietly, in 30-minute sessions.
             It never means optional: missing, FAIL or UNKNOWN assessments still block the set.
             GROUNDED_FACT requires external evidence for actual entity facts: current prices, location, opening schedules,
@@ -105,6 +111,9 @@ public final class OpenAiCandidateStages implements EngineStages {
             and groundingRequired with the ORIGINAL request. Report omitted, invented or misclassified conditions here.
             Check unit for the requested option type and granularity; a concise unit need not repeat conditions faithfully captured in constraints.
             Choosing preference-aligned activities is not itself a hard restriction; still reject actual promotion, omission or weakening of conditions.
+            Audit each original exclusion against constraints before judging candidate fit. An exclusion recorded only in softPreferences
+            is a CONSTRAINTS interpretation finding, even if every proposed candidate happens to avoid the excluded category.
+            Conversely, promoting a relative preference with an explicitly acceptable alternative to a hard exclusion is also a CONSTRAINTS finding.
             An interpretation FAIL/UNKNOWN requires a finding naming the affected interpretation field, a verbatim
             request excerpt in sourceText, and a concise explanation of the mismatch/uncertainty. PASS requires no such findings.
             Candidate noncompliance, filler, poor appeal or duplicates belong in intent rejections or candidate findings,

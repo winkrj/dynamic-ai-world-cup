@@ -168,7 +168,7 @@ class CandidateReuseServiceTest {
         CandidateReuseOperator.validateArguments(new String[]{"approve", "id", "operator", "expiry", "quality", "safety", "--time-independent"});
     }
     @Test void interpretationPromptChangesRequireAnExplicitReusePolicyBump() {
-        assertThat(dev.worldcup.infrastructure.ai.OpenAiResponsesClient.PROMPT_VERSION).isEqualTo("ce002-v20-acquirable-preparation");
-        assertThat(ReusePolicy.VERSION).isEqualTo("approved-complete-set-v2-engine-v20");
+        assertThat(dev.worldcup.infrastructure.ai.OpenAiResponsesClient.PROMPT_VERSION).isEqualTo("ce002-v21-request-exclusion-strength");
+        assertThat(ReusePolicy.VERSION).isEqualTo("approved-complete-set-v3-engine-v21");
     }
 }

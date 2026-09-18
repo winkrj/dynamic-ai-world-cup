@@ -268,6 +268,12 @@ class OpenAiResponsesClientTest {
                 "Preferences must shape relevance and coverage without becoming automatic hard exclusions",
                 "'I like doing things alone' guides solo-compatible choices; 'it must be possible alone' requires a constraint",
                 "Explicit exclusions and mandatory budget, time, location or participant conditions still belong in constraints",
+                "A direct, unqualified rejection of a choice category in a recommendation request is an exclusion",
+                "'운동은 싫어. 취미를 찾고 있어' excludes exercise",
+                "'비운동 취미가 더 좋지만 가벼운 운동도 괜찮아' expresses a relative preference",
+                "'운동이 싫은 건 아니야' does not exclude exercise",
+                "Do not classify by a dislike keyword alone or turn a positive preference into exclusion of everything else",
+                "the planner can request clarification and reviewers use UNKNOWN",
                 "SEMANTIC_ESTIMATE evaluates general activity fit", "FAIL or UNKNOWN assessments still block",
                 "GROUNDED_FACT requires external evidence", "Explicit or numeric wording alone does not require web evidence",
                 "never downgrade externally verifiable entity facts");
@@ -317,7 +323,11 @@ class OpenAiResponsesClientTest {
         assertThat(instructions).containsOnlyOnce("unit names what ONE option is and its comparison granularity");
         if (phase.equals("allocate") || phase.equals("review")) {
             assertThat(instructions).contains("a concise unit need not repeat conditions faithfully captured in constraints",
-                    "still reject actual promotion, omission or weakening of conditions");
+                    "still reject actual promotion, omission or weakening of conditions",
+                    "Audit each original exclusion against constraints before judging candidate fit",
+                    "An exclusion recorded only in softPreferences",
+                    "even if every proposed candidate happens to avoid the excluded category",
+                    "promoting a relative preference with an explicitly acceptable alternative to a hard exclusion");
         }
         assertThat(instructions).containsOnlyOnce("one coherent choice, not a menu of independent alternatives");
         assertThat(instructions).contains("this does not require putting both in the set",

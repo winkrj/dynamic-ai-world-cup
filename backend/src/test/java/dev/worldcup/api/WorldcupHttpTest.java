@@ -82,6 +82,10 @@ class WorldcupHttpTest extends PostgresSupport {
         samples.add(Map.of("schema", schema, "value", value));
         return value;
     }
+    private PostPreviewHttpFlow.Requester flowClient(Browser browser) {
+        return (method, path, body, key, status, schema) -> accepted(
+                "GET".equals(method) ? browser.get(path) : browser.post(path, body, key), status, schema);
+    }
     private void rejected(HttpResponse<String> response, int status, String code) {
         var value = accepted(response, status, "ApiError");
         assertThat(value.get("code").asString()).isEqualTo(code);
@@ -110,30 +114,10 @@ class WorldcupHttpTest extends PostgresSupport {
         String draft = ready(owner, size);
         var preview = accepted(owner.get("/drafts/" + draft), 200, "Preview");
         assertThat(preview.get("candidates").size()).isEqualTo(size);
-        var started = accepted(owner.post("/drafts/" + draft + "/start", Map.of("expectedVersion", 1)), 201, "SessionStart");
-        var retried = accepted(owner.post("/drafts/" + draft + "/start", Map.of("expectedVersion", 1)), 201, "SessionStart");
-        assertThat(retried).isEqualTo(started);
-        String session = started.get("sessionId").asString();
-        var snapshot = json.read(started.get("snapshot").toString(), BracketSnapshot.class);
-        assertThat(snapshot.size()).isEqualTo(size);
-        assertThat(snapshot.title()).doesNotContain("PRIVATE-PROMPT");
-        rejected(outsider.get("/snapshots/" + snapshot.snapshotId()), 404, "NOT_FOUND");
-        assertThat(accepted(owner.get("/snapshots/" + snapshot.snapshotId()), 200, "Snapshot")).isEqualTo(started.get("snapshot"));
-        var events = PlaySessionTest.complete(snapshot, false);
-        String key = UUID.randomUUID().toString();
-        var ack = accepted(owner.post("/sessions/" + session + "/selections", Map.of("events", events), key), 200, "SelectionAck");
-        assertThat(ack.get("nextSequence").asInt()).isEqualTo(size - 1);
-        assertThat(accepted(owner.post("/sessions/" + session + "/selections", Map.of("events", events), key), 200, "SelectionAck")).isEqualTo(ack);
-        var share = accepted(owner.post("/sessions/" + session + "/shares", null), 201, "ShareCreated");
-        String token = share.get("token").asString();
-        assertThat(share.get("url").asString()).isEqualTo("https://worldcup.example/shares/" + token);
-        var publicView = accepted(outsider.get("/shares/" + token), 200, "SharedBracket");
-        assertThat(publicView.get("snapshot")).isEqualTo(started.get("snapshot"));
-        assertThat(publicView.toString()).doesNotContain("PRIVATE-PROMPT", "actor", "evidence", "history");
         int calls = engine.calls.get();
-        var replay = accepted(outsider.post("/shares/" + token + "/sessions", null), 201, "SessionStart");
-        assertThat(replay.get("snapshot")).isEqualTo(started.get("snapshot"));
-        assertThat(replay.get("sessionId")).isNotEqualTo(started.get("sessionId"));
+        var result = PostPreviewHttpFlow.complete(preview, json, flowClient(owner), flowClient(outsider));
+        assertThat(result.snapshot().path("title").asString()).doesNotContain("PRIVATE-PROMPT");
+        assertThat(result.share().toString()).doesNotContain("PRIVATE-PROMPT", "actor", "evidence", "history");
         assertThat(engine.calls.get()).isEqualTo(calls);
     }
     @ParameterizedTest @ValueSource(ints = {8, 16, 32})
