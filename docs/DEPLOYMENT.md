@@ -12,6 +12,8 @@
 
 ### 실제 설정 진도 — 서비스 시작 전
 
+후속 확인: HTTPS edge stack `CREATE_COMPLETE`, CloudFront `Deployed`. 준비 주소는 `https://dcti7vhb3wkpw.cloudfront.net`이며 실제 TLSv1.3 인증서 검증이 통과했다. HTTP→HTTPS, private VPC origin, 캐시 비활성화·전체 viewer 전달(Host 제외), origin 검증 헤더 존재를 실제 설정에서 대조했다. 이는 origin 앱 응답 검증이 아니다. 운영 metadata·신규 DB·origin 설정 3개를 root/0600으로 설치했고 예산은 준비 상태 `0`, app.env 없음·서비스 컨테이너 미시작을 확인했다. 기존 API 키 이전과 후속 수정 리뷰 승인은 계속 대기 중이다.
+
 - 전용 foundation 생성 완료. 새 호스트 EC2 status checks/SSM Online, 별도 EBS의 ext4 mount, Docker의 data mount 의존성과 checksum 고정 Compose 설치를 확인했다. 기존 타 프로젝트 자원은 변경하지 않았다.
 - 운영 앱 소스는 `a917a482534ae8c32461c463ac1971df4060e2a3`. 실행 이미지 `release-a917a48-app`의 digest는 `sha256:a7cf6219da1d034298db3ecf8bea4a873a6f11519520dd13c5ce7300edf88382`이며 실제 x86 호스트 pull·Java 21 실행을 확인했다. Spring 시작/READY 검증은 아직 아니다.
 - 최초 `release-a917a48` 태그는 attestation manifest가 먼저 점유해 앱 manifest가 불변 태그 오류로 실패했다. 그 태그를 운영에 사용하지 않는다. 새 실행 태그는 부가 attestation 없이 패키징했으며 소스 label과 digest를 보존했다. 불변 정책은 완화하지 않았다.
