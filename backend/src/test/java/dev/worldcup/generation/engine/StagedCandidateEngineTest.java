@@ -251,6 +251,21 @@ class StagedCandidateEngineTest {
         assertThat(stages.reviewCount).isEqualTo(2);
         assertThat(result.candidates().candidates().getFirst().name()).contains("수정");
     }
+    @ParameterizedTest @ValueSource(strings = {"FAIL", "UNKNOWN"})
+    void ordinaryHomeFeasibilityCannotOverrideAnExplicitQuietConstraint(Verdict verdict) {
+        // Synthetic reviewer verdicts prove gate enforcement, not the model's semantic judgment.
+        stages.reviewFunction = (batch, count) -> {
+            var conditions = new ArrayList<>(assessments(batch));
+            conditions.set(0, new Assessment("c1", "quiet", verdict));
+            var evidence = batch.candidates().stream().map(c -> new FeasibilityAssessment(c.id(), Verdict.PASS,
+                    "일반적인 집 안 연습은 가능하지만 명시 소음 조건은 별도 판정")).toList();
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, conditions, evidence, List.of());
+        };
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.lastReplacementIds).containsExactly("c1");
+        assertThat(stages.repairs).isEqualTo(1);
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL", "REPAIR", "REVIEW_REPAIRED");
+    }
     @ParameterizedTest
     @CsvSource({"8, UNKNOWN, false", "8, FAIL, false", "16, UNKNOWN, false", "16, FAIL, false", "32, UNKNOWN, false", "32, FAIL, false",
             "8, UNKNOWN, true", "8, FAIL, true", "16, UNKNOWN, true", "16, FAIL, true", "32, UNKNOWN, true", "32, FAIL, true"})

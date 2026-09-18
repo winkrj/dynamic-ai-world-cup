@@ -27,6 +27,10 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
+최신 사용자 판단(TD-38): 소음 제한이 없는 요청의 하모니카 연습은 집에서 가능한 것으로 다룬다. v18은 일반 집 안 공간·통상적 연습과 특수 환경 접근을 공통 프롬프트에서 구별하며, 명시 조건/feasibility UNKNOWN 차단/Repair 상한을 유지한다. v17 실제 실패를 소급 PASS로 바꾸지 않는다. 추가 과금 없이 프롬프트 전달·기존 gate 회귀 테스트와 독립 리뷰로 확인하며 실제 v18 품질 평가는 별도 미실행이다.
+
+v18 구현 검증: 관련 118개 통과, 독립 리뷰 Critical/High/actionable 0. 전체 verify Java 232개 실행(유료 1개 제외)·프론트 48개·handoff 6개·fixture 5개·HTTP 159개/8 schemas·웹/두 jar 통과. 추가 유료 호출 0회, 누적 장부 $4.4511778/잔여 $0.5488222 유지. 다음 실제 모델 평가와 사람 품질 승인 없이 전체 Goal 완료로 판단하지 않는다.
+
 2026-09-18 제품 통합 검증: 프론트 48개, Java 192개 실행(유료 1개 제외), handoff 6개, fixture 5개·HTTP 159개/8 schemas, 웹/기본 jar/app jar 통과. 브라우저에서 360px 8/16/32의 7/15/31개 선택 저장 및 같은 snapshot·새 세션 공유 replay를 검증했다. 실패 후 새로고침 복구·느린 이미지 2초 fallback·긴 이름·360/1280·키보드 선택도 별도 합성 응답으로 통과했다. 독립 리뷰 최초 High 1/Medium 1을 수정하고 재리뷰 Critical/High/actionable 0. 추가 유료 호출 0. 상세/잔여 한계는 `docs/INTEGRATION_SPEC.md` 10절이다.
 
 시안 4/A 상하 카드 제품 통합은 위 검증 범위까지 완료했다. 사용자가 엔진 수정 보류를 해제해 현재는 `feat/engine/context-feasibility`에서 **필수 환경·접근 전제의 후보별 검토**를 보완한다. 기존 frontend/API는 유지하며 추가 유료 호출 없이 검사 구조·회귀 테스트를 먼저 구현한다. 실제 모델 품질·미리보기 정보 충분성·2명 사람 평가·배포 승인은 별도다. 상세는 `docs/CANDIDATE_ENGINE.md` v17 절, 역할 경계는 AGENTS, 제품 기준은 [제품 통합 Spec](docs/INTEGRATION_SPEC.md)이다. 아래는 보존된 엔진 체크포인트다.

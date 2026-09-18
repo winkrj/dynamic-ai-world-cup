@@ -267,7 +267,7 @@ class OpenAiResponsesClientTest {
                 "never downgrade externally verifiable entity facts");
     }
     @ParameterizedTest @ValueSource(strings = {"plan", "allocate", "repairIntents", "generate", "review", "repair"})
-    void everyCandidateStageUsesTheSameSingleChoiceBoundary(String phase) {
+    void everyCandidateStageUsesTheSameChoiceAndEligibilityBoundary(String phase) {
         var input = new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul");
         var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
                 List.of(new BucketSpec("group", "활동", List.of(new IntentSpec("i1", "합성 활동", "적합")))), List.of());
@@ -312,10 +312,19 @@ class OpenAiResponsesClientTest {
                 "Examples, genres and complementary steps within one activity are allowed",
                 "punctuation alone is not a defect", "Do not split those examples or steps into extra candidates");
         assertThat(instructions).containsOnlyOnce("Distinguish ordinary obtainable supplies from essential user-dependent access.");
+        assertThat(instructions).containsOnlyOnce("Ordinary home space and routine personal practice are reasonable defaults unless the request states a conflicting condition.");
+        assertThat(instructions).contains("harmonica practice at home can be feasible without a stated noise restriction",
+                "missing home details alone are not UNKNOWN",
+                "An explicit quiet/no-sound condition still applies",
+                "do not assume audible playing meets it or replace playing with silent study",
+                "does not establish a dedicated practice room, soundproofing, large-equipment space",
+                "observing wild birds nearby depends on an accessible setting where birds can actually be observed");
+        assertThat(instructions).doesNotContain("Do not assume special equipment, prior skill, suitable space");
         assertThat(instructions).contains("An unresolved essential prerequisite is UNKNOWN, not PASS",
                 "This is not a ban on birdwatching or all outdoor activities.", "Do not invent additional user constraints");
         if (phase.equals("review")) assertThat(instructions).contains(
                 "Separately return exactly one feasibility assessment for EVERY candidate, even when there are no hard constraints.",
+                "missing ordinary home details alone are not an unresolved essential prerequisite",
                 "A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.",
                 "The public preview contains only name and tags");
         assertThat(calls).hasValue(1);

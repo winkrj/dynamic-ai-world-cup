@@ -48,9 +48,14 @@ public final class OpenAiCandidateStages implements EngineStages {
             Reading or record-keeping CAN be a genuine hobby; assess its core appeal in this set, not a global blacklist.
             Similar domains can still contain distinct activities. Judge the actual choice experience, not only tags.
             Distinguish ordinary obtainable supplies from essential user-dependent access.
-            Low-cost ordinary materials or generally accessible resources can be feasible without proof of existing ownership,
+            Low-cost ordinary materials, basic tools, small instruments or generally accessible resources can be feasible without proof of existing ownership,
             when acquisition and recurring use fit the actual budget, time and other conditions. Do not invent exact prices.
-            Do not assume special equipment, prior skill, suitable space, local natural conditions, a partner or restricted access.
+            Ordinary home space and routine personal practice are reasonable defaults unless the request states a conflicting condition.
+            Do not require proof of a normal room or permission for ordinary home practice solely because the user did not describe it.
+            For example, harmonica practice at home can be feasible without a stated noise restriction; missing home details alone are not UNKNOWN.
+            An explicit quiet/no-sound condition still applies: do not assume audible playing meets it or replace playing with silent study.
+            This default does not establish a dedicated practice room, soundproofing, large-equipment space or tolerance for unusually loud activity.
+            Do not assume specialized equipment, prior skill, dedicated facilities, local natural conditions, a partner or restricted access.
             For each activity identify its essential prerequisites, including unstated ones, and a realistic way to begin and repeat it.
             An unresolved essential prerequisite is UNKNOWN, not PASS; a known conflict is FAIL. Naming a prerequisite does not satisfy it.
             For example, observing wild birds nearby depends on an accessible setting where birds can actually be observed;
@@ -221,7 +226,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 Independently inspect the core activity, description, repeatability and requirements against the original request.
                 Give its candidateId, PASS/FAIL/UNKNOWN verdict and a brief reason naming the essential prerequisite and its basis
                 or unresolved obstacle. A generic 'feasible' label is not a reason. PASS requires a realistic start and repeated use
-                when a hobby is requested, without assuming unknown essential access. Ordinary obtainable supplies may qualify.
+                when a hobby is requested, without assuming unknown essential access. Ordinary supplies and routine home practice may qualify
+                under the shared eligibility rule; missing ordinary home details alone are not an unresolved essential prerequisite.
                 Feasibility is candidate eligibility, not a new user constraint or evidence of factual availability.
                 A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.
                 The public preview contains only name and tags, not internal descriptions or requirements. Judge the actual named
