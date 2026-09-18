@@ -1,31 +1,67 @@
 package dev.worldcup.infrastructure;
 
-import static dev.worldcup.shared.Failure.Code.RATE_LIMITED;
 import dev.worldcup.identity.ActorService;
 import dev.worldcup.shared.Failure;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Sliding ten-minute quota, serialized by actor and hashed socket peer IP. Called inside mutation tx. */
+/** Accepted jobs consume one daily actor slot and actor/IP burst slots in the mutation transaction. */
 @Component
 public class GenerationRateLimit {
+    private static final ZoneId DAILY_ZONE = ZoneId.of("Asia/Seoul");
+    private static final Duration BURST_WINDOW = Duration.ofMinutes(10);
+    private static final int BURST_LIMIT = 5;
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    public GenerationRateLimit(JdbcTemplate jdbc, Clock clock) { this.jdbc = jdbc; this.clock = clock; }
+    private final int dailyLimit;
+    public GenerationRateLimit(JdbcTemplate jdbc, Clock clock,
+            @Value("${worldcup.generation.daily-limit:2}") int dailyLimit) {
+        if (dailyLimit < 1) throw new IllegalArgumentException("Daily generation limit must be positive");
+        this.jdbc = jdbc; this.clock = clock; this.dailyLimit = dailyLimit;
+    }
     public void reserve(String actor, String remoteAddress) {
-        var now = Timestamp.from(clock.instant());
-        var since = Timestamp.from(clock.instant().minus(Duration.ofMinutes(10)));
-        for (String scope : Stream.of("actor:" + actor, "ip:" + ActorService.hash(remoteAddress)).sorted().toList()) {
+        String actorScope = "actor:" + actor;
+        var scopes = Stream.of(actorScope, "ip:" + ActorService.hash(remoteAddress)).sorted().toList();
+        for (String scope : scopes) {
             jdbc.update("INSERT INTO generation_quota(scope) VALUES (?) ON CONFLICT DO NOTHING", scope);
             jdbc.queryForObject("SELECT scope FROM generation_quota WHERE scope = ? FOR UPDATE", String.class, scope);
-            int count = jdbc.queryForObject("SELECT count(*) FROM generation_rate_event WHERE scope = ? AND created_at > ?", Integer.class, scope, since);
-            if (count >= 5) throw Failure.of(RATE_LIMITED);
-            jdbc.update("INSERT INTO generation_rate_event(scope, created_at) VALUES (?, ?)", scope, now);
-            jdbc.update("UPDATE generation_quota SET last_used_at = ? WHERE scope = ?", now, scope);
+        }
+        // A lock wait may cross midnight. Decide the accounting day only after acquiring both locks.
+        Instant now = clock.instant();
+        var day = now.atZone(DAILY_ZONE).toLocalDate();
+        Instant dayStart = day.atStartOfDay(DAILY_ZONE).toInstant();
+        Instant nextDay = day.plusDays(1).atStartOfDay(DAILY_ZONE).toInstant();
+        int dailyCount = jdbc.queryForObject("""
+                SELECT count(*) FROM generation_rate_event
+                WHERE scope = ? AND created_at >= ? AND created_at < ?
+                """, Integer.class, actorScope, Timestamp.from(dayStart), Timestamp.from(nextDay));
+        Instant retryAt = dailyCount >= dailyLimit ? nextDay : now;
+        for (String scope : scopes) {
+            // The fifth newest event must expire, even if a previous configuration admitted more.
+            var recent = jdbc.query("""
+                    SELECT created_at FROM generation_rate_event WHERE scope = ? AND created_at > ?
+                    ORDER BY created_at DESC LIMIT ?
+                    """, (row, index) -> row.getTimestamp(1).toInstant(), scope,
+                    Timestamp.from(now.minus(BURST_WINDOW)), BURST_LIMIT);
+            if (recent.size() == BURST_LIMIT) {
+                Instant burstReset = recent.getLast().plus(BURST_WINDOW);
+                if (burstReset.isAfter(retryAt)) retryAt = burstReset;
+            }
+        }
+        if (retryAt.isAfter(now)) {
+            Duration wait = Duration.between(now, retryAt);
+            throw Failure.rateLimited(wait.getSeconds() + (wait.getNano() == 0 ? 0 : 1));
+        }
+        for (String scope : scopes) {
+            jdbc.update("INSERT INTO generation_rate_event(scope, created_at) VALUES (?, ?)", scope, Timestamp.from(now));
+            jdbc.update("UPDATE generation_quota SET last_used_at = ? WHERE scope = ?", Timestamp.from(now), scope);
         }
     }
 }

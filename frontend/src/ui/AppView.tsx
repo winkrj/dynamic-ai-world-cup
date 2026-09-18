@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Actions, ViewState } from '../app/view-model.ts';
 import type { Candidate, Size } from '../api/types.ts';
+import { formatRetryDuration } from './retry-duration.ts';
 
 type ViewProps = { state: ViewState; actions: Actions };
 const examples = [
@@ -26,6 +27,10 @@ function Heading({ eyebrow, children, subtitle }: { eyebrow: string; children: R
 
 function Tags({ candidate }: { candidate: Candidate }) {
   return <span className="tags">{candidate.tags.slice(0, 2).map((tag, index) => <span key={`${tag}-${index}`}>{tag}</span>)}</span>;
+}
+
+function GenerationPolicy() {
+  return <p className="fine-print generation-policy">이 브라우저에서 하루 2회까지 만들 수 있어요. 전체 다시 만들기와 접수 후 실패도 포함돼요.<br />한국 시간 자정에 초기화돼요. 같은 요청 재전송·공유 플레이는 차감하지 않아요.</p>;
 }
 
 /** A missing, failed, or slow image settles to the same-size artwork. */
@@ -62,7 +67,7 @@ function Problems({ state, actions }: ViewProps) {
     {state.storageBlocked && <div className="message message--warning" role="alert"><strong>진행 상황을 저장할 수 없어요.</strong><p>브라우저의 사이트 저장 공간을 허용한 뒤 다시 시도해 주세요. 안전하게 이어 할 수 있도록 시작을 잠시 멈췄어요.</p></div>}
     {state.error && <section className="message message--error" aria-label="문제 안내">
       <div role="alert"><strong>{state.error.title}</strong><p>{state.error.detail}</p></div>
-      {remainingSeconds > 0 && <p className="retry-countdown" aria-live="off">다시 시도까지 {Math.floor(remainingSeconds / 60)}분 {twoDigits(remainingSeconds % 60)}초</p>}
+      {remainingSeconds > 0 && <p className="retry-countdown" aria-live="off">다시 시도까지 {formatRetryDuration(remainingSeconds)}</p>}
       {(state.canRetry || state.canEdit) && <div className="message-actions">
         {state.canRetry && <button className="button button--small" disabled={state.busy || remainingSeconds > 0 || state.locked} onClick={actions.retry}>다시 시도</button>}
         {state.canEdit && <button className="text-button" disabled={state.busy || state.locked} onClick={actions.editInput}>고민 수정하기 <Arrow direction="left" /></button>}
@@ -88,7 +93,7 @@ function InputScreen({ state, actions }: ViewProps) {
         placeholder="취향, 예산, 함께할 사람… 원하는 조건을 편하게 적어 주세요." rows={5} required />
       <div className="field-help"><span id="question-help">조건이 구체적일수록, 더 나다운 후보.</span><span id="question-count">{state.prompt.length} / 500</span></div>
       <button className="button button--primary" type="submit" disabled={!state.prompt.trim() || state.busy || state.locked || state.storageBlocked}>월드컵 만들기 <Arrow /></button>
-      <p className="input-reassurance">로그인 없이 시작해요. 후보는 먼저 확인할 수 있어요.</p>
+      <p className="input-reassurance">로그인 없이 시작해요. 후보는 먼저 확인할 수 있어요.<br />이 브라우저에서 하루 2회 · 한국 시간 자정 초기화</p>
       <div className="example-section"><p className="tiny-label">이렇게 시작해 봐도 좋아요</p>
         {examples.map((example, index) => <button className="example" type="button" key={example} disabled={state.busy || state.locked} onClick={() => actions.editPrompt(example)}>
           <span className="example-number">{twoDigits(index + 1)}</span><span>{example}</span><span aria-hidden="true">↗</span>
@@ -115,6 +120,7 @@ function SizeScreen({ state, actions }: ViewProps) {
       </label>)}
     </fieldset>
     <p className="fine-print">대결마다 7초. 시간이 지나면 둘 중 하나가 무작위로 진출해요.</p>
+    <GenerationPolicy />
     <div className="action-stack"><button className="button button--primary" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.generate}>후보 {state.size}개 만들기 <Arrow /></button>
       <button className="text-button" disabled={state.busy || state.locked} onClick={actions.back}><Arrow direction="left" /> 고민으로 돌아가기</button></div>
   </section>;
@@ -145,7 +151,8 @@ function PreviewScreen({ state, actions }: ViewProps) {
     {state.busy && <p className="notice" role="status">처리 중이에요. 완료될 때까지 현재 후보를 그대로 보여드려요.</p>}
     <div className="preview-actions action-stack">
       <button className="button button--primary" onClick={actions.start} disabled={state.previewLocked || state.busy || state.locked || state.storageBlocked}>이대로 시작 <Arrow /></button>
-      <button className="button button--outline" onClick={actions.regenerate} disabled={state.previewLocked || state.busy || state.locked || state.storageBlocked || preview.regenerationsRemaining === 0}>전체 다시 만들기 <span className="button-meta">남은 {preview.regenerationsRemaining}회</span></button>
+      <GenerationPolicy />
+      <button className="button button--outline" onClick={actions.regenerate} disabled={state.previewLocked || state.busy || state.locked || state.storageBlocked || preview.regenerationsRemaining === 0}>전체 다시 만들기 <span className="button-meta">교체 남은 {preview.regenerationsRemaining}회</span></button>
       <p className="fine-print">전체 후보 교체는 성공 기준 1회. 시작 후 되돌리기는 없어요.</p>
     </div>
   </section>;
@@ -246,7 +253,7 @@ function ShareScreen({ state, actions }: ViewProps) {
     {champion && <div className="original-champion"><span className="tiny-label">만든 사람의 CHAMPION</span><strong>{champion.name}</strong><Tags candidate={champion} /><span className="original-mark" aria-hidden="true">✳</span></div>}
     <div className="roster-heading"><h2>함께 고를 후보 <span>{shared.snapshot.size}강</span></h2><span className="tiny-label">SAME BRACKET</span></div>
     <CandidateList candidates={shared.snapshot.candidates} />
-    <p className="fine-print frozen-note">{Number.isNaN(frozenAt.getTime()) ? '저장된' : frozenAt.toLocaleString('ko-KR')} 대진 그대로 진행해요.<br />후보를 새로 만들지 않으며, 내 결과는 별도로 저장돼요.</p>
+    <p className="fine-print frozen-note">{Number.isNaN(frozenAt.getTime()) ? '저장된' : frozenAt.toLocaleString('ko-KR')} 대진 그대로 진행해요.<br />후보를 새로 만들지 않으며, 내 결과는 별도로 저장돼요.<br />공유 플레이는 하루 만들기 횟수를 쓰지 않아요.</p>
     <div className="action-stack"><button className="button button--primary" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.replay}>이 월드컵 해보기 <Arrow /></button><button className="text-button" disabled={state.busy || state.locked} onClick={actions.newCup}>내 월드컵으로 돌아가기 <Arrow /></button><p className="fine-print">진행 중인 월드컵이 있다면 이어서 열려요.</p></div>
   </section>;
 }

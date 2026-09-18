@@ -29,7 +29,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@SpringBootTest
+@SpringBootTest(properties = "worldcup.generation.daily-limit=100")
 @Import(EngineTestConfiguration.class)
 class BackendPersistenceTest extends PostgresSupport {
     @Autowired JdbcTemplate jdbc;

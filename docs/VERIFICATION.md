@@ -1,5 +1,17 @@
 # 검증 기록
 
+## 2026-09-18 TD-40 — 일일 생성 접수 제한
+
+AC-19: 기본 익명 브라우저별 하루 2회, 서울 자정 초기화, 생성/재생성/접수 후 실패 합산. 기존 rate event/transaction을 사용하고 schema/공개 DTO/모델은 그대로다. 24시간 event 보존, 알려진 제한만 정확한 Retry-After, 프론트 정책 안내와 긴 대기 표시를 함께 변경했다.
+
+새 실제 PostgreSQL/HTTP 테스트 12개 PASS: default 2회·8/16/32 동일 차감, idempotency 동시 재전송·마지막 슬롯 경합, 실패한 재생성/접수 rollback, 서울 자정·시간대 조작·DB 잠금 대기가 자정을 넘는 경우, retention 뒤 당일 기록, IP burst·자정 중첩, 소진 후 완주/공유/replay, 미상 제한의 대기시간 미발명. 최초 테스트 assertion 컴파일 오류 1건을 수정했고 동작 테스트 실패는 없었다.
+
+전체 verify 실행 PASS: **Java 244개 실행/실패·오류 0/유료 1개 제외**, 프론트 **50개**, handoff **6개**, fixture **5개**, 실제 HTTP **159개/8 schemas**, 웹 build·bootJar·appJar. 독립 read-only 리뷰 1회 **Critical 0 / High 0 / actionable 0**. 코드 변경 없이 마지막 verify도 PASS(Gradle은 동일 입력 UP-TO-DATE, 웹 테스트/빌드와 계약 검사 재실행).
+
+합성 브라우저: 360/1280px 생성 전·preview 정책 안내, 24시간 대기, 만료 자동 POST 0회, 수동 재시도 동일 key/body, 키보드/reduced motion/가로 넘침·브라우저 오류 없음. 기존 browser-states의 fallback·복구 회귀도 통과했다. 재현: Node 24로 `node frontend/tests/generation-policy.browser.mjs <loopback frontend origin>`. provider 호출은 가로채며 원래 18086 preview/DB는 변경하지 않았다.
+
+이 quota 검증은 무료 합성 검증이다. 별도 승인한 실제 v18 32강 1회는 사전 해석 실패로 **live test 1개 실패**, $0.0728365, preview 없음이며 CANDIDATE_ENGINE에 따로 기록했다. 후보 품질/운영 배포 완료가 아니다. 누적 장부 $4.5240143/$6(미확인 예약 $0.50 포함), 자동 충전 OFF·추가 유료 호출 승인 없음. 후보 DB 재사용은 TECH_DESIGN 8절의 미구현 제안이다.
+
 아래 첫 기록은 2026-09-12 저장소 기반 + CE-001이다. 이후 API Goal 검증은 문서 하단에 별도로 남긴다.
 
 ## 최종 로컬 검증

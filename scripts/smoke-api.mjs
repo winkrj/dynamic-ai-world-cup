@@ -30,7 +30,12 @@ export async function runApiSmoke({ baseUrl = 'http://127.0.0.1:8080', fetchImpl
     const setCookie = response.headers.get('set-cookie');
     if (setCookie) cookie = setCookie.split(';')[0];
     if (response.status !== expected) {
-      if (response.status === 429) throw new Error('Generation rate limit reached. Wait ten minutes before rerunning.');
+      if (response.status === 429) {
+        const delay = response.headers.get('retry-after');
+        const hint = delay && /^[1-9]\d{0,5}$/.test(delay)
+          ? `Retry after ${delay} seconds.` : 'Check the generation allowance; no reset time was supplied.';
+        throw new Error(`Generation rate limit reached. ${hint}`);
+      }
       throw new Error(`API returned HTTP ${response.status}; expected ${expected}. See docs/API_CONTRACT.md.`);
     }
     return response.json();

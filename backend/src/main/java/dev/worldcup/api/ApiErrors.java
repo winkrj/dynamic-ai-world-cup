@@ -4,6 +4,7 @@ import dev.worldcup.shared.Failure;
 import dev.worldcup.shared.Failure.Code;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.util.OptionalLong;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -41,7 +42,7 @@ public class ApiErrors {
             case QUALITY_GATE_FAILED -> "No candidate set passed validation. Revise the request or try again.";
             case CLARIFICATION_REQUIRED -> "Clarify the concern before generating candidates.";
             case UNSUPPORTED_REQUEST -> "This request cannot be handled safely.";
-            case RATE_LIMITED -> "The generation limit is five requests per ten minutes. Try later.";
+            case RATE_LIMITED -> "The generation allowance is currently exhausted. Try later.";
             case PROVIDER_UNAVAILABLE -> "Candidate generation is unavailable. Try later.";
             case INVALID_SELECTION -> "Check the sequence, current pair and elapsed time of each selection.";
             case SESSION_NOT_COMPLETED -> "Complete the session before sharing.";
@@ -51,7 +52,9 @@ public class ApiErrors {
         return new ApiModels.Error(code.name(), message, requestId, retryable);
     }
     @ExceptionHandler(Failure.class)
-    ResponseEntity<ApiModels.Error> business(Failure failure, HttpServletRequest request) { return response(failure.code(), request); }
+    ResponseEntity<ApiModels.Error> business(Failure failure, HttpServletRequest request) {
+        return response(failure.code(), failure.retryAfterSeconds(), request);
+    }
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class,
             MissingRequestHeaderException.class, ConstraintViolationException.class, HandlerMethodValidationException.class})
     ResponseEntity<ApiModels.Error> invalid(Exception failure, HttpServletRequest request) { return response(Code.INVALID_INPUT, request); }
@@ -68,8 +71,11 @@ public class ApiErrors {
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiModels.Error> unexpected(Exception failure, HttpServletRequest request) { return response(Code.INTERNAL_ERROR, request); }
     private ResponseEntity<ApiModels.Error> response(Code code, HttpServletRequest request) {
+        return response(code, OptionalLong.empty(), request);
+    }
+    private ResponseEntity<ApiModels.Error> response(Code code, OptionalLong retryAfterSeconds, HttpServletRequest request) {
         var builder = ResponseEntity.status(status(code));
-        if (code == Code.RATE_LIMITED) builder.header("Retry-After", "600");
+        retryAfterSeconds.ifPresent(seconds -> builder.header("Retry-After", Long.toString(seconds)));
         return builder.body(body(code, (String) request.getAttribute(ApiGuard.REQUEST_ID)));
     }
 }

@@ -90,6 +90,7 @@ test('a changed replay snapshot fails the smoke result', async () => {
   await assert.rejects(runApiSmoke({ fetchImpl: api.fetchImpl }), assert.AssertionError);
 });
 test('rate limit and unreachable API return safe actionable errors without dumping responses', async () => {
-  await assert.rejects(runApiSmoke({ fetchImpl: async () => new Response('private response', { status: 429 }) }), /Wait ten minutes/);
+  await assert.rejects(runApiSmoke({ fetchImpl: async () => new Response('private response', { status: 429 }) }), /no reset time was supplied/);
+  await assert.rejects(runApiSmoke({ fetchImpl: async () => new Response('private response', { status: 429, headers: { 'Retry-After': '86400' } }) }), /Retry after 86400 seconds/);
   await assert.rejects(runApiSmoke({ fetchImpl: async () => { throw new Error('sensitive detail'); } }), /Start the dev server/);
 });

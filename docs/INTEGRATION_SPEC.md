@@ -36,7 +36,7 @@
 | 05A 상하 대결 | `POST /drafts/{id}/start`의 sessionId/snapshot → 인접 pair 및 승자 순서 | 서버 freeze는 구현됨. A는 렌더링과 분리한 게임 상태·timer·RNG·복원 구현 |
 | 06 Champion | N−1개 event를 selections API에 저장하고 `COMPLETED`/championId 확인 | 공유는 마지막 event까지 서버 수락 후 활성화. 로컬 우승과 저장 중/실패 구분 |
 | 07 공유 진입 | `GET /shares/{token}` → 원본 champion/snapshot; `POST /shares/{token}/sessions` → 새 session | 서버 구현됨. 원문 고민/history 비공개, AI 재호출 없음. A가 공유 화면 구현 |
-| E2 생성 제한 | 429/RATE_LIMITED와 Retry-After | 시안의 고정 04:12/58% 대신 응답 수신 기준 대기 안내. 만료 때 자동 생성하지 않음 |
+| E2 생성 제한 | 익명 브라우저 하루 2회/서울 자정, 생성·재생성·접수 후 실패 합산. 429/RATE_LIMITED와 알려진 Retry-After | 생성·재생성 전에 정책 안내. 시안의 고정 04:12/58% 대신 실제 응답 대기 안내(긴 대기는 시·분·초). 만료 때 자동 생성하지 않음. 교체 잔여 1회를 일일 잔여로 표시하지 않음 |
 | E3 공유 실패 | 404/NOT_FOUND와 일시적 503/PROVIDER_UNAVAILABLE 구별 | 같은 공유 주소 GET 재시도. 없는 링크를 재생성하거나 다른 후보로 대체하지 않음 |
 | E4 복귀·새로고침 | local checkpoint의 snapshot/session/events/current deadline | 서버에서 현재 경기 timer를 복원하는 API는 없음. A가 로컬 복원·전송 대기열을 관리 |
 

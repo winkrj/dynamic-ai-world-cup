@@ -1,5 +1,7 @@
 package dev.worldcup.shared;
 
+import java.util.OptionalLong;
+
 /** Stable business failures, independent of HTTP and provider exception text. */
 public final class Failure extends RuntimeException {
     public enum Code {
@@ -9,7 +11,16 @@ public final class Failure extends RuntimeException {
         RATE_LIMITED, PROVIDER_UNAVAILABLE, INVALID_SELECTION, SESSION_NOT_COMPLETED, INTERNAL_ERROR
     }
     private final Code code;
-    public Failure(Code code) { super(code.name()); this.code = code; }
+    private final OptionalLong retryAfterSeconds;
+    public Failure(Code code) { this(code, OptionalLong.empty()); }
+    private Failure(Code code, OptionalLong retryAfterSeconds) {
+        super(code.name()); this.code = code; this.retryAfterSeconds = retryAfterSeconds;
+    }
     public Code code() { return code; }
+    public OptionalLong retryAfterSeconds() { return retryAfterSeconds; }
     public static Failure of(Code code) { return new Failure(code); }
+    public static Failure rateLimited(long seconds) {
+        if (seconds < 1) throw new IllegalArgumentException("Retry delay must be positive");
+        return new Failure(Code.RATE_LIMITED, OptionalLong.of(seconds));
+    }
 }

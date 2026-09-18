@@ -29,7 +29,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "worldcup.generation.daily-limit=100")
 @Import(EngineTestConfiguration.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorldcupHttpTest extends PostgresSupport {
@@ -280,7 +281,7 @@ class WorldcupHttpTest extends PostgresSupport {
         }
         var response = new Browser().request("POST", "/generation-jobs", json.write(input(8)), Map.of("Idempotency-Key", "key", "X-Forwarded-For", "203.0.113.1"));
         rejected(response, 429, "RATE_LIMITED");
-        assertThat(response.headers().firstValue("Retry-After")).contains("600");
+        assertThat(Long.parseLong(response.headers().firstValue("Retry-After").orElseThrow())).isBetween(1L, 600L);
     }
     @Test void wrongGetAndPostMethodsReturn405NotRetryable500() throws Exception {
         var browser = new Browser();

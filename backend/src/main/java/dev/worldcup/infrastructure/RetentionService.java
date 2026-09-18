@@ -23,7 +23,8 @@ public class RetentionService {
                 AND NOT EXISTS (SELECT 1 FROM generation_job j WHERE j.draft_id = d.id AND j.state IN ('QUEUED', 'RUNNING'))
                 """, day);
         jdbc.update("DELETE FROM play_session WHERE created_at < ?", month);
-        jdbc.update("DELETE FROM generation_rate_event WHERE created_at <= ?", Timestamp.from(now.minus(Duration.ofMinutes(10))));
+        // Keep the entire current Seoul day; burst expiry is not daily quota expiry.
+        jdbc.update("DELETE FROM generation_rate_event WHERE created_at < ?", day);
         jdbc.update("DELETE FROM generation_quota WHERE last_used_at < ?", day);
         // Public snapshots and links are intentionally untouched; owner hashes remain for access control.
         jdbc.update("""

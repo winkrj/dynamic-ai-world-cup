@@ -40,7 +40,8 @@ Google AIP 완전 준수 구현은 아니다. 기존 프론트 계약을 호환�
 ## transaction과 실패 처리
 
 - idempotency 예약 → business mutation → 응답 JSON 저장을 하나의 transaction으로 처리한다. 동시 같은 key는 DB에서 직렬화되고 실패는 예약·quota와 함께 rollback된다.
-- 생성 속도는 actor와 실제 socket peer IP 각각 5회/최근 10분이다. IP는 hash만 저장한다. forwarding header를 신뢰하지 않으며 reverse proxy 도입 시 신뢰 경계를 별도로 설정해야 한다.
+- 생성 접수는 actor별 서울 날짜 하루 2회 + actor와 실제 socket peer IP 각각 5회/최근 10분이다(TD-40). 생성/재생성은 합산하고, 접수 뒤 FAILED도 소비한다. idempotency 재전송·접수 rollback·worker 복구/Repair·공유 플레이는 추가 소비하지 않는다. 두 scope를 정렬해 잠근 뒤 시간을 한 번 읽고 기존 rate event로 계산하므로 자정/동시 접수에도 제한을 보존한다. 새 schema는 없다. IP는 hash만 저장하며 forwarding header를 신뢰하지 않는다. reverse proxy 도입 시 신뢰 경계를 별도로 설정해야 한다.
+- `GENERATION_DAILY_LIMIT`은 양수, 기본 2다. 횟수 변경은 사용자에게 보이는 정책 안내와 함께 한다. 정확한 사람당 식별이나 월 과금 상한을 뜻하지 않는다. 알려진 제한 해제 시간만 HTTP Retry-After로 전달하고, 전역 예산 소진의 재개 시각은 임의로 추측하지 않는다. rate event는 최소 24시간 보존해 당일 생성 기록이 10분 후 지워지지 않도록 한다.
 - worker는 DB에서 QUEUED를 SKIP LOCKED로 하나 claim한다. provider 실행 중에는 DB transaction을 열어두지 않는다. 두 실행 슬롯, 메모리 대기 queue 없음. 단일 프로세스 운영 기준이다.
 - attempt/lease를 검사한 현재 worker만 결과를 저장한다. 기본/dev lease는 60초, CE-002 `live`는 300초다([설정 근거](CANDIDATE_ENGINE.md)). 만료 작업은 같은 job에서 최대 두 attempt까지 복구한다. 이후 FAILED, 재생성이라면 기존 READY를 복원한다. 이는 crash recovery이며 엔진 내부 Repair 1회와 다르다.
 - deadline이 지난 provider 결과는 버린다. 실제 adapter는 네트워크 timeout/interrupt를 지켜야 한다. 무한 대기하는 adapter를 Java thread에서 강제 종료한다고 보장하지 않으며, 이런 adapter는 연결하지 않는다.
