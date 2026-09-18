@@ -68,6 +68,26 @@ class CandidateReusePersistenceTest extends PostgresSupport {
                 "Synthetic public-safety lifecycle fixture", true, clock.instant().plusSeconds(3600)));
     }
     int count(String table) { return jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class); }
+    String legacySet(State state, String sourceJobId) {
+        String id = UUID.randomUUID().toString();
+        var now = Timestamp.from(clock.instant());
+        boolean approved = state == State.APPROVED;
+        // Deliberately use today's lookup key: an old certificate must miss even if it reaches the reader.
+        jdbc.update("""
+                INSERT INTO candidate_reuse_set(id, context_hash, membership_hash, policy_version, source_job_id, source_attempt,
+                    state, public_title, provider_version, validator_version, certificate, created_at, updated_at,
+                    approved_at, expires_at, quality_approved, public_safe, time_independent)
+                VALUES (?, ?, ?, 'approved-complete-set-v3-engine-v22', ?, 1, ?, '합성 이전 버전 세트',
+                    'synthetic-generator', 'synthetic-independent-review', ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+                """, id, ReusePolicy.contextHash(input()), ReusePolicy.membershipHash(ReuseFixtures.generated().candidates().candidates().stream()
+                        .map(c -> c.name()).toList()), sourceJobId, state.name(), ReuseFixtures.LEGACY_V3_CERTIFICATE, now, now,
+                approved ? now : null, approved ? Timestamp.from(clock.instant().plusSeconds(3600)) : null,
+                approved, approved, approved);
+        return id;
+    }
+    String certificateJson(String id) {
+        return jdbc.queryForObject("SELECT certificate::text FROM candidate_reuse_set WHERE id = ?", String.class, id);
+    }
 
     @Test void readyDoesNotAutoApproveAndOnlyExplicitlyApprovedExactSetAvoidsEngine() {
         ready(actor()); var first = onlyPending();
@@ -83,6 +103,7 @@ class CandidateReusePersistenceTest extends PostgresSupport {
         assertThat(count("candidate_reuse_review")).isEqualTo(1);
         String payload = jdbc.queryForObject("SELECT certificate::text FROM candidate_reuse_set WHERE id = ?", String.class, first.id());
         assertThat(payload).doesNotContain(input().prompt(), "sourceText", "recentDirectChoices", "\"prompt\"");
+        assertThat(payload).doesNotContain("allocationInterpretation", "allocationComparable", "allocationNoSemanticDuplicates", "allocationFeasible", "intentId");
         assertThatThrownBy(() -> jdbc.update("UPDATE candidate_reuse_set SET certificate = '{}'::jsonb WHERE id = ?", first.id()))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -202,6 +223,49 @@ class CandidateReusePersistenceTest extends PostgresSupport {
     @Test void legacyDevelopmentOrTestEngineWithoutCertificateNeverStages() {
         engine.certified = false; ready(actor());
         assertThat(count("candidate_reuse_set")).isZero(); assertThat(count("candidate_reuse_use")).isZero();
+    }
+    @Test void literalOldApprovedCertificateIsAMissAndFallsBackOnceWithoutRewritingEvidence() {
+        String id = legacySet(State.APPROVED, "synthetic-old-approved-job");
+        String original = certificateJson(id);
+        assertThat(original).contains("allocationInterpretation", "allocationComparable", "allocationNoSemanticDuplicates", "allocationFeasible", "intentId");
+        assertThat(repository.get(id, false).orElseThrow().certificate()).isNull();
+        assertThat(reuse.find(input(), ReuseFixtures.context(), null)).isEmpty();
+        ready(actor());
+        assertThat(engine.calls.get()).isEqualTo(1);
+        assertThat(count("candidate_reuse_use")).isZero();
+        assertThat(certificateJson(id)).isEqualTo(original);
+        assertThat(repository.get(id, false).orElseThrow().policyVersion()).isEqualTo("approved-complete-set-v3-engine-v22");
+    }
+    @Test void literalOldPendingCertificateCannotBeApprovedOrSilentlyUpgraded() {
+        String id = legacySet(State.PENDING, "synthetic-old-pending-job");
+        String original = certificateJson(id);
+        assertThat(reuse.pending()).singleElement().satisfies(set -> assertThat(set.certificate()).isNull());
+        assertThatThrownBy(() -> approve(id)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(repository.get(id, false).orElseThrow().state()).isEqualTo(State.PENDING);
+        assertThat(count("candidate_reuse_review")).isZero();
+        assertThat(certificateJson(id)).isEqualTo(original);
+        assertThat(engine.calls.get()).isZero();
+    }
+    @Test void oldDraftCertificateHasNoTrustedCoreHashButFrozenShareRemainsPlayable() {
+        engine.certified = false;
+        String actor = actor();
+        var draft = ready(actor);
+        String sourceJob = jdbc.queryForObject("SELECT id FROM generation_job WHERE draft_id = ?", String.class, draft.id());
+        String id = legacySet(State.APPROVED, sourceJob);
+        String original = certificateJson(id);
+        String membership = ReusePolicy.membershipHash(draft.content().candidates().stream().map(c -> c.name()).toList());
+        assertThat(repository.forDraft(actor, draft.id()).orElseThrow().certificate()).isNull();
+        assertThat(reuse.previousCoreActivities(actor, draft.id(), membership)).isEmpty();
+        var start = tournaments.start(actor, draft.id(), 1);
+        tournaments.select(actor, start.sessionId(), PlaySessionTest.complete(start.snapshot(), false));
+        var share = sharing.create(actor, start.sessionId());
+        assertThat(sharing.read(share.token()).snapshot()).isEqualTo(start.snapshot());
+        var replay = sharing.replay(actor(), share.token());
+        assertThat(replay.snapshot()).isEqualTo(start.snapshot());
+        assertThat(replay.sessionId()).isNotEqualTo(start.sessionId());
+        assertThat(certificateJson(id)).isEqualTo(original);
+        assertThat(engine.calls.get()).isEqualTo(1);
+        assertThat(count("candidate_reuse_use")).isZero();
     }
 
     @TestConfiguration static class FixtureConfiguration {

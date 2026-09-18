@@ -146,29 +146,34 @@ public final class OpenAiCandidateStages implements EngineStages {
     public OpenAiCandidateStages(OpenAiResponsesClient client, Clock clock, String generationModel, String reviewModel) {
         this.client = client; this.clock = clock; this.generationModel = generationModel; this.reviewModel = reviewModel;
     }
-    @Override public StageResult<PlanProposal> plan(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call) {
+    @Override public StageResult<GenerationProposal> generate(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call) {
         var reply = client.complete(generationModel, BOUNDARY + QUALITY + REQUEST_SCOPE + """
-                PLAN ONLY; no display cards yet. First separate context from explicit hard constraints;
-                then define one candidate unit; then consider ONLY related direct historical choices; finally propose feasible activity intents.
+                GENERATE one complete proposal: output plan first, then candidates. This proposal is NOT quality approval.
+                First separate context, explicit hard constraints and soft preferences; then define one candidate unit;
+                then consider ONLY related direct historical choices; establish request-specific coverage and generate the full set.
                 History must not override current conditions or erase diversity. Ignore unrelated/weak evidence.
                 Constraint sourceText must be a verbatim excerpt from the original prompt, with concise description and unique id.
                 Capture all explicit exclusions, time, place, budget and participant conditions; do not label a hard constraint soft.
-                For READY: propose N to N+4 compact, concretely different activity intents. Each has a stable lowercase id,
-                coreActivity (what the user actually does/chooses), a concise fit explanation including obstacles,
-                nested directly inside one request-specific broad experience group in coverage. Across all groups combined,
-                there must be N to N+4 intents, each with a globally unique ID. Do not assign numeric quotas or cross-reference buckets.
-                No conventional domain must be represented. Derive groups from eligible activities, not activities from empty quotas.
-                Across ALL buckets, do not pad with materials/styles/genres of one activity. Do not force an unsuitable domain
-                into the request by inventing chores or artificial schedules. Extra intents are optional repair options, never filler.
-                For entity requests, each intent must identify the specific entity/experience whose facts will later be checked.
-                Do not include an activity that your own fit explanation says violates a hard condition.
-                An independent allocation reviewer will reject unsuitable intents; do not leave obvious violations for it to fix.
+                For READY: coverage contains broad experience groups with unique lowercase IDs, descriptions and positive quotas
+                summing exactly to N. Derive useful groups from eligible possibilities, not a fixed checklist of conventional domains.
+                Leave room for genuinely different replacements within each group; do not make a group synonymous with one activity.
+                Return exactly N concretely distinct candidates, in order c1..cN, each assigned to one existing coverage bucket.
+                The number of candidates in each bucket must equal its quota. Check semantic overlap across ALL buckets,
+                not only within a bucket. Do not fill an unsuitable domain with chores, artificial schedules or variants of one activity.
+                coreActivity states what the user actually does/chooses. name and tags must faithfully express that choice;
+                description explains the activity and its appeal; repeatability describes sustained practice for hobbies,
+                or the appropriate experience for other domains. requirements states concrete preparation and fit, not invented guarantees.
+                For entity requests, identify the specific entity/experience whose facts will later be checked independently.
+                Do not include a candidate whose own requirements reveal a violated condition or unresolved essential access.
+                Do not output self-verdicts, scores or invented factual evidence. Every card and the interpretation will be independently reviewed.
                 If one comparison unit cannot safely be inferred, return CLARIFICATION_REQUIRED (not a made-up assumption).
-                If a request cannot responsibly be served, return UNSUPPORTED_REQUEST. These decisions may use empty coverage.
-                """, Map.of("request", input, "referenceTime", referenceTime, "history", history), AiSchemas.plan(input.size()), PlanProposal.class, false, call);
+                If a request cannot responsibly be served, return UNSUPPORTED_REQUEST. Non-READY decisions return empty coverage and candidates.
+                """, Map.of("request", input, "referenceTime", referenceTime, "history", history,
+                        "fixedIds", StagedCandidateEngine.allIds(input.size())), AiSchemas.generation(input.size()), GenerationProposal.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
-    @Override public StageResult<AllocationReview> allocate(GenerationInput input, Instant referenceTime, PlanProposal proposal, CallContext call) {
+    /** Historical fixed-input diagnostic only; the runtime EngineStages contract has no allocation call. */
+    public StageResult<AllocationReview> allocate(GenerationInput input, Instant referenceTime, PlanProposal proposal, CallContext call) {
         var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + """
                 INDEPENDENT ALLOCATION REVIEW before quota freeze or detailed generation.
                 Do not repair the interpretation, invent new intents, or trust the planner's fit statements as proof.
@@ -190,33 +195,6 @@ public final class OpenAiCandidateStages implements EngineStages {
                 classification in the plan and leave proof of current prices/accessibility/availability to the later web verifier.
                 """, Map.of("request", input, "referenceTime", referenceTime, "proposal", proposal),
                 AiSchemas.allocation(input.size(), proposal.intents().stream().map(ActivityIntent::id).toList()), AllocationReview.class, false, call);
-        return new StageResult<>(reply.value(), reply.version());
-    }
-    @Override public StageResult<IntentRepairs> repairIntents(GenerationInput input, Instant referenceTime, PlanProposal original,
-                                                            List<IntentRejection> rejections, CallContext call) {
-        var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
-                ONE SHARED REPAIR ATTEMPT before quota freeze. Replace only the rejected intent IDs listed in rejections.
-                Return one replacement per rejected ID, preserving that ID. Choose an existing coverage group for each replacement.
-                Address its rejection reason with a genuinely different eligible activity, distinct from every retained activity
-                and the other replacements. Do not rename the same rejected activity.
-                All original request conditions, comparison unit, hobby interpretation and grounding requirements remain binding.
-                You cannot edit the interpretation, group definitions or retained activities. The server applies only this patch.
-                The entire pool will be independently reviewed again, and all detailed candidates still need final validation.
-                There is no further Repair after this one. Never compensate for unsuitable activities by weakening conditions.
-                """, Map.of("request", input, "referenceTime", referenceTime, "original", original, "rejections", rejections),
-                AiSchemas.intentRepairs(original, rejections), IntentRepairs.class, false, call);
-        return new StageResult<>(reply.value(), reply.version());
-    }
-    @Override public StageResult<Batch> generate(FixedPlan plan, CallContext call) {
-        var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
-                GENERATE from the immutable plan. Do not redefine its unit, constraints, bucket ids or quotas.
-                Fill each fixed ID exactly once and preserve its order c1..cN. Each candidate belongs to one existing bucket.
-                Assign the first N approvedIntents in order to c1..cN. Copy its intentId, bucketId and coreActivity exactly.
-                Do not use rejected intents from the original proposal. The display name and details must faithfully express that intent.
-                description explains what one does and its appeal.
-                repeatability describes sustained practice for hobbies; for other domains describe the appropriate experience instead.
-                requirements states concrete prerequisites and fit, not invented guarantees. Do not emit valid/pass/self-scores.
-                """, generationData(plan), AiSchemas.batch(plan), Batch.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public Grounding ground(FixedPlan plan, Batch candidates, CallContext call) {
@@ -275,8 +253,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 or an activity without a credible way to repeat it when a hobby is requested. Name the concrete defect in findings.
                 Do not create a FAIL/UNKNOWN or finding solely because an otherwise eligible option is ordinary, niche or less exciting.
                 Comparable units and noSemanticDuplicates must be assessed separately. Renamed subtypes and broad parent/child overlap fail.
-                Names/descriptions/requirements must express the linked approved intent, not disguise another activity behind its ID.
-                Allocation approval is not proof: independently check the actual detailed candidates and their facts.
+                Names/descriptions/requirements must faithfully express the actual core activity, not disguise a different activity.
+                Neither the generated plan nor its cards have prior quality approval; independently check the actual full set and its facts.
                 List actionable findings with fixed candidate IDs and brief reasons, identifying only candidates needing replacement.
                 Use an empty candidateIds list only for a truly set-wide candidate issue. Keep interpretation findings separate.
                 No candidate findings means every candidate quality dimension passed.
@@ -286,18 +264,19 @@ public final class OpenAiCandidateStages implements EngineStages {
         return new StageResult<>(reply.value(), reply.version());
     }
     @Override public StageResult<Batch> repair(FixedPlan plan, Batch original, List<String> replacementIds, List<Finding> findings, CallContext call) {
-        var reply = client.complete(generationModel, BOUNDARY + QUALITY + """
+        var reply = client.complete(generationModel, BOUNDARY + QUALITY + REQUEST_SCOPE + """
                 ONE REPAIR ATTEMPT. Return the full candidate set using the immutable plan and exact fixed IDs.
                 Only candidates in replacementIds may change. Copy all other candidate objects exactly, preserving every field.
                 Correct the supplied failure reasons and ensure the repaired set is distinct from retained candidates.
-                Each replacement must use its current approved intent or an unused approved intent in the same frozen coverage plan;
-                copy that intentId/bucketId/coreActivity exactly. Rejected or invented intents are forbidden, even if plausible.
-                If no approved alternative can fix the issue, do not disguise it with different wording; the final gate will fail closed.
+                A flagged candidate may be replaced with a genuinely different eligible core activity, not merely renamed.
+                There is no approved-intent pool: choose a suitable replacement under the same fixed interpretation and coverage quotas.
+                Its name, tags, description, repeatability and requirements must faithfully describe the new activity.
+                Check replacements against every retained candidate and one another, including cross-bucket overlap.
                 Never relax constraints, change coverage/unit/N, rename a duplicate without changing the activity, or claim a pass.
                 If the original set was malformed, replacementIds may contain every ID; reconstruct the set under the same plan.
+                The entire repaired set will be independently reviewed again. This is the only Repair; a remaining failure blocks the set.
                 """, Map.of("plan", plan, "fixedIds", StagedCandidateEngine.allIds(plan.input().size()), "original", original,
                         "replacementIds", replacementIds, "findings", findings), AiSchemas.batch(plan), Batch.class, false, call);
         return new StageResult<>(reply.value(), reply.version());
     }
-    private Map<String, Object> generationData(FixedPlan plan) { return Map.of("plan", plan, "fixedIds", StagedCandidateEngine.allIds(plan.input().size())); }
 }

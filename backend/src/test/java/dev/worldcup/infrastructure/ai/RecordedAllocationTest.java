@@ -5,7 +5,6 @@ import static dev.worldcup.generation.engine.EngineModels.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import dev.worldcup.generation.GenerationInput;
-import dev.worldcup.generation.engine.EngineStages;
 import dev.worldcup.infrastructure.JsonCodec;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,7 +36,7 @@ class RecordedAllocationTest {
         var parsed = RecordedAllocation.read(json.write(List.of(exchange("PLAN", 200, List.of()),
                 exchange("ALLOCATE", 200, List.of()), exchange("ALLOCATE_REPAIRED", 200, List.of()))), json);
         assertThat(parsed).isEqualTo(recorded());
-        var stages = mock(EngineStages.class);
+        var stages = mock(OpenAiCandidateStages.class);
         var call = new CallContext("diagnostic", 1, "ALLOCATE_DIAGNOSTIC", Instant.now().plusSeconds(90));
         var expected = new StageResult<>(review(Verdict.FAIL, InterpretationField.CONSTRAINTS, "운동은 싫어", "제외 조건을 선호로 잘못 분류함"), "stub");
         when(stages.allocate(parsed.request(), parsed.referenceTime(), parsed.proposal(), call)).thenReturn(expected);

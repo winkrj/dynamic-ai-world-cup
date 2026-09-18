@@ -127,9 +127,7 @@ public class CandidateReuseService {
                     || c.referenceTime().isAfter(c.validatedAt()) || c.validatedAt().isAfter(now)
                     || !c.referenceTime().isAfter(now.minus(ReusePolicy.MAX_EVIDENCE_AGE))
                     || c.plan().groundingRequired() || c.plan().hardConstraints().stream().anyMatch(h -> h.mode() == VerificationMode.GROUNDED_FACT)
-                    || !c.evidence().facts().isEmpty() || !faithful(c.allocationInterpretation())
-                    || c.allocationComparable() != Verdict.PASS || c.allocationNoSemanticDuplicates() != Verdict.PASS
-                    || c.allocationFeasible() != Verdict.PASS || !faithful(c.finalReview().interpretation())
+                    || !c.evidence().facts().isEmpty() || !faithful(c.finalReview().interpretation())
                     || c.finalReview().candidateQuality() != Verdict.PASS || !c.finalReview().findings().isEmpty()
                     || c.finalReview().comparable() != c.evidence().comparable()
                     || c.finalReview().noSemanticDuplicates() != c.evidence().noSemanticDuplicates()
@@ -143,7 +141,7 @@ public class CandidateReuseService {
             if (!ids.equals(assessed) || c.richCandidates().size() != c.candidates().size()) return Optional.empty();
             var richIds = new HashSet<String>();
             for (var rich : c.richCandidates()) {
-                if (!richIds.add(rich.id()) || blank(rich.intentId()) || blank(rich.coreActivity()) || blank(rich.description())
+                if (!richIds.add(rich.id()) || blank(rich.coreActivity()) || blank(rich.description())
                         || blank(rich.repeatability()) || blank(rich.requirements())
                         || rich.coreActivity().length() > 120 || rich.description().length() > 240
                         || rich.repeatability().length() > 240 || rich.requirements().length() > 300

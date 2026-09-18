@@ -22,13 +22,15 @@
 Context/Constraint → Candidate Unit → Historical Preference → Coverage Plan → Structured Generation → Selective Grounding → Validation → 실패 시 Repair → 재검증 → READY draft.
 
 - `GenerationRequest`: 원래 고민, N, locale/timezone, 해석 기준일, 서버에서 읽은 history.
-- `CandidatePlan`: 단일 비교 단위, hard/soft constraint, 동적 coverage bucket과 quota. quota 합=N. 모델이 생성 중 규칙을 완화하지 못하도록 생성 출력과 독립 보관한다.
+- `CandidatePlan`: 단일 비교 단위, hard/soft constraint, 동적 coverage bucket과 quota. quota 합=N. TD-51에서는 하나의 구조화 생성 응답에 plan→candidates 순서로 작성한 뒤 서버가 계획 구조를 검사·고정한다. 독립 검토는 원문 대비 해석의 타당성을 확인하며 Repair는 이 계획을 바꿀 수 없다.
 - TD-41 표현 경계: unit은 한 후보가 나타내는 선택 대상의 종류·비교 수준이다. 예산·장소·참여 조건과 선호를 합친 요약 문장이 아니며 기존 constraints/softPreferences에 각각 보존한다. 명시한 선택 범위를 무조건 ‘활동’으로 일반화하지 않는다. 선호에 맞는 후보를 고르는 것과 선호를 필수 제외 조건으로 강화하는 것을 구별하고 실제 해석 FAIL/UNKNOWN은 계속 차단한다.
 - TD-47 분류 경계: 추천할 선택 범주에 대한 직접적·무조건적 거부는 명시 제외 조건이다. 상대적 선호, 허용한 대안, 부정 표현은 원문 전체에서 구별한다. 비운동을 제외 조건으로 정한 요청을 softPreferences에만 넣거나 상대적 선호를 제외 조건으로 강화하면 독립 검토의 CONSTRAINTS finding 대상이다. 서버에 한국어 키워드 판정기/후보명 예외를 넣지 않으며 해석 FAIL/UNKNOWN 차단·Repair 상한은 유지한다. 지침 전달/합성 집행 테스트와 실제 의미 판정의 정확도는 별도 검증한다.
 - `CandidateSet`: N개의 내부 candidate. id/name/unit/coverage bucket, display 태그 ≤2, grounded-claim requirement.
 - `ValidationEvidence`: 생성기와 분리된 semantic review + constraint별 assessment + 필요 출처. 후보 생성기의 `valid=true`를 그대로 믿지 않는다.
 - `CandidateQualityGate`: schema, 개수, 정규화 중복, 단위, quota, 독립 assessment, 근거 freshness, semantic review를 검사한다. 위반 code/대상 id를 반환한다.
 - `Repair`: 실패 목록으로 문제 후보만 수리하되 전체 set을 다시 검증한다. 최초 plan/hard constraints/N을 변경할 수 없다. 최대 1회. invalid set을 preview로 변환하는 경로를 만들지 않는다.
+
+TD-51/v23 호출 구조: 위 논리 순서는 유지하되 사전 활동 ALLOCATE/REPAIR_INTENTS 호출은 제거한다. 생성한 전체 상세 후보 → 필요 근거 확인 → 독립 검토 → 필요한 후보 교체 1회·전체 재검토다. 새 핵심 활동 교체도 같은 조건/coverage/정상 후보 보존 및 최종 gate를 거친다. 해석 FAIL/UNKNOWN은 후보 교체로 우회하지 않는다. 최종 실제 증명만 저장하는 재사용 policy v4로 이전 승인 세트를 분리하되 immutable snapshot 공유는 보존한다. 모델/공개 API/게임 규칙은 바뀌지 않는다.
 
 실재/가격/운영 일정 같은 현재 사실은 외부 확인이 필요하다. 조용함/새로움은 semantic estimate로 별도 표시하고 객관 사실로 쓰지 않는다. URL의 존재나 형식만으로 grounded fact를 통과시키지 않는다. 서버 grounding adapter가 출처 내용과 요청 시점/조건을 대조한 판정이 필요하다. CE-001은 이 판정을 집행하는 첫 모듈이며 아직 검색/LLM 판정기는 없다.
 

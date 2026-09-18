@@ -9,11 +9,7 @@ import java.util.List;
 
 /** Each review/grounding call is independent of the generator's response/conversation. */
 public interface EngineStages {
-    StageResult<PlanProposal> plan(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call);
-    StageResult<AllocationReview> allocate(GenerationInput input, Instant referenceTime, PlanProposal proposal, CallContext call);
-    StageResult<IntentRepairs> repairIntents(GenerationInput input, Instant referenceTime, PlanProposal original,
-                                           List<IntentRejection> rejections, CallContext call);
-    StageResult<Batch> generate(FixedPlan plan, CallContext call);
+    StageResult<GenerationProposal> generate(GenerationInput input, List<Preference> history, Instant referenceTime, CallContext call);
     Grounding ground(FixedPlan plan, Batch candidates, CallContext call);
     StageResult<Review> review(FixedPlan plan, Batch candidates, Grounding grounding, CallContext call);
     StageResult<Batch> repair(FixedPlan plan, Batch original, List<String> replacementIds,

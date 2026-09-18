@@ -134,9 +134,9 @@ class OpenAiResponsesClientTest {
         assertThatThrownBy(() -> call(true)).isInstanceOf(InvalidModelOutput.class);
     }
     @Test void grounderDowngradesClaimNotBoundToAnActualToolSource() {
-        var proposal = new PlanProposal(Decision.READY, "장소", false, true, List.of(), List.of(new BucketSpec("places", "장소", List.of())), List.of());
+        var proposal = new RequestPlan(Decision.READY, "장소", false, true, List.of(), List.of(new CoverageSpec("places", "장소", 8)), List.of());
         var fixed = new FixedPlan(new GenerationInput("갈 장소", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
-                new Plan(8, "장소", true, List.of(), List.of(new CoverageBucket("places", 8))), List.of());
+                new Plan(8, "장소", true, List.of(), List.of(new CoverageBucket("places", 8))));
         response = completed(json.writeValueAsString(new FactChecks(List.of(
                 new FactCheck("c1", "availability", Verdict.PASS, "https://fabricated.example/place", "exists", "today"),
                 new FactCheck("c2", "availability", Verdict.PASS, "https://official.example/place", "exists", "today")))));
@@ -176,9 +176,9 @@ class OpenAiResponsesClientTest {
         assertThat(ledger.completed).isEqualTo(1);
     }
     @Test void groundingWithoutFactualClaimsMakesNoPaidCall() {
-        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(), List.of(), List.of());
+        var proposal = new RequestPlan(Decision.READY, "취미", true, false, List.of(), List.of(), List.of());
         var fixed = new FixedPlan(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
-                new Plan(8, "취미", false, List.of(), List.of()), List.of());
+                new Plan(8, "취미", false, List.of(), List.of()));
         assertThatThrownBy(() -> groundingStages().ground(fixed, new Batch(List.of()),
                 new CallContext("job", 1, "GROUND_INITIAL", Instant.now().plusSeconds(10))))
                 .isInstanceOf(InvalidModelOutput.class);
@@ -192,9 +192,9 @@ class OpenAiResponsesClientTest {
         var constraints = List.of(new ConstraintSpec("parents", "부모님과 함께", "부모님과", VerificationMode.SEMANTIC_ESTIMATE),
                 new ConstraintSpec("access", "계단 없이", "계단과 긴 도보 이동 없이", VerificationMode.GROUNDED_FACT),
                 new ConstraintSpec("walking", "긴 도보 이동 없이", "계단과 긴 도보 이동 없이", VerificationMode.GROUNDED_FACT));
-        var proposal = new PlanProposal(Decision.READY, "장소", false, availabilityRequired, constraints, List.of(), List.of());
+        var proposal = new RequestPlan(Decision.READY, "장소", false, availabilityRequired, constraints, List.of(), List.of());
         return new FixedPlan(new GenerationInput("부모님과 계단과 긴 도보 이동 없이", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
-                new Plan(8, "장소", availabilityRequired, constraints.stream().map(c -> new HardConstraint(c.id(), c.mode())).toList(), List.of()), List.of());
+                new Plan(8, "장소", availabilityRequired, constraints.stream().map(c -> new HardConstraint(c.id(), c.mode())).toList(), List.of()));
     }
     private void stubGroundingFacts(List<FactCheck> facts) {
         response = completed(json.writeValueAsString(new FactChecks(facts)));
@@ -203,41 +203,101 @@ class OpenAiResponsesClientTest {
                 List.of(Map.of("type", "url", "url", "https://official.example/place")))));
         response.put("output", items);
     }
-    @Test void planningSchemaUsesContainmentInsteadOfAnUnverifiableBucketReference() {
-        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
-                List.of(new BucketSpec("community", "함께 하는 활동", List.of(new IntentSpec("volunteering", "정기 봉사", "팀으로 함께 참여")))), List.of());
+    @Test void generationProducesThePlanAndFullCardsWithoutSelfApprovalInOneRequest() {
+        var proposal = new GenerationProposal(hobbyPlan(8), candidateBatch(8).candidates());
         response = completed(json.writeValueAsString(proposal));
         var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
-        var result = stages.plan(new GenerationInput("함께 할 취미", 8, "ko-KR", "Asia/Seoul"), List.of(), Instant.now(),
-                new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)));
-        assertThat(result.value().intents()).containsExactly(new ActivityIntent("volunteering", "community", "정기 봉사", "팀으로 함께 참여"));
+        var result = stages.generate(new GenerationInput("함께 할 취미", 8, "ko-KR", "Asia/Seoul"), List.of(), Instant.now(),
+                new CallContext("job", 1, "GENERATE", Instant.now().plusSeconds(10)));
+        assertThat(result.value()).isEqualTo(proposal);
+        assertThat(result.version()).isEqualTo("openai/gpt-5.6-terra/ce002-v23-generate-review-repair/resp_test");
         var properties = request.path("text").path("format").path("schema").path("properties");
-        assertThat(properties.has("intents")).isFalse();
-        var intentProperties = properties.path("coverage").path("items").path("properties").path("intents").path("items").path("properties");
-        assertThat(intentProperties.has("bucketId")).isFalse();
-        assertThat(intentProperties.has("coreActivity")).isTrue();
+        assertThat(properties.propertyNames()).containsExactly("plan", "candidates");
+        var cardProperties = properties.path("candidates").path("items").path("properties");
+        assertThat(cardProperties.propertyNames()).containsExactlyInAnyOrder(
+                "id", "name", "bucketId", "tags", "coreActivity", "description", "repeatability", "requirements");
+        assertThat(cardProperties.has("intentId")).isFalse();
+        assertThat(properties.toString()).doesNotContain("approvedIntentIds", "candidateQuality", "verdict", "score");
+        assertThat(request.path("instructions").asString()).contains("This proposal is NOT quality approval",
+                "Do not output self-verdicts, scores or invented factual evidence",
+                "Every card and the interpretation will be independently reviewed");
         assertThat(request.path("input").asString()).doesNotContain("sk-test-only");
+        assertThat(calls).hasValue(1);
     }
     @ParameterizedTest @ValueSource(ints = {8, 16, 32})
-    void planningSeparatesOutputCountWithoutRewritingActivityConditions(int size) {
-        var proposal = new PlanProposal(Decision.READY, "활동", false, false, List.of(), List.of(), List.of());
+    void generationOrdersInterpretationBeforeCoverageAndCardsWithoutRewritingConditions(int size) {
+        var proposal = new GenerationProposal(hobbyPlan(size), candidateBatch(size).candidates());
         response = completed(json.writeValueAsString(proposal));
         var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
         var input = new GenerationInput("매주 두 사람이 30분씩 할 활동 " + size + "개, 회당 2만원 이내", size, "ko-KR", "Asia/Seoul");
-        assertThat(stages.plan(input, List.of(), Instant.now(), new CallContext("job", 1, "PLAN", Instant.now().plusSeconds(10)))
+        assertThat(stages.generate(input, List.of(), Instant.now(), new CallContext("job", 1, "GENERATE", Instant.now().plusSeconds(10)))
                 .value()).isEqualTo(proposal);
         var sent = json.readTree(request.path("input").asString());
         assertThat(sent.path("request")).isEqualTo(json.valueToTree(input));
+        assertThat(sent.path("fixedIds")).isEqualTo(json.valueToTree(
+                java.util.stream.IntStream.rangeClosed(1, size).mapToObj(i -> "c" + i).toList()));
         assertRequestScopeInstructions();
         var schema = request.path("text").path("format").path("schema");
+        assertThat(schema.path("properties").propertyNames()).containsExactly("plan", "candidates");
+        var planSchema = schema.path("properties").path("plan");
         var orderedFields = List.of("constraints", "softPreferences", "unit", "hobby", "groundingRequired", "decision", "coverage");
-        assertThat(schema.path("properties").propertyNames()).containsExactlyElementsOf(orderedFields);
-        assertThat(schema.path("required")).isEqualTo(json.valueToTree(orderedFields.stream().sorted().toList()));
+        assertThat(planSchema.path("properties").propertyNames()).containsExactlyElementsOf(orderedFields);
+        assertThat(planSchema.path("required")).isEqualTo(json.valueToTree(orderedFields.stream().sorted().toList()));
+        assertThat(planSchema.path("additionalProperties").asBoolean()).isFalse();
         assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
-        var coverage = schema.path("properties").path("coverage");
+        var coverage = planSchema.path("properties").path("coverage");
         assertThat(coverage.path("maxItems").asInt()).isEqualTo(size);
-        assertThat(coverage.path("items").path("properties").path("intents").path("maxItems").asInt()).isEqualTo(size + 4);
+        var coverageFields = coverage.path("items").path("properties");
+        assertThat(coverageFields.has("intents")).isFalse();
+        assertThat(coverageFields.path("quota").path("minimum").asInt()).isEqualTo(1);
+        assertThat(coverageFields.path("quota").path("maximum").asInt()).isEqualTo(size);
+        var candidates = schema.path("properties").path("candidates");
+        assertThat(candidates.path("minItems").asInt()).isZero();
+        assertThat(candidates.path("maxItems").asInt()).isEqualTo(size);
+        assertThat(candidates.path("items").path("properties").path("id").path("enum"))
+                .isEqualTo(sent.path("fixedIds"));
+        assertThat(request.path("instructions").asString()).contains("summing exactly to N", "Return exactly N",
+                "must equal its quota", "Check semantic overlap across ALL buckets");
         assertThat(calls).hasValue(1);
+    }
+    @ParameterizedTest @ValueSource(strings = {"CLARIFICATION_REQUIRED", "UNSUPPORTED_REQUEST"})
+    void nonReadyGenerationCanReturnEmptyCoverageAndNoCards(String decision) {
+        var plan = new RequestPlan(Decision.valueOf(decision), "", false, false, List.of(), List.of(), List.of());
+        response = completed(json.writeValueAsString(new GenerationProposal(plan, List.of())));
+        var result = groundingStages().generate(new GenerationInput("모호한 요청", 16, "ko-KR", "Asia/Seoul"),
+                List.of(), Instant.now(), new CallContext("job", 1, "GENERATE", Instant.now().plusSeconds(10)));
+        assertThat(result.value().plan().decision()).isEqualTo(Decision.valueOf(decision));
+        assertThat(result.value().candidates()).isEmpty();
+        assertThat(request.path("instructions").asString()).contains("Non-READY decisions return empty coverage and candidates");
+        assertThat(calls).hasValue(1);
+    }
+    @ParameterizedTest @ValueSource(strings = {"missing-plan", "null-plan", "missing-quota", "null-quota",
+            "fractional-quota", "missing-core", "null-candidate", "self-approval"})
+    void malformedCombinedGenerationIsRejectedWithoutAnAdapterRetry(String defect) {
+        var quota = new LinkedHashMap<String, Object>(Map.of("id", "group", "description", "활동", "quota", 8));
+        var plan = new LinkedHashMap<String, Object>(Map.of("decision", "READY", "unit", "취미", "hobby", true,
+                "groundingRequired", false, "constraints", List.of(), "coverage", List.of(quota), "softPreferences", List.of()));
+        var card = new LinkedHashMap<String, Object>(Map.of("id", "c1", "name", "합성 활동", "bucketId", "group",
+                "tags", List.of(), "coreActivity", "합성 활동", "description", "설명", "repeatability", "반복", "requirements", "준비물"));
+        var output = new LinkedHashMap<String, Object>(Map.of("plan", plan, "candidates", List.of(card)));
+        switch (defect) {
+            case "missing-plan" -> output.remove("plan");
+            case "null-plan" -> output.put("plan", null);
+            case "missing-quota" -> quota.remove("quota");
+            case "null-quota" -> quota.put("quota", null);
+            case "fractional-quota" -> quota.put("quota", 1.5);
+            case "missing-core" -> card.remove("coreActivity");
+            case "null-candidate" -> output.put("candidates", Collections.singletonList(null));
+            case "self-approval" -> card.put("verdict", "PASS");
+            default -> throw new AssertionError(defect);
+        }
+        response = completed(json.writeValueAsString(output));
+        assertThatThrownBy(() -> groundingStages().generate(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"),
+                List.of(), Instant.now(), new CallContext("job", 1, "GENERATE", Instant.now().plusSeconds(10))))
+                .isInstanceOf(InvalidModelOutput.class);
+        assertThat(calls).hasValue(1);
+        assertThat(ledger.completed).isEqualTo(1);
+        assertThat(ledger.failed).isZero();
     }
     private void assertRequestScopeInstructions() {
         assertVerificationInstructions();
@@ -278,34 +338,20 @@ class OpenAiResponsesClientTest {
                 "GROUNDED_FACT requires external evidence", "Explicit or numeric wording alone does not require web evidence",
                 "never downgrade externally verifiable entity facts");
     }
-    @ParameterizedTest @ValueSource(strings = {"plan", "allocate", "repairIntents", "generate", "review", "repair"})
+    @ParameterizedTest @ValueSource(strings = {"generate", "review", "repair"})
     void everyCandidateStageUsesTheSameChoiceAndEligibilityBoundary(String phase) {
         var input = new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul");
-        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
-                List.of(new BucketSpec("group", "활동", List.of(new IntentSpec("i1", "합성 활동", "적합")))), List.of());
+        var proposal = hobbyPlan(8);
         var fixed = new FixedPlan(input, Instant.now(), proposal, new Plan(8, "취미", false, List.of(),
-                List.of(new CoverageBucket("group", 8))), proposal.intents());
-        var batch = new Batch(List.of());
+                List.of(new CoverageBucket("group", 8))));
+        var batch = candidateBatch(8);
         var interpretation = new InterpretationReview(Verdict.PASS, List.of());
         var call = new CallContext("job", 1, phase, Instant.now().plusSeconds(10));
         var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
         switch (phase) {
-            case "plan" -> {
-                response = completed(json.writeValueAsString(proposal));
-                stages.plan(input, List.of(), Instant.now(), call);
-            }
-            case "allocate" -> {
-                response = completed(json.writeValueAsString(new AllocationReview(interpretation, Verdict.PASS,
-                        Verdict.PASS, Verdict.PASS, List.of("i1"), List.of())));
-                stages.allocate(input, Instant.now(), proposal, call);
-            }
-            case "repairIntents" -> {
-                response = completed(json.writeValueAsString(new IntentRepairs(proposal.intents())));
-                stages.repairIntents(input, Instant.now(), proposal, List.of(new IntentRejection("i1", "독립 선택 묶음")), call);
-            }
             case "generate" -> {
-                response = completed(json.writeValueAsString(batch));
-                stages.generate(fixed, call);
+                response = completed(json.writeValueAsString(new GenerationProposal(proposal, batch.candidates())));
+                stages.generate(input, List.of(), Instant.now(), call);
             }
             case "review" -> {
                 response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS,
@@ -321,7 +367,7 @@ class OpenAiResponsesClientTest {
         var instructions = request.path("instructions").asString();
         assertVerificationInstructions();
         assertThat(instructions).containsOnlyOnce("unit names what ONE option is and its comparison granularity");
-        if (phase.equals("allocate") || phase.equals("review")) {
+        if (phase.equals("review")) {
             assertThat(instructions).contains("a concise unit need not repeat conditions faithfully captured in constraints",
                     "still reject actual promotion, omission or weakening of conditions",
                     "Audit each original exclusion against constraints before judging candidate fit",
@@ -340,10 +386,6 @@ class OpenAiResponsesClientTest {
                 "chores, admin tasks or one-off missions are not filler hobbies");
         assertThat(instructions).doesNotContain("genuine appeal and sustained practice",
                 "Do not approve a weak intent", "weak sustained appeal", "filler, poor appeal");
-        if (phase.equals("allocate")) assertThat(instructions).contains(
-                "Do not approve an ineligible intent just to reach N",
-                "Subjective appeal can help rank eligible choices; it is not by itself a rejection reason",
-                "'Boring' or 'unlikely to win' alone is not a defect");
         if (phase.equals("review")) assertThat(instructions).contains(
                 "candidateQuality checks substantive suitability, not whether every candidate is highly attractive",
                 "Name the concrete defect in findings",
@@ -383,16 +425,21 @@ class OpenAiResponsesClientTest {
         assertThat(calls).hasValue(1);
         assertThat(request.path("tools").size()).isZero();
     }
-    @Test void laterStageSchemasAllowOnlyExistingIntentAndBucketIds() {
+    @Test void historicalAllocationKeepsExactIntentIdsWhileRepairUsesOnlyFixedCandidateAndBucketIds() {
         var allocation = json.valueToTree(AiSchemas.allocation(8, List.of("known-intent")));
         assertThat(allocation.path("properties").path("approvedIntentIds").path("items").path("enum").toString())
                 .isEqualTo("[\"known-intent\"]");
-        var proposal = new PlanProposal(Decision.READY, "취미", true, false, List.of(), List.of(), List.of());
+        var proposal = new RequestPlan(Decision.READY, "취미", true, false, List.of(),
+                List.of(new CoverageSpec("active-bucket", "활동", 8)), List.of());
         var fixed = new FixedPlan(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), proposal,
-                new Plan(8, "취미", false, List.of(), List.of(new CoverageBucket("active-bucket", 8))),
-                List.of(new ActivityIntent("approved-intent", "active-bucket", "합성 활동", "합성 적합성")));
-        var fields = json.valueToTree(AiSchemas.batch(fixed)).path("properties").path("candidates").path("items").path("properties");
-        assertThat(fields.path("intentId").path("enum").toString()).isEqualTo("[\"approved-intent\"]");
+                new Plan(8, "취미", false, List.of(), List.of(new CoverageBucket("active-bucket", 8))));
+        var candidates = json.valueToTree(AiSchemas.batch(fixed)).path("properties").path("candidates");
+        assertThat(candidates.path("minItems").asInt()).isEqualTo(8);
+        assertThat(candidates.path("maxItems").asInt()).isEqualTo(8);
+        var fields = candidates.path("items").path("properties");
+        assertThat(fields.has("intentId")).isFalse();
+        assertThat(fields.path("id").path("enum")).isEqualTo(json.valueToTree(
+                java.util.stream.IntStream.rangeClosed(1, 8).mapToObj(i -> "c" + i).toList()));
         assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"active-bucket\"]");
     }
     @ParameterizedTest @ValueSource(ints = {8, 16, 32})
@@ -454,25 +501,39 @@ class OpenAiResponsesClientTest {
         return java.util.stream.IntStream.rangeClosed(1, size)
                 .mapToObj(i -> new FeasibilityAssessment("c" + i, Verdict.PASS, "일반 준비물로 반복할 수 있는 합성 활동")).toList();
     }
-    @Test void intentRepairRequestOnlyExposesRejectedIdsAndExistingGroupsAsWritableFields() {
-        var plan = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
-                List.of(new BucketSpec("group", "활동 그룹", List.of(new IntentSpec("keep", "유지 활동", "적합"),
-                        new IntentSpec("replace", "부적합 활동", "부적합")))), List.of());
-        response = completed(json.writeValueAsString(new IntentRepairs(List.of(new ActivityIntent("replace", "group", "새 활동", "조건 부합")))));
-        var stages = new OpenAiCandidateStages(client, Clock.systemUTC(), "gpt-5.6-terra", "gpt-5.6-terra");
-        var result = stages.repairIntents(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), plan,
-                List.of(new IntentRejection("replace", "기존 활동과 겹침")), new CallContext("job", 1, "REPAIR_INTENTS", Instant.now().plusSeconds(10)));
-        assertThat(result.value().replacements()).hasSize(1);
+    @Test void repairCanReplaceFlaggedCoreActivityWithoutMakingInterpretationWritable() {
+        var plan = hobbyPlan(8);
+        var fixed = new FixedPlan(new GenerationInput("취미", 8, "ko-KR", "Asia/Seoul"), Instant.now(), plan,
+                new Plan(8, "취미", false, List.of(), List.of(new CoverageBucket("group", 8))));
+        var original = candidateBatch(8);
+        var cards = new ArrayList<>(original.candidates());
+        cards.set(0, new Proposal("c1", "새 활동", "group", List.of("합성"), "새로운 핵심 활동", "새 활동 설명", "반복 연습", "일반 준비물"));
+        var repaired = new Batch(cards);
+        response = completed(json.writeValueAsString(repaired));
+        var result = groundingStages().repair(fixed, original, List.of("c1"),
+                List.of(new Finding("DUPLICATE", List.of("c1"), "기존 활동과 겹침")),
+                new CallContext("job", 1, "REPAIR", Instant.now().plusSeconds(10)));
+        assertThat(result.value()).isEqualTo(repaired);
+        assertThat(result.value().candidates().getFirst().coreActivity()).isNotEqualTo(original.candidates().getFirst().coreActivity());
         var properties = request.path("text").path("format").path("schema").path("properties");
-        assertThat(properties.size()).isEqualTo(1);
-        var replacements = properties.path("replacements");
-        assertThat(replacements.path("minItems").asInt()).isEqualTo(1);
-        assertThat(replacements.path("maxItems").asInt()).isEqualTo(1);
-        var fields = replacements.path("items").path("properties");
-        assertThat(fields.path("id").path("enum").toString()).isEqualTo("[\"replace\"]");
+        assertThat(properties.propertyNames()).containsExactly("candidates");
+        var candidates = properties.path("candidates");
+        assertThat(candidates.path("minItems").asInt()).isEqualTo(8);
+        assertThat(candidates.path("maxItems").asInt()).isEqualTo(8);
+        var fields = candidates.path("items").path("properties");
         assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"group\"]");
         assertThat(fields.has("constraints")).isFalse();
-        assertThat(request.path("input").asString()).contains("기존 활동과 겹침");
+        assertThat(fields.has("intentId")).isFalse();
+        var input = json.readTree(request.path("input").asString());
+        assertThat(input.path("replacementIds")).isEqualTo(json.valueToTree(List.of("c1")));
+        assertThat(input.path("original")).isEqualTo(json.valueToTree(original));
+        assertThat(input.path("plan")).isEqualTo(json.valueToTree(fixed));
+        assertThat(input.path("findings").toString()).contains("기존 활동과 겹침");
+        assertThat(request.path("instructions").asString()).contains("Only candidates in replacementIds may change",
+                "Copy all other candidate objects exactly", "genuinely different eligible core activity",
+                "There is no approved-intent pool", "same fixed interpretation and coverage quotas",
+                "The entire repaired set will be independently reviewed again", "This is the only Repair");
+        assertThat(request.path("instructions").asString()).doesNotContain("Rejected or invented intents are forbidden");
         assertThat(request.path("tools").size()).isZero();
         assertThat(request.toString()).doesNotContain("previous_response_id");
     }
@@ -492,14 +553,19 @@ class OpenAiResponsesClientTest {
         } else {
             response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS, Verdict.FAIL,
                     List.of(), feasibility(8), List.of(new Finding("FILLER", List.of("c1"), "별도의 후보 문제")))));
-            var fixed = new FixedPlan(input, Instant.now(), plan, new Plan(8, "취미", false, List.of(),
-                    List.of(new CoverageBucket("group", 8))), plan.intents());
+            var fixed = new FixedPlan(input, Instant.now(), hobbyPlan(8), new Plan(8, "취미", false, List.of(),
+                    List.of(new CoverageBucket("group", 8))));
             var reviewed = stages.review(fixed, new Batch(List.of()), Grounding.empty(),
                     new CallContext("job", 1, "REVIEW_INITIAL", Instant.now().plusSeconds(10))).value();
             assertThat(reviewed.interpretation()).isEqualTo(interpretation);
             assertThat(reviewed.findings()).hasSize(1);
             assertEvidenceScopeInstructions();
             assertThat(request.path("instructions").asString()).contains("their PASS labels are not proof", "Independently compare each excerpt");
+            var reviewInput = json.readTree(request.path("input").asString());
+            assertThat(reviewInput.propertyNames()).containsExactlyInAnyOrder("plan", "candidates", "grounding");
+            assertThat(reviewInput.toString()).doesNotContain("history", "approvedIntentIds");
+            assertThat(request.path("instructions").asString()).contains("You have no generator conversation or generator score",
+                    "Neither the generated plan nor its cards have prior quality approval");
         }
         var properties = request.path("text").path("format").path("schema").path("properties");
         assertThat(properties.has("planFaithful")).isFalse();
@@ -540,6 +606,15 @@ class OpenAiResponsesClientTest {
     private void assertProviderFailure() {
         assertThatThrownBy(() -> call(false)).isInstanceOfSatisfying(Failure.class,
                 e -> assertThat(e.code()).isEqualTo(Failure.Code.PROVIDER_UNAVAILABLE));
+    }
+    private RequestPlan hobbyPlan(int size) {
+        return new RequestPlan(Decision.READY, "취미", true, false, List.of(),
+                List.of(new CoverageSpec("group", "폭넓은 합성 활동", size)), List.of());
+    }
+    private Batch candidateBatch(int size) {
+        return new Batch(java.util.stream.IntStream.rangeClosed(1, size)
+                .mapToObj(i -> new Proposal("c" + i, "합성 활동 " + i, "group", List.of("합성"),
+                        "합성 핵심 활동 " + i, "활동 설명 " + i, "반복할 활동 " + i, "일반 준비물")).toList());
     }
     private Map<String, Object> completed(String output) {
         var value = new LinkedHashMap<String, Object>();

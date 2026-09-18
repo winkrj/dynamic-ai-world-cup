@@ -4,7 +4,6 @@ import static dev.worldcup.candidate.CandidateModels.Verdict.FAIL;
 import static dev.worldcup.generation.engine.EngineModels.*;
 
 import dev.worldcup.generation.GenerationInput;
-import dev.worldcup.generation.engine.EngineStages;
 import dev.worldcup.infrastructure.JsonCodec;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -36,7 +35,7 @@ record RecordedAllocation(GenerationInput request, Instant referenceTime, PlanPr
         }
         return json.read(body.path("input").asString(), RecordedAllocation.class);
     }
-    StageResult<AllocationReview> reviewOnce(EngineStages stages, CallContext context) {
+    StageResult<AllocationReview> reviewOnce(OpenAiCandidateStages stages, CallContext context) {
         return stages.allocate(request, referenceTime, proposal, context);
     }
     /** A reported, source-anchored mismatch still needs human reading; unrelated FAIL is not detection. */

@@ -8,7 +8,14 @@ import java.util.Collections;
 /** Schema definitions stay next to the provider boundary, not in the public API contract. */
 final class AiSchemas {
     private AiSchemas() {}
-    static Map<String, Object> plan(int size) {
+    static Map<String, Object> generation(int size) {
+        var properties = new LinkedHashMap<String, Object>();
+        properties.put("plan", requestPlan(size));
+        // Non-READY decisions contain no cards; READY cardinality is also checked by the server.
+        properties.put("candidates", array(candidate(size, identifier()), 0, size));
+        return object(Collections.unmodifiableMap(properties));
+    }
+    private static Map<String, Object> requestPlan(int size) {
         // Structured Outputs follows property order: interpret the request before filling activity slots.
         var properties = new LinkedHashMap<String, Object>();
         properties.put("constraints", array(object(Map.of("id", identifier(), "description", string(300), "sourceText", string(500),
@@ -19,29 +26,25 @@ final class AiSchemas {
         properties.put("groundingRequired", Map.of("type", "boolean"));
         properties.put("decision", choice("READY", "CLARIFICATION_REQUIRED", "UNSUPPORTED_REQUEST"));
         properties.put("coverage", array(object(Map.of("id", identifier(), "description", string(300),
-                "intents", array(object(Map.of("id", identifier(), "coreActivity", string(120), "fit", string(300))), 0, size + 4))), 0, size));
+                "quota", Map.of("type", "integer", "minimum", 1, "maximum", size))), 0, size));
         return object(Collections.unmodifiableMap(properties));
     }
+    /** Kept only for the consumed, fixed-input historical interpretation diagnostic. */
     static Map<String, Object> allocation(int size, List<String> intentIds) {
         var id = choice(intentIds.toArray(String[]::new));
         return object(Map.of("interpretation", interpretation(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
                 "feasible", verdict(), "approvedIntentIds", array(id, 0, size + 4),
                 "rejections", array(object(Map.of("intentId", id, "reason", string(300))), 0, size + 4)));
     }
-    static Map<String, Object> intentRepairs(dev.worldcup.generation.engine.EngineModels.PlanProposal plan,
-                                           List<dev.worldcup.generation.engine.EngineModels.IntentRejection> rejections) {
-        return object(Map.of("replacements", array(object(Map.of(
-                "id", choice(rejections.stream().map(r -> r.intentId()).toArray(String[]::new)),
-                "bucketId", choice(plan.coverage().stream().map(b -> b.id()).toArray(String[]::new)),
-                "coreActivity", string(120), "fit", string(300))), rejections.size(), rejections.size())));
-    }
     static Map<String, Object> batch(dev.worldcup.generation.engine.EngineModels.FixedPlan plan) {
         int size = plan.input().size();
-        return object(Map.of("candidates", array(object(Map.of("id", candidateId(size),
-                "intentId", choice(plan.approvedIntents().stream().map(i -> i.id()).toArray(String[]::new)), "name", string(100),
-                "bucketId", choice(plan.gatePlan().coverage().stream().map(b -> b.id()).toArray(String[]::new)),
+        return object(Map.of("candidates", array(candidate(size,
+                choice(plan.gatePlan().coverage().stream().map(b -> b.id()).toArray(String[]::new))), size, size)));
+    }
+    private static Map<String, Object> candidate(int size, Map<String, Object> bucketId) {
+        return object(Map.of("id", candidateId(size), "name", string(100), "bucketId", bucketId,
                 "tags", array(string(40), 0, 2), "coreActivity", string(120),
-                "description", string(240), "repeatability", string(240), "requirements", string(300))), size, size)));
+                "description", string(240), "repeatability", string(240), "requirements", string(300)));
     }
     static Map<String, Object> review(int size, int constraints) {
         return object(Map.of("interpretation", interpretation(), "comparable", verdict(), "noSemanticDuplicates", verdict(),

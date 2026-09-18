@@ -1,5 +1,18 @@
 # 검증 기록
 
+## 2026-09-18 TD-51 — v23 호출 구조 전환 검증
+
+- production 컴파일 PASS. 관련 오프라인 262개(engine 97·adapter 59·gate 42·reuse service 37·DB 15·기존 진단 12) PASS, 실패/오류/제외 0.
+- 초기 컴파일에서 과거 진단 helper의 runtime interface 참조를 역사 전용 adapter 타입으로 옮겼다. 진단 입력·hash·1회 실행 보호는 변경하지 않았다. 후보 전체 교체 때 잘못된 기존 ID까지 유지하려던 오류를 수정하고 기존 unknown-ID 회귀로 확인했다.
+- 한 loopback 테스트가 621초 후 PROVIDER_UNAVAILABLE로 실패한 관측은 보존한다. host pause 가능성이 있으나 원인을 확정하지 않았다. 검증 프로세스 중 유휴 잠자기만 막아 재실행한 동일 기준 262개는 19초에 PASS했다. 예외 기대값이나 시간 한도를 느슨하게 바꾸지 않았다.
+- read-only Reviewer cycle 1: **Critical 0 / High 0 / actionable 0**, 테스트 XML도 직접 확인. 이후 production/test 변경 없음.
+- 최종 전체 verify 종료 0: **Java 358개 실행·실패/오류 0·유료 2개 제외(총 360)**, frontend 60개, handoff 6개, release 13개, fixture 5개·생성 TS, 실제 합성 HTTP 166개/9 schemas, 웹 build·bootJar·appJar PASS. 두 유료 플래그는 false.
+- 기존 v3 literal certificate의 승인 세트 miss/단일 fallback, PENDING 승인 거절, 과거 draft core 조회 empty 및 동일 frozen snapshot 공유·새 세션 보존을 격리 PostgreSQL에서 검증했다. 운영 데이터 migration/증명 소급 승격은 없다.
+
+실제 v23 `LiveEngineHttpTest` 별도 1회: **PASS, 실패/오류/제외 0, Gradle 종료 0**. `seed-v1/hobby-solo/16`, 127.012초/4회 HTTP 200/Repair 1회/검색 0/$0.1380685. 테마 요리의 주방 접근 UNKNOWN을 보컬 연습으로 교체하고 정상 후보 15개·고정 계획 불변을 대조했다. 최종 자동 판정은 조건 32개·feasibility 16개·해석/비교/중복/quality 모두 PASS, findings 0이다. 같은 preview로 freeze→15개 선택 저장→Champion→동일 snapshot 공유·새 익명 세션을 확인했고 추가 생성/provider 호출 0회다. 실제 응답 14개/8 schemas도 별도 OpenAPI 검사 PASS다.
+
+원시 자료는 gitignored `reports/local/live-engine/2026-09-18T14-13-08.608264Z-size16/`에 보존했다. 누적 장부 **$5.0736678/$6**(미확인 예약 $0.50 포함), 152 provider 시도, 잔여 $0.9263322다. 자동 충전 OFF 재확인·추가 호출 없음. 일반 주방을 미확인으로 본 과도한 판정과 한 사례의 한계는 엔진 문서에 기록했다. 실제 브라우저 체감 시간/32강 최신 실측/외부 사실 정확도/사람 승인/공개 배포를 증명하지 않는다. 아래 TD-49/50 금액과 상태는 당시 기록이다.
+
 후속 TD-50은 향후 실제 평가를 순차 1건씩 실행하는 사전 승인이다. 아래 TD-49의 1회 실패 결과를 바꾸거나 추가 실행을 이미 했다는 뜻은 아니다. 누적 $6·검색 없음·자동 충전 OFF·기존 예약·반복 한도를 유지하며 현재 장부는 $4.9355993이다. [OpenAI 선불 결제 안내](https://help.openai.com/en/articles/8264644)에 따르면 잔액 소진 후 차단에 처리 지연이 생길 수 있어, 사용자 승인 상한을 별도 장부로 유지한다(2026-09-18 확인).
 
 ## 2026-09-18 TD-49 — 1차 버전 기준 반영과 실제 16강 1회

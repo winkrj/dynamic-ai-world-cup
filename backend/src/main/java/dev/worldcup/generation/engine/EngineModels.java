@@ -11,6 +11,7 @@ public final class EngineModels {
     private EngineModels() {}
     public enum Decision { READY, CLARIFICATION_REQUIRED, UNSUPPORTED_REQUEST }
     public record ConstraintSpec(String id, String description, String sourceText, VerificationMode mode) {}
+    /** Legacy plan types are retained only for the consumed fixed-input diagnostic. */
     public record IntentSpec(String id, String coreActivity, String fit) {}
     public record BucketSpec(String id, String description, List<IntentSpec> intents) {
         public BucketSpec { intents = List.copyOf(intents); }
@@ -42,15 +43,23 @@ public final class EngineModels {
                                    Verdict feasible, List<String> approvedIntentIds, List<IntentRejection> rejections) {
         public AllocationReview { approvedIntentIds = List.copyOf(approvedIntentIds); rejections = List.copyOf(rejections); }
     }
-    /** Only rejected activities can be replaced; interpretation fields are not part of this output. */
-    public record IntentRepairs(List<ActivityIntent> replacements) {
-        public IntentRepairs { replacements = List.copyOf(replacements); }
+    public record CoverageSpec(String id, String description, int quota) {}
+    /** Interpretation and coverage are generated before cards and remain fixed during Repair. */
+    public record RequestPlan(Decision decision, String unit, boolean hobby, boolean groundingRequired,
+                              List<ConstraintSpec> constraints, List<CoverageSpec> coverage,
+                              List<String> softPreferences) {
+        public RequestPlan {
+            constraints = List.copyOf(constraints);
+            coverage = List.copyOf(coverage);
+            softPreferences = List.copyOf(softPreferences);
+        }
     }
-    public record FixedPlan(GenerationInput input, Instant referenceTime, PlanProposal specification, Plan gatePlan,
-                            List<ActivityIntent> approvedIntents) {
-        public FixedPlan { approvedIntents = List.copyOf(approvedIntents); }
+    /** One structured provider result; neither its plan nor its cards are self-approved. */
+    public record GenerationProposal(RequestPlan plan, List<Proposal> candidates) {
+        public GenerationProposal { candidates = List.copyOf(candidates); }
     }
-    public record Proposal(String id, String intentId, String name, String bucketId, List<String> tags,
+    public record FixedPlan(GenerationInput input, Instant referenceTime, RequestPlan specification, Plan gatePlan) {}
+    public record Proposal(String id, String name, String bucketId, List<String> tags,
                            String coreActivity, String description, String repeatability, String requirements) {
         public Proposal { tags = List.copyOf(tags); }
     }

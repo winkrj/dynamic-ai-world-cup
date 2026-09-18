@@ -33,7 +33,7 @@ class CandidateReuseServiceTest {
     ValidationCertificate withReview(Review review) {
         var c = generated().certificate();
         return new ValidationCertificate(c.policyVersion(), c.referenceTime(), c.validatedAt(), c.plan(), c.candidates(), c.richCandidates(), c.evidence(),
-                c.allocationInterpretation(), c.allocationComparable(), c.allocationNoSemanticDuplicates(), c.allocationFeasible(), review);
+                review);
     }
     @Test void approvedSetGetsANewGateIssuedBoundaryUsingTheOriginalEvidence() {
         var original = generated(); serve(stored(original, State.APPROVED));
@@ -82,7 +82,7 @@ class CandidateReuseServiceTest {
         assertThat(service.find(input(), context(), null)).isEmpty();
     }
     @ParameterizedTest @EnumSource(value = Verdict.class, names = {"FAIL", "UNKNOWN"})
-    void finalQualityInterpretationFeasibilityAndAllocationCannotBecomePassOnReuse(Verdict verdict) {
+    void finalQualityInterpretationAndFeasibilityCannotBecomePassOnReuse(Verdict verdict) {
         var c = generated().certificate(); var r = c.finalReview();
         var badReviews = List.of(
                 new Review(r.interpretation(), r.comparable(), r.noSemanticDuplicates(), verdict, r.assessments(), r.feasibility(), List.of()),
@@ -93,9 +93,6 @@ class CandidateReuseServiceTest {
             serve(withCertificate(withReview(review)));
             assertThat(service.find(input(), context(), null)).isEmpty();
         }
-        serve(withCertificate(new ValidationCertificate(c.policyVersion(), c.referenceTime(), c.validatedAt(), c.plan(), c.candidates(), c.richCandidates(),
-                c.evidence(), c.allocationInterpretation(), c.allocationComparable(), c.allocationNoSemanticDuplicates(), verdict, c.finalReview())));
-        assertThat(service.find(input(), context(), null)).isEmpty();
     }
     @Test void originalEvidenceAndFindingsCannotBeFabricatedOrOmitted() {
         var c = generated().certificate(); var r = c.finalReview();
@@ -107,9 +104,22 @@ class CandidateReuseServiceTest {
         var assessments = c.evidence().assessments().stream().map(a -> new Assessment(a.candidateId(), a.constraintId(), Verdict.UNKNOWN)).toList();
         var evidence = new Evidence(assessments, List.of(), Verdict.PASS, Verdict.PASS, c.evidence().reviewerVersion());
         serve(withCertificate(new ValidationCertificate(c.policyVersion(), c.referenceTime(), c.validatedAt(), c.plan(), c.candidates(), c.richCandidates(), evidence,
-                c.allocationInterpretation(), c.allocationComparable(), c.allocationNoSemanticDuplicates(), c.allocationFeasible(),
                 new Review(r.interpretation(), r.comparable(), r.noSemanticDuplicates(), r.candidateQuality(), assessments, r.feasibility(), List.of()))));
         assertThat(service.find(input(), context(), null)).isEmpty(); // Even internally consistent UNKNOWN evidence fails existing gate.
+    }
+    @Test void finalReviewMustStillMatchOriginalEvidenceAndHaveNoInterpretationFindings() {
+        var r = generated().certificate().finalReview();
+        var inconsistent = List.of(
+                new Review(r.interpretation(), Verdict.UNKNOWN, r.noSemanticDuplicates(), r.candidateQuality(), r.assessments(), r.feasibility(), List.of()),
+                new Review(r.interpretation(), r.comparable(), Verdict.UNKNOWN, r.candidateQuality(), r.assessments(), r.feasibility(), List.of()),
+                new Review(r.interpretation(), r.comparable(), r.noSemanticDuplicates(), r.candidateQuality(), List.of(), r.feasibility(), List.of()),
+                new Review(new InterpretationReview(Verdict.PASS,
+                        List.of(new InterpretationFinding(InterpretationField.UNIT, "합성 테스트 요청", "합성 해석 불일치"))),
+                        r.comparable(), r.noSemanticDuplicates(), r.candidateQuality(), r.assessments(), r.feasibility(), List.of()));
+        for (var review : inconsistent) {
+            serve(withCertificate(withReview(review)));
+            assertThat(service.find(input(), context(), null)).isEmpty();
+        }
     }
     @ParameterizedTest @ValueSource(strings = {"old", "future", "grounded", "fact", "rich", "old-policy", "null"})
     void unsupportedOrStaleCertificatesMiss(String defect) {
@@ -117,10 +127,10 @@ class CandidateReuseServiceTest {
         var plan = defect.equals("grounded") ? new Plan(8, c.plan().unit(), true, c.plan().hardConstraints(), c.plan().coverage()) : c.plan();
         var evidence = defect.equals("fact") ? new Evidence(c.evidence().assessments(), List.of(new GroundedFact("c0", "availability", Verdict.PASS,
                 "https://example.test", "test fact", NOW, NOW.plusSeconds(60))), Verdict.PASS, Verdict.PASS, c.evidence().reviewerVersion()) : c.evidence();
-        var certificate = new ValidationCertificate(defect.equals("old-policy") ? "old" : c.policyVersion(),
+        var certificate = new ValidationCertificate(defect.equals("old-policy") ? "approved-complete-set-v3-engine-v22" : c.policyVersion(),
                 defect.equals("old") ? NOW.minus(ReusePolicy.MAX_EVIDENCE_AGE) : c.referenceTime(), defect.equals("future") ? NOW.plusSeconds(1) : c.validatedAt(),
                 plan, c.candidates(), defect.equals("rich") ? List.of() : c.richCandidates(), evidence,
-                c.allocationInterpretation(), c.allocationComparable(), c.allocationNoSemanticDuplicates(), c.allocationFeasible(), c.finalReview());
+                c.finalReview());
         serve(withCertificate(defect.equals("null") ? null : certificate));
         assertThat(service.find(input(), context(), null)).isEmpty();
     }
@@ -168,7 +178,7 @@ class CandidateReuseServiceTest {
         CandidateReuseOperator.validateArguments(new String[]{"approve", "id", "operator", "expiry", "quality", "safety", "--time-independent"});
     }
     @Test void qualityPromptChangesRequireAnExplicitReusePolicyBump() {
-        assertThat(dev.worldcup.infrastructure.ai.OpenAiResponsesClient.PROMPT_VERSION).isEqualTo("ce002-v22-eligibility-before-appeal");
-        assertThat(ReusePolicy.VERSION).isEqualTo("approved-complete-set-v3-engine-v22");
+        assertThat(dev.worldcup.infrastructure.ai.OpenAiResponsesClient.PROMPT_VERSION).isEqualTo("ce002-v23-generate-review-repair");
+        assertThat(ReusePolicy.VERSION).isEqualTo("approved-complete-set-v4-engine-v23");
     }
 }
