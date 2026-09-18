@@ -1,5 +1,13 @@
 # 검증 기록
 
+## 2026-09-18 TD-51 후속 — 변경 없는 v23 실제 32강 1회
+
+`fc35557` 그대로 `LiveEngineHttpTest`만 별도 실행했다. **1개 FAIL/오류·제외 0, Gradle 종료 1**, `seed-v1/hobby-solo/32`는 QUALITY_GATE_FAILED다. 185.026초/4회 HTTP 200/Repair 1회/검색 0/$0.221852. 첫 검토에서 c30 식물 접근 UNKNOWN만 수정했고 나머지 31개 카드는 불변이었다. 재검토가 그대로인 그림 3개를 중복으로 거절해 preview·완주·공유 검사는 실행되지 않았다. 출력 잘림/시간 초과는 관측되지 않았다.
+
+별도 원시 응답 대조: 4회 모두 completed/tools=[]/Terra/출력 한도 8192, 장부 COMPLETED/search_calls=0. 실제 QUEUED/FAILED HTTP 응답 2개는 GenerationJob schema PASS다. 첫 검토의 중복 PASS와 마지막 FAIL을 함께 보존하며 16강 실제 PASS나 오프라인 PASS로 이번 실패를 지우지 않는다. 재호출·production/test/프롬프트 변경 없음이다.
+
+비공개 자료: `reports/local/live-engine/2026-09-18T14-32-55.614295Z-size32/`. 기존 생성-only 4회 비용과 미확인 예약 $0.50을 포함해 전체 장부를 재합산한 결과 **$5.2955198/$6**, 잔여 $0.7044802, provider 시도 156회다. 자동 충전 OFF를 실행 전 확인했고 기본 유료 플래그는 false다. 이번은 실행 기록 문서만 변경하므로 코드 리뷰/전체 회귀를 반복하지 않고 아래 같은 코드의 검증과 독립 리뷰를 재사용한다.
+
 ## 2026-09-18 TD-51 — v23 호출 구조 전환 검증
 
 - production 컴파일 PASS. 관련 오프라인 262개(engine 97·adapter 59·gate 42·reuse service 37·DB 15·기존 진단 12) PASS, 실패/오류/제외 0.
