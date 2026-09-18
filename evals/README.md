@@ -26,6 +26,8 @@ API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/loc
 
 ## 실행 현황과 구분
 
+최신 TD-48: 승인한 조건 해석 진단 1회는 실행 완료했다. 고정 v20 계획의 비운동 제외 soft 오분류를 v21 검토기가 CONSTRAINTS FAIL로 검출해 진단은 PASS, 1회/$0.021828/검색·새 생성·Repair 0이다. 누적 장부 $4.8716363/$6(미확인 예약 $0.50 포함), 자동 충전 OFF·추가 호출 미승인. seed 완료 수·전체 품질·사람 R FAIL은 바뀌지 않는다. 아래 미실행/이전 비용은 당시 기록이다.
+
 최신 상태(2026-09-18, TD-46/47): 마지막 승인 v20 hobby-solo/32는 사전 Repair 뒤에도 활동 30/32만 승인돼 FAILED, preview 없음이다. v21은 제외 조건 분류 지침의 오프라인 보완만 검증했으며 실제 호출 0회다. 현재 누적 장부 $4.8498083/$6(미확인 예약 $0.50 포함), 자동 충전 OFF, 추가 유료 실행 미승인이다. 아래 v17/seed 첫 실행 기록은 과거 결과로 보존한다. 최신 원인·검증 범위는 `docs/CANDIDATE_ENGINE.md` TD-46/47을 따른다. 반복된 중복 실패를 새 버전명으로 재시도하거나 기존 R 사람 FAIL을 덮지 않는다.
 
 2026-09-18 v17 `hobby-solo/32` 후속 비교: 만료 키로 종료한 시도 뒤 별도 승인된 재시도 1회를 마쳤다. 인증 복구/6회 HTTP 200/32개 상세 후보 생성은 확인했으나 최종 하모니카 연습 환경 UNKNOWN으로 `QUALITY_GATE_FAILED`, preview 없음이다. 사전 Repair 1회, 검색 0회, 180.132초/$0.218444. 내부 64개 조건 PASS와 feasibility PASS 31/UNKNOWN 1을 구별하며 사람 품질 통과로 세지 않는다. 새 seed 첫 실행이 아니므로 아래 11/18 및 최초 결과는 바꾸지 않는다. 최신 누적 장부와 잔여 한도는 `docs/CANDIDATE_ENGINE.md` TD-37 결과를 따른다. 추가 승인도 사용 완료해 새 승인 전 유료 재시도하지 않는다.
@@ -34,13 +36,15 @@ API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/loc
 
 유료 harness는 `CANDIDATE_LIVE_CASE`로 이 파일의 사례 ID를 선택하며 질문 원문을 변경하지 않는다. 기본 `hobby-calibration`은 datasetVersion `calibration-2026-09-15`로 별도 표시한다. `CANDIDATE_LIVE_SIZE=8|16|32`; 일반 검증에서는 `CANDIDATE_LIVE_TEST=false`로 실제 과금을 막는다. 정확한 실행 환경·키/예산 주입·누적 비용 대조는 `docs/CANDIDATE_ENGINE.md`를 따른다.
 
-## 재생성 없는 조건 해석 진단 — 준비 완료, 유료 실행 미승인
+## 재생성 없는 조건 해석 진단 — 1회 실행 완료, 승인 소진
+
+아래는 실행한 단일 진단의 통제 조건이다. 고정 경로는 이미 사용했으므로 다시 실행하거나 경로/장부 기준을 바꿔 재시도하지 않는다. 결과와 한계는 `docs/CANDIDATE_ENGINE.md` TD-48에 기록했다.
 
 `LiveInterpretationDiagnosticTest`는 기록된 v20의 첫 ALLOCATE 입력만 v21 검토기에 보내는 별도 진단이다. 원래 요청·기준 시각·잘못 분류된 계획을 그대로 보존하고, PLAN/후보 생성/Repair/검색/preview를 실행하지 않는다. 목적은 비운동 제외 조건이 softPreferences에만 들어간 오류를 검토기가 발견하는지 확인하는 것이다. 중복 해결이나 32강 품질 승인, seed 첫 실행으로 집계하지 않는다.
 
-일반 검증에서는 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false`를 유지한다. **별도 명시 승인 후에만** 후자를 `true`로 바꾸고 `./gradlew --no-daemon test --tests '*LiveInterpretationDiagnosticTest'` 한 클래스를 실행한다. 전자는 반드시 `false`여야 한다. 키는 기존 비공개 환경으로만 주입하며, 승인·자동 충전 OFF·전체 누적 장부를 먼저 확인한다. 환경 플래그나 잔여 예산 자체는 승인이 아니다.
+일반 검증에서는 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false`를 유지한다. 이번에는 별도 명시 승인 후에만 후자를 `true`로 바꾸고 `./gradlew --no-daemon test --tests '*LiveInterpretationDiagnosticTest'` 한 클래스를 실행했다. 전자는 `false`였고 두 플래그를 파일에 저장하지 않았다. 키는 기존 비공개 환경으로만 주입했으며, 승인·자동 충전 OFF·전체 누적 장부를 먼저 확인했다. 환경 플래그나 잔여 예산 자체는 승인이 아니다.
 
 - 고정 v20 기록의 SHA-256과 누적 장부 $4.8498083이 맞아야 실행한다. 과거 생성-only 4회 $0.0725468 및 미확인 비용을 포함한다. 1회 예약 $0.50/전체 $6 이내이며 다른 실험으로 장부가 달라졌다면 재검토 없이 기준값을 바꾸지 않는다.
 - 고정 로컬 경로 `reports/local/live-engine/interpretation-v20-allocate-v21-once`를 원자적으로 생성해 재실행을 차단한다. 실패·중단돼도 지우거나 이름을 바꿔 재시도하지 않는다. 호출 전 미확인 예약을 기록하고 응답/DB 장부로 갱신한다. 장부는 같은 디렉터리의 임시 파일 완성 후 원자적으로 교체하며 기존 예약 파일을 먼저 비우지 않는다. 테스트 실패를 이유로 자동 재호출하지 않는다.
 - 해석 FAIL과 원문에 연결된 CONSTRAINTS finding을 함께 확인한다. PASS/UNKNOWN, 후보 중복만 지적한 결과, 엉뚱한 필드의 FAIL은 검출 성공이 아니다. 검출 표시는 사람의 이유 검토가 필요하며 후보 품질 PASS로 승격하지 않는다.
-- 원시 기록과 비용은 gitignore인 로컬 경로에만 보존한다. 아직 실제 진단은 실행하지 않았고 추가 비용은 없다.
+- 원시 기록과 비용은 gitignore인 로컬 경로에만 보존한다. 실제 진단 비용은 $0.021828이며 재실행하지 않았다.

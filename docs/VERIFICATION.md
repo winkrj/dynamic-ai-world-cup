@@ -1,5 +1,15 @@
 # 검증 기록
 
+## 2026-09-18 TD-48 — 승인된 조건 해석 진단 1회
+
+코드 d85ab97 상태에서 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=true`로 `LiveInterpretationDiagnosticTest`만 실행했다. **1개 실행/PASS/실패·오류·제외 0**, Gradle 종료 0, 테스트 22.501초/provider 17.382초다. 원본 v20 첫 ALLOCATE와 실제 전송 input JSON이 동일함을 대조했고 provider 장부/응답 각 1건, HTTP 200, tools 빈 배열/search_calls 0, 새 generation_job 0을 확인했다.
+
+해석 CONSTRAINTS FAIL의 근거는 원문의 “운동은 싫어.”이고 설명은 직접 제외가 필수 조건 대신 선호로만 기록됐다는 것이다. `reportedExclusionMismatch=true`, `candidateQualityApproved=false`, `humanReviewRequired=true`를 보존한다. 실제 의미 오류 검출을 1건 확인한 것이며 전체 계획 생성·후보 품질·사람 승인·UI 완주 검증으로 확대하지 않는다. 모델의 승인 활동은 26/32이고 중복 경계 대조는 남았다.
+
+이번 비용 $0.021828, 누적 장부 $4.8716363/$6(기존 미확인 예약 $0.50 포함). 자동 충전 OFF를 UI로 실행 전 확인했으며 키는 비공개 파일에서 환경에만 주입해 출력/커밋하지 않았다. 예약 장부의 COMPLETED 갱신과 로컬 원시 기록 보존을 확인했다. 승인 소진, 재시도·추가 호출 없음.
+
+이번 변경은 결과 문서뿐이므로 코드 리뷰와 전체 회귀를 반복하지 않았다. 같은 코드의 아래 325개 Java/60개 프론트·계약 검증 및 독립 재리뷰를 재사용한다. 이번 실제 테스트 1개 PASS는 별도 증거이며 과거 v20 전체 평가 FAIL을 덮지 않는다.
+
 ## 2026-09-18 조건 해석 단일 진단 도구 — 유료 실행 전 준비
 
 test-only `RecordedAllocation`/`LiveInterpretationDiagnosticTest`와 오프라인 테스트를 추가했다. 고정 v20 첫 ALLOCATE의 원본 hash·요청·기준 시각·계획을 보존하고 v21 검토기만 1회 호출하도록 분리했다. PLAN/후보 생성/Repair/검색은 없다. 별도 opt-in, 기존 full live test OFF, 고정 경로의 원자적 생성, 정확한 누적 장부 대조, $0.50 예약/$6 전체 한도, 중단 시 보수적 장부 보존으로 범위를 제한한다. production/API/모델/품질 기준 변경은 없다.

@@ -2,6 +2,18 @@
 
 2026-09-18 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 실제 검증 범위는 버전별로 구별한다.
 
+## TD-48 v21 실제 단일 진단 — 제외 조건 오분류 검출
+
+사용자가 승인한 진단 1회를 실행했다. 기존 v20 첫 ALLOCATE의 요청·기준 시각·계획을 그대로 두고 v21 검토기만 호출했다. 원본 hash와 실제 전송 input JSON의 동등성을 확인했다. Terra **1회 HTTP 200·17.382초·$0.021828·검색 0**이며 새 PLAN/상세 생성/Repair/preview는 없다. `LiveInterpretationDiagnosticTest` 1개 PASS, skipped 0이다.
+
+검토기는 원문의 “운동은 싫어.”를 근거로 필수 제외 조건이 constraints에 없고 선호로만 기록됐다는 **CONSTRAINTS FAIL**을 반환했다. 오류가 있는 계획을 거절하는 것이 진단의 기대 결과이므로 테스트는 PASS다. 이 한 사례에서 과거 자동 PASS가 놓친 오류를 검출한 증거이며, 모든 부정문·선호 분류 정확도나 생성기가 새 계획을 올바르게 만드는지를 입증하지 않는다. 단계별 좁은 평가와 과거 입력 사용은 [OpenAI 평가 지침](https://developers.openai.com/api/docs/guides/evaluation-best-practices)을 참고했다.
+
+같은 응답의 활동 분류는 승인 26/32·거절 6개다. 수채화·디지털 일러스트·컬러링·시 쓰기 외에 캘리그래피/손그림, 요리 레시피 개발/홈베이킹도 중복으로 거절했다. 이것은 **검토기의 관측**이지 새 제품 합의가 아니다. 후자의 경계가 과도하게 넓은지 사람 기준 대조가 남으며, 승인 pool에 대한 comparable/noSemanticDuplicates/feasible PASS를 원본 32개 전체의 품질 PASS로 읽지 않는다. 원본 계획을 수정하거나 거절된 후보를 임의로 대체하지 않았다.
+
+실행 전 결제 화면에서 자동 충전 OFF를 재확인했고 설정을 변경하지 않았다. 사용량은 input 4,623/cache 0/output 856(이 중 reasoning 516) tokens다. 누적 provider 시도 **144회**(pipeline 139 + 초기 비교 4 + 이번 진단 1), 사용량 기반 추정 **$4.3716363** + 기존 미확인 예약 **$0.50** = 장부 **$4.8716363/$6**, 잔여 **$1.1283637**. 한 번의 승인 소진, 추가 호출 없음이며 잔여액은 추가 승인이나 운영 예산이 아니다.
+
+비공개 근거는 gitignored `reports/local/live-engine/interpretation-v20-allocate-v21-once/`의 run/review/exchanges/ledger/diagnostic이다. 재실행 차단 경로와 기존 실패 기록을 보존한다. seed 최초 실행 11/18·사람 R FAIL·전체 v20 FAILED는 바뀌지 않으며 최신 실제 preview/완주/공유·외부 사실 평가·배포는 여전히 미완료다. 이번 결과로 production/test/모델/프롬프트를 추가 변경하지 않았다.
+
 ## TD-47 v21 — 제외 조건 분류의 제한된 보완
 
 v20 원본은 “운동은 싫어”를 softPreferences로만 분류했고 두 사전 해석 검토도 PASS였다. 현재 서버는 실제 constraints에 존재하는 항목만 독립 assessment 대상으로 만든다. 따라서 후보가 우연히 비운동이어도 원래 제외 조건이 보존됐다는 증거가 아니며, sourceText 포함 검사만으로 누락의 의미를 판별할 수 없다.
