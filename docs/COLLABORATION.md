@@ -2,6 +2,8 @@
 
 역할은 화면별로 매번 바꾸지 않는다. **A는 플레이 경험 전체, B는 후보 품질과 서버 전체**를 책임진다. 각자 자신의 AI와 역할 내부 작업을 나누되, 다른 역할의 소유 파일을 동시에 수정하지 않는다.
 
+프론트 API 전달은 [시작 안내 한 장](FRONTEND_HANDOFF.md)과 [FE-001 상세 티켓](tickets/FE-001.md)을 기준으로 한다. PR #1 미병합 상태에서 최신 API로 착수하려면 해당 안내의 `feat/server/backend-api` clone 절차를 사용한다. 아래 main 기준 예시는 서버 PR 병합 이후의 일반 절차다.
+
 | 큰 역할 | 결과 책임 | 소유 경로 |
 | --- | --- | --- |
 | A — 플레이 경험 | 입력부터 Champion·공유 진입까지 모바일 경험, 접근성, 애니메이션, 타이머, 게임 상태, API client와 mock, 브라우저 테스트 | `frontend/**` (자동생성 schema 제외) |
@@ -27,6 +29,7 @@ B는 `contracts/openapi.json`과 검증된 `contracts/fixtures`를 제공한다.
 main
   feat/play/fe-001-preview       # A: 플레이 경험의 첫 작업
   feat/engine/ce-002-generation  # B: 후보 품질·서버의 다음 작업
+  feat/server/backend-api       # B: 엔진과 분리한 API·저장 구현
 ```
 
 첫 기반 작업/CE-001과 두 시작 브랜치는 이미 저장소에 올라와 있다. 새로 합류하면 갱신된 안내를 포함하는 최신 `main`에서 자신의 작업 브랜치를 만든다. 각 개발자는 별도 clone을 권장한다. 같은 컴퓨터에서 여러 AI가 작업할 때만 작업별 worktree를 사용한다. 서로의 checkout에서 branch를 바꾸지 않는다.
@@ -55,13 +58,13 @@ git remote rename origin upstream
 git remote add origin https://github.com/YOUR_GITHUB_ID/dynamic-ai-world-cup.git
 ```
 
-담당 작업을 구현하고 관련 검증을 마친 뒤 변경 파일을 commit한다. A의 경우 다음 명령으로 자신의 Fork에 올린다. B는 브랜치 이름을 `feat/engine/ce-002-generation`으로 바꾼다.
+담당 작업을 구현하고 관련 검증을 마친 뒤 변경 파일을 commit한다. 현재 작업 브랜치에 있는지 `git branch --show-current`로 확인하고 다음 명령으로 자신의 Fork에 같은 이름으로 올린다. `HEAD`는 현재 브랜치이므로 시작 안내의 `feat/play/fe-001-integration`과 다른 역할의 브랜치에도 그대로 사용한다.
 
 ```sh
-git push -u origin feat/play/fe-001-preview
+git push -u origin HEAD
 ```
 
-GitHub에서 base를 `winkrj/dynamic-ai-world-cup`의 `main`, compare를 본인 Fork의 작업 브랜치로 선택해 PR을 만든다. 원본의 변경을 가져올 때는 `git fetch upstream` 후 작업 브랜치에서 `git merge upstream/main`으로 반영한다.
+GitHub에서 base repository는 `winkrj/dynamic-ai-world-cup`, compare는 본인 Fork의 작업 브랜치를 선택한다. **API 브랜치에서 시작한 프론트 작업은 PR #1 미병합 동안 base branch를 `feat/server/backend-api`로 지정한다.** 이 기간에 원본 API 변경을 반영할 때는 `git fetch upstream` 후 자신의 작업 브랜치에서 `git merge upstream/feat/server/backend-api`를 사용한다. 서버 PR 병합 이후에는 PR base를 `main`으로 변경하고 차이를 확인한다. 이후 일반 작업은 `main`을 base로 하며 `git fetch upstream`과 `git merge upstream/main`으로 갱신한다.
 
 협업자 초대를 수락해 원본 쓰기 권한이 생기면 Fork 없이 원본의 작업 브랜치로 push할 수 있다. 공개 전환만으로 모든 방문자에게 원본 쓰기 권한이 생기지는 않는다.
 
@@ -70,3 +73,12 @@ GitHub에서 base를 `winkrj/dynamic-ai-world-cup`의 `main`, compare를 본인 
 A: “AGENTS.md와 frontend/AGENTS.md, PRD/DESIGN_SPEC, contracts와 FE-001을 읽고 플레이 경험 역할로 작업해. frontend 내부를 소유하고 계약 변경이 필요하면 먼저 차이를 제안해. fixture 모드가 실제 AI 생성처럼 보이지 않게 하고 관련 브라우저 검증을 해.”
 
 B: “AGENTS.md와 backend/AGENTS.md, TECH_DESIGN, contracts와 CE-002를 읽고 후보 품질과 서버 역할로 작업해. backend/evals를 소유하고 최초 plan을 유지한 Generate→Ground→Validate→Repair를 구현해. 실제 provider 비용 호출은 준비된 eval 범위와 자격정보를 확인하고 수행해.”
+
+## B 내부의 엔진 / 서버 작업
+
+두 사람이 맡는 큰 역할 A/B를 바꾸는 것이 아니다. B 안에서 엔진 품질은 사람이 실제 후보와 기준을 함께 결정하고, API·DB는 확정된 계약과 자동 테스트로 길게 진행한다.
+
+- 서버 작업: `feat/server/backend-api`, `api`, `identity`, `generation`의 job/draft service·repository, `tournament`, `sharing`, `infrastructure`, migration/tests. 프론트 내부와 실제 provider 선택은 건드리지 않는다.
+- 엔진 작업: `feat/engine/ce-002-generation`, `candidate`와 실제 engine adapter/evals. `CandidateEngine` port를 구현하고 Generated에 gate-issued set과 공개 제목을 반환한다. server state/SQL/controller는 수정하지 않는다.
+- 공통 접점: `CandidateEngine`, `GenerationInput`, `Context/Generated`, 공개 OpenAPI. 변경이 필요하면 먼저 영향과 테스트 fixture를 기록하고 양쪽 변경을 함께 검토한다.
+- 엔진은 서버 PR이 main에 합쳐진 뒤 최신 main을 반영해 연결한다. 병합 전이라면 해당 PR의 port를 읽고 adapter 설계만 진행한다. main 자동 병합은 하지 않는다.
