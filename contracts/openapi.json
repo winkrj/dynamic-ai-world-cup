@@ -11,6 +11,23 @@
     }
   ],
   "paths": {
+    "/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "summary": "Read-only application readiness, not AI quality or account balance",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Database, web bundle, worker setting and engine profile are ready",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Readiness" } } }
+          },
+          "503": {
+            "description": "Application dependencies or configuration are not ready",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Readiness" } } }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "operationId": "getHealth",
@@ -1043,6 +1060,15 @@
           "snapshot",
           "championId"
         ]
+      },
+      "Readiness": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "service"],
+        "properties": {
+          "status": { "type": "string", "enum": ["READY", "NOT_READY"] },
+          "service": { "type": "string", "const": "dynamic-ai-world-cup" }
+        }
       },
       "Health": {
         "type": "object",

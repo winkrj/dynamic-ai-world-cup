@@ -2,26 +2,29 @@ import type { GenerationRequest, Preview, SelectionAck, SelectionEvent, ShareCre
 import { restorePlay } from '../play/core.ts';
 import { isPreview } from '../api/client.ts';
 import type { PlayState } from '../play/core.ts';
+import { promptLength } from './clarification.ts';
 
-export type InputFlow = { kind: 'input' | 'size'; prompt: string; size: Size };
+export type InputFlow = { kind: 'input' | 'size'; prompt: string; size: Size; clarificationUsed?: true };
+export type ClarificationFlow = { kind: 'clarification'; input: GenerationRequest; answer: string };
 export type GenerationFlow = {
   kind: 'generation'; input: GenerationRequest; key: string; jobId?: string;
   previous?: Preview; failed?: boolean; status?: 'QUEUED' | 'RUNNING';
+  clarificationUsed?: true; manualRetry?: true; retryAt?: number;
 };
-export type PreviewFlow = { kind: 'preview'; input: GenerationRequest; preview: Preview; startKey?: string };
+export type PreviewFlow = { kind: 'preview'; input: GenerationRequest; preview: Preview; startKey?: string; clarificationUsed?: true };
 export type PlayFlow = {
   kind: 'play'; play: PlayState; acknowledged: number; ack?: SelectionAck;
   pending?: { key: string; events: SelectionEvent[] };
   shareKey?: string; share?: ShareCreated; feedbackUntil?: number;
 };
 export type ShareFlow = { kind: 'share'; token: string; shared?: SharedBracket; replayKey?: string };
-export type Flow = InputFlow | GenerationFlow | PreviewFlow | PlayFlow | ShareFlow;
+export type Flow = InputFlow | ClarificationFlow | GenerationFlow | PreviewFlow | PlayFlow | ShareFlow;
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): value is RecordValue => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const size = (value: unknown): value is Size => value === 8 || value === 16 || value === 32;
 const input = (value: unknown): value is GenerationRequest => record(value) && text(value.prompt)
-  && value.prompt.trim().length > 0 && value.prompt.length <= 500 && size(value.size)
+  && value.prompt.trim().length > 0 && promptLength(value.prompt) <= 500 && size(value.size)
   && value.locale === 'ko-KR' && text(value.timezone);
 
 function preview(value: unknown): value is Preview {
@@ -36,11 +39,15 @@ export function restoreFlow(raw: string | null, now: number): { flow?: Flow; war
     const value = envelope.flow;
     const ttl = value.kind === 'play' ? 30 * 86400000 : 86400000;
     if (now - envelope.savedAt > ttl || envelope.savedAt > now + 60000) throw Error();
+    if (value.clarificationUsed !== undefined && value.clarificationUsed !== true) throw Error();
     if ((value.kind === 'input' || value.kind === 'size') && typeof value.prompt === 'string'
-      && value.prompt.length <= 500 && size(value.size)) return { flow: value as InputFlow };
+      && size(value.size) && (value.kind === 'input' || promptLength(value.prompt) <= 500)) return { flow: value as InputFlow };
+    if (value.kind === 'clarification' && input(value.input) && typeof value.answer === 'string') return { flow: value as ClarificationFlow };
     if (value.kind === 'generation' && input(value.input) && text(value.key)
       && (value.jobId === undefined || text(value.jobId)) && (value.previous === undefined || preview(value.previous))
       && (value.failed === undefined || typeof value.failed === 'boolean')
+      && (value.manualRetry === undefined || value.manualRetry === true)
+      && (value.retryAt === undefined || (typeof value.retryAt === 'number' && Number.isFinite(value.retryAt) && value.retryAt >= 0))
       && (value.status === undefined || value.status === 'QUEUED' || value.status === 'RUNNING')) return { flow: value as GenerationFlow };
     if (value.kind === 'preview' && input(value.input) && preview(value.preview)
       && (value.startKey === undefined || text(value.startKey))) return { flow: value as PreviewFlow };

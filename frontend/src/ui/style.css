@@ -71,6 +71,10 @@ textarea::placeholder { color: #706b67; }
 .flow-page { width: 100%; max-width: 540px; margin: 0 auto; }
 .flow-page .screen-heading h1, .preview-page h1 { font-size: clamp(37px, 4.5vw, 50px); }
 .prompt-quote { border-left: 3px solid var(--accent); padding: 9px 0 9px 17px; margin-bottom: 28px; font-size: 13px; line-height: 1.75; color: var(--muted); overflow-wrap: anywhere; white-space: pre-wrap; }
+.clarification-original { margin: 10px 0 26px; }
+.clarification-page .prompt-panel label { font-size: 18px; word-break: keep-all; overflow-wrap: anywhere; }
+.clarification-page .field-help > span:last-child { flex-shrink: 0; }
+.clarification-cost { margin: 0 0 20px; }
 .size-options { display: grid; gap: 12px; padding: 0; margin: 0; border: 0; min-width: 0; }
 .size-option { position: relative; display: grid; grid-template-columns: 80px 1fr; align-items: center; column-gap: 14px; padding: 20px; border: 1px solid #bcb6b1; background: transparent; cursor: pointer; min-height: 115px; }
 .size-option.is-selected { border: 2px solid var(--ink); background: #fff; padding: 19px; box-shadow: 4px 4px 0 var(--ink); margin-right: 4px; }

@@ -9,6 +9,7 @@ import { ApiFailure } from '../src/api/client.ts';
 import type { ApiClient } from '../src/api/client.ts';
 import type { GenerationRequest, Preview, SelectionAck, SelectionEvent, SessionStart, Size } from '../src/api/types.ts';
 import { createPlay } from '../src/play/core.ts';
+import { clarifiedPrompt, promptLength } from '../src/app/clarification.ts';
 
 const storageKey = 'worldcup:flow:v1:/';
 const input: GenerationRequest = { prompt: '합성 테스트 고민', size: 8, locale: 'ko-KR', timezone: 'Asia/Seoul' };
@@ -525,4 +526,163 @@ test('returning from shared bracket navigates home and preserves existing root t
   assert.equal(playFlow(reopened).play.phase, 'active');
   assert.equal(playFlow(reopened).play.deadline, 8000);
   assert.equal(playFlow(reopened).play.events.length, 0);
+});
+
+test('clarification preserves original conditions, size and answer across reload; only explicit answer sends a new key', async t => {
+  const original = '혼자 할 거야. 운동은 싫고 월 예산은 10만 원이야.\n집에서 30분만 쓸 수 있어.';
+  const answer = '새로 시작할 취미를 고르고 싶어요.';
+  const posts: { input: GenerationRequest; key: string }[] = [];
+  let gets = 0;
+  const storage = memory();
+  const api = client({ createGeneration: async (body, key) => {
+    assert.deepEqual(JSON.parse(storage.getItem(storageKey)!).flow.input, body);
+    assert.equal(JSON.parse(storage.getItem(storageKey)!).flow.key, key);
+    posts.push({ input: structuredClone(body), key });
+    return { jobId: `job-${posts.length}`, status: 'QUEUED', draftId: null, error: null };
+  }, getJob: async id => {
+    gets++;
+    return id === 'job-1' ? { jobId: id, status: 'FAILED', draftId: null,
+      error: { code: 'CLARIFICATION_REQUIRED', message: 'private model detail', requestId: 'clarification', retryable: false } }
+      : { jobId: id, status: 'READY', draftId: 'draft', error: null };
+  }, getPreview: async () => preview(32) });
+  const first = harness(t, { storage, api }).controller;
+  first.editPrompt(original); first.next(); first.chooseSize(32); await first.generate();
+  assert.equal(first.getSnapshot().screen, 'clarification');
+  assert.equal(first.getSnapshot().prompt, original);
+  assert.equal(first.getSnapshot().size, 32);
+  first.editClarification(answer);
+  await first.resume(); await first.retry();
+  assert.equal(posts.length, 1);
+  assert.equal(gets, 1);
+  first.dispose();
+  const restored = harness(t, { storage, api, uuid: () => 'explicit-answer-key' }).controller;
+  await restored.resume();
+  assert.equal(restored.getSnapshot().screen, 'clarification');
+  assert.equal(restored.getSnapshot().clarificationAnswer, answer);
+  assert.equal(restored.getSnapshot().prompt, original);
+  assert.equal(posts.length, 1);
+  assert(!storage.getItem(storageKey)!.includes('private model detail'));
+  await Promise.all([restored.submitClarification(), restored.submitClarification()]);
+  assert.equal(posts.length, 2);
+  assert.notEqual(posts[0].key, posts[1].key);
+  assert.deepEqual(posts[1], { input: { ...posts[0].input, prompt: clarifiedPrompt(original, answer) }, key: 'explicit-answer-key' });
+  assert.equal(restored.getSnapshot().screen, 'preview');
+  assert.equal(restored.getSnapshot().preview!.size, 32);
+});
+
+test('clarification validates the full 500 Unicode-codepoint request without truncating original or answer', async t => {
+  const original = '😀'.repeat(480);
+  const exactAnswer = '😀'.repeat(500 - promptLength(clarifiedPrompt(original, '')));
+  const posted: GenerationRequest[] = [];
+  const h = harness(t, { api: client({ createGeneration: async body => {
+    posted.push(body); return { jobId: 'job', status: 'QUEUED', draftId: null, error: null };
+  }, getJob: async () => ({ jobId: 'job', status: 'READY', draftId: 'draft', error: null }), getPreview: async () => preview() }) },
+  { kind: 'clarification', input: { ...input, prompt: original }, answer: '' });
+  await h.controller.submitClarification();
+  assert.equal(posted.length, 0);
+  h.controller.editClarification(`${exactAnswer}😀`);
+  await h.controller.submitClarification();
+  assert.equal(posted.length, 0);
+  assert.equal(h.controller.getSnapshot().clarificationAnswer, `${exactAnswer}😀`);
+  assert.equal(h.controller.getSnapshot().prompt, original);
+  assert.match(h.controller.getSnapshot().error!.detail, /1자 줄이거나/);
+  h.controller.editClarification(exactAnswer);
+  await h.controller.submitClarification();
+  assert.equal(posted.length, 1);
+  assert.equal(promptLength(posted[0].prompt), 500);
+  assert.equal(posted[0].prompt, clarifiedPrompt(original, exactAnswer));
+});
+
+test('original prompt editing retains over-limit text, counts Unicode points and prevents premature generation', async t => {
+  const h = harness(t);
+  const tooLong = '😀'.repeat(501);
+  h.controller.editPrompt(tooLong); h.controller.next(); await h.controller.generate();
+  assert.equal(h.controller.getSnapshot().screen, 'input');
+  assert.equal(h.controller.getSnapshot().prompt, tooLong);
+  assert.match(h.controller.getSnapshot().error!.detail, /500자/);
+  h.controller.editPrompt('😀'.repeat(500)); h.controller.next();
+  assert.equal(h.controller.getSnapshot().screen, 'size');
+});
+
+test('a repeated clarification failure and subsequent edit never ask another question in the same creation flow', async t => {
+  let posts = 0;
+  const storage = memory({ kind: 'clarification', input, answer: '취미를 고를 거야' });
+  const api = client({ createGeneration: async () => {
+    posts++; return { jobId: `job-${posts}`, status: 'QUEUED', draftId: null, error: null };
+  }, getJob: async id => ({ jobId: id, status: 'FAILED', draftId: null,
+    error: { code: 'CLARIFICATION_REQUIRED', message: 'private repeated question', requestId: 'again', retryable: false } }) });
+  const first = harness(t, { storage, api }).controller;
+  await first.submitClarification();
+  assert.equal(first.getSnapshot().screen, 'generating');
+  assert.equal(first.getSnapshot().canEdit, true);
+  assert.equal(first.getSnapshot().canRetry, false);
+  first.dispose();
+  const restored = harness(t, { storage, api, uuid: () => 'edited-key' }).controller;
+  await restored.resume();
+  assert.equal(posts, 1);
+  restored.editInput(); restored.next(); await restored.generate();
+  assert.equal(posts, 2);
+  assert.equal(restored.getSnapshot().screen, 'generating');
+  assert.equal(restored.getSnapshot().canEdit, true);
+  restored.newCup();
+  assert.deepEqual(restored.getFlow(), { kind: 'input', prompt: '', size: 16 });
+});
+
+test('editing the original instead of answering consumes the one clarification opportunity without losing conditions', async t => {
+  const h = harness(t, {}, { kind: 'clarification', input: { ...input, size: 32 }, answer: '작성 중인 답변' });
+  h.controller.editInput();
+  assert.deepEqual(h.controller.getFlow(), { kind: 'input', prompt: input.prompt, size: 32, clarificationUsed: true });
+  h.controller.next(); h.controller.back();
+  assert.equal(h.controller.getFlow().kind, 'input');
+  assert.equal((h.controller.getFlow() as { clarificationUsed?: true }).clarificationUsed, true);
+});
+
+test('clarification answer 429 preserves retry deadline and exact new request across reload without automatic POST', async t => {
+  const posts: { input: GenerationRequest; key: string }[] = [];
+  const storage = memory({ kind: 'clarification', input, answer: '취미를 고를 거야' });
+  const api = client({ createGeneration: async (body, key) => {
+    posts.push({ input: structuredClone(body), key });
+    if (posts.length === 1) throw new ApiFailure('RATE_LIMITED', { status: 429, retryAt: 5000, retryable: true });
+    return { jobId: 'answer-job', status: 'QUEUED', draftId: null, error: null };
+  }, getJob: async () => ({ jobId: 'answer-job', status: 'READY', draftId: 'draft', error: null }), getPreview: async () => preview() });
+  const first = harness(t, { storage, api }).controller;
+  await first.submitClarification(); first.dispose();
+  const h = harness(t, { storage, api, uuid: () => 'must-not-change-answer-key' });
+  assert.equal(h.controller.getSnapshot().error!.retryAt, 5000);
+  assert.equal(h.controller.getSnapshot().busy, false);
+  await h.controller.resume(); await h.controller.retry();
+  h.setTime(5000); h.controller.tick(); await h.controller.resume();
+  assert.equal(posts.length, 1);
+  await h.controller.retry();
+  assert.equal(posts.length, 2);
+  assert.deepEqual(posts[1], posts[0]);
+  assert.equal(h.controller.getSnapshot().screen, 'preview');
+});
+
+test('ambiguous answer delivery remains manual after reload and retry keeps the answered body/key', async t => {
+  const storage = memory({ kind: 'clarification', input, answer: '취미를 고를 거야' });
+  const posts: { input: GenerationRequest; key: string }[] = [];
+  const api = client({ createGeneration: async (body, key) => {
+    posts.push({ input: structuredClone(body), key }); throw new ApiFailure('NETWORK_ERROR');
+  } });
+  const first = harness(t, { storage, api }).controller;
+  await first.submitClarification(); first.dispose();
+  const restored = harness(t, { storage, api }).controller;
+  await restored.resume();
+  assert.equal(posts.length, 1);
+  assert.equal(restored.getSnapshot().canRetry, true);
+  await restored.retry();
+  assert.deepEqual(posts, [posts[0], posts[0]]);
+});
+
+test('CLARIFICATION_REQUIRED during regeneration preserves the old preview and never opens a question', async t => {
+  const original = preview(32);
+  const h = harness(t, { api: client({ regenerate: async () => ({ jobId: 'regen', status: 'QUEUED', draftId: null, error: null }),
+    getJob: async () => ({ jobId: 'regen', status: 'FAILED', draftId: null,
+      error: { code: 'CLARIFICATION_REQUIRED', message: 'private', requestId: 'regen', retryable: false } }) }) },
+  { kind: 'preview', input: { ...input, size: 32 }, preview: original });
+  await h.controller.regenerate();
+  assert.equal(h.controller.getSnapshot().screen, 'preview');
+  assert.deepEqual(h.controller.getSnapshot().preview, original);
+  assert.equal(h.controller.getSnapshot().previewLocked, false);
 });

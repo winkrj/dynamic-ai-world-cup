@@ -1,5 +1,19 @@
 # 검증 기록
 
+## 2026-09-18 TD-42~44 — DB 재사용·서비스 보완·준비 가능성 기준
+
+현재 로컬 변경: 승인된 complete set의 exact-context 재사용, 원본 certificate와 승인/사용 감사 기록(V3), 취소/만료·동시 완료·재생성 동일 구성 차단, 초기 생성 보충 질문 1회, v20 장비 준비/외부 환경 구분, readiness·prod 시작 검사와 배포 패키지다. 모든 합성 검증은 `CANDIDATE_LIVE_TEST=false`이며 실제 승인된 공용 후보 세트는 아직 없다.
+
+전체 `npm run verify` PASS: **Java 309개 실행/실패·오류 0/유료 1개 제외(총 310)**, 프론트 **60개**, handoff **6개**, release 도구 **13개**, fixture **5개**, 실제 HTTP **160개/9 schemas**, TypeScript·웹 build·bootJar·appJar. Java/실제 격리 PostgreSQL 테스트는 이번 상태에서 실행했다. 재사용 관련 48개와 12개 실제 DB lifecycle 테스트가 포함되며 quota·snapshot·lease 회귀를 유지했다. 독립 read-only Reviewer 1회 **Critical 0 / High 0 / actionable 0**. Reviewer는 구현 파일을 변경하지 않았다. 이후 변경은 결과/운영 문서뿐이다.
+
+프론트 합성 브라우저 점검 PASS: `frontend/tests/clarification.browser.mjs`에서 360/1280px, 원래 고민/32강/답변 복원, Unicode 500자 제한과 무단 잘라내기 없음, 키보드 제출, reduced motion, 429 대기/새로고침 뒤 자동 POST 없음, 수동 같은 key 재시도, 반복 질문 대신 수정 경로. 모든 API는 합성 응답으로 가로챘다. 실행 서버는 종료했고 기존 18086 preview는 수정하지 않았다.
+
+배포 검증은 **부분 통과**다. Docker 웹 stage 빌드와 로컬 통합 JAR는 통과했고 JAR 안의 웹 문서와 운영자 launcher 존재를 확인했다. 전체 runtime 이미지 빌드는 기반 이미지 적재 중 Docker/containerd `input/output error`로 실패했다. 같은 시점 macOS Data 여유 공간은 **161MiB(100% 사용 표기)**였다. 기존 파일·이미지·volume 삭제나 Docker 재시작을 하지 않았다. 완성 runtime 이미지, 새 이미지의 실제 기동·readiness smoke·운영자 CLI 실제 DB 실행은 아직 검증하지 못했다. 디스크 공간 확보 후 해당 검증을 재개해야 한다.
+
+별도 승인된 v19 실제 평가 1회는 위 합성 통과와 달리 **FAILED**였다: 176.932초/6회/$0.238354/검색 0/사전 Repair 1회, 최종 UNIT FAIL·베이킹 환경 UNKNOWN·preview 없음. 누적 장부 $4.7623683/$6(미확인 예약 $0.50 포함), 추가 승인 없음. v20은 사용자 기준을 반영했으나 실제 호출/사람 품질 검증은 하지 않았다. 실패 기록은 소급 승인하지 않았다.
+
+미완료: v20 실제 후보 품질·사람 승인, 실제 승인 pool의 재사용/비용 절감, 최신 실제 AI와 프론트 완주, preview 준비 정보 충분성, 배포 사업자/월 운영비/도메인 선택, proxy/IP·TLS·DB backup/복원, 공개 배포. 이번 상태는 전체 Goal 완료가 아니다. 아래는 이전 시점별 검증 기록이다.
+
 ## 2026-09-18 TD-40 — 일일 생성 접수 제한
 
 AC-19: 기본 익명 브라우저별 하루 2회, 서울 자정 초기화, 생성/재생성/접수 후 실패 합산. 기존 rate event/transaction을 사용하고 schema/공개 DTO/모델은 그대로다. 24시간 event 보존, 알려진 제한만 정확한 Retry-After, 프론트 정책 안내와 긴 대기 표시를 함께 변경했다.

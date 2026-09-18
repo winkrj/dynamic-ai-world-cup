@@ -106,3 +106,22 @@ test('corrupted, unsupported, expired and future checkpoints produce warning wit
   assert.ok(restoreFlow(play, 2000 + 29 * 86400000).flow);
   assert.ok(restoreFlow(play, 2000 + 30 * 86400000 + 1).warning);
 });
+
+test('clarification and draft answers including over-limit edits survive reload without truncation', () => {
+  const values: Flow[] = [
+    { kind: 'clarification', input: { ...input, prompt: '😀'.repeat(500), size: 32 }, answer: '😀'.repeat(501) },
+    { kind: 'input', prompt: '😀'.repeat(501), size: 32, clarificationUsed: true },
+    { kind: 'generation', input, key: 'answer-key', clarificationUsed: true, manualRetry: true, retryAt: 5000 },
+  ];
+  for (const flow of values) assert.deepEqual(restoreFlow(encodeFlow(flow, 1000), 1500), { flow });
+});
+
+test('invalid clarification metadata or generated request length is rejected safely', () => {
+  for (const flow of [
+    { kind: 'clarification', input, answer: null },
+    { kind: 'clarification', input: { ...input, prompt: '😀'.repeat(501) }, answer: '' },
+    { kind: 'generation', input, key: 'key', clarificationUsed: false },
+    { kind: 'generation', input, key: 'key', manualRetry: 'yes' },
+    { kind: 'generation', input, key: 'key', manualRetry: true, retryAt: -1 },
+  ]) assert.ok(restoreFlow(JSON.stringify({ version: 1, savedAt: 1000, flow }), 1500).warning);
+});

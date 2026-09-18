@@ -1,6 +1,7 @@
 package dev.worldcup.generation;
 
 import dev.worldcup.candidate.CandidateQualityGate.ValidatedSet;
+import dev.worldcup.generation.reuse.ValidationCertificate;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -16,7 +17,11 @@ public interface CandidateEngine {
     record Context(String jobId, int attempt, Instant deadline, List<Preference> recentDirectChoices) {
         public Context { recentDirectChoices = List.copyOf(recentDirectChoices); }
     }
-    record Generated(ValidatedSet candidates, String publicTitle, String providerVersion, String validatorVersion) {
+    record Generated(ValidatedSet candidates, String publicTitle, String providerVersion, String validatorVersion,
+                     ValidationCertificate certificate) {
+        public Generated(ValidatedSet candidates, String publicTitle, String providerVersion, String validatorVersion) {
+            this(candidates, publicTitle, providerVersion, validatorVersion, null);
+        }
         public Generated {
             Objects.requireNonNull(candidates);
             if (publicTitle == null || publicTitle.isBlank() || publicTitle.length() > 100

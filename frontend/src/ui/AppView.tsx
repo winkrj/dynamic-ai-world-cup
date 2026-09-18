@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Actions, ViewState } from '../app/view-model.ts';
 import type { Candidate, Size } from '../api/types.ts';
 import { formatRetryDuration } from './retry-duration.ts';
+import { clarificationProblem, clarificationQuestion, clarifiedPrompt, promptLength } from '../app/clarification.ts';
 
 type ViewProps = { state: ViewState; actions: Actions };
 const examples = [
@@ -88,11 +89,12 @@ function InputScreen({ state, actions }: ViewProps) {
     <form className="prompt-panel" onSubmit={(event) => { event.preventDefault(); actions.next(); }}>
       <div className="section-kicker"><span className="tiny-label">01 / YOUR QUESTION</span><span className="square-dot" /></div>
       <label htmlFor="question">지금, 무엇을 고르고 싶어?</label>
-      <textarea id="question" name="question" maxLength={500} value={state.prompt} disabled={state.busy || state.locked}
+      <textarea id="question" name="question" value={state.prompt} disabled={state.busy || state.locked}
         onChange={(event) => actions.editPrompt(event.target.value)} aria-describedby="question-help question-count"
+        aria-invalid={promptLength(state.prompt) > 500}
         placeholder="취향, 예산, 함께할 사람… 원하는 조건을 편하게 적어 주세요." rows={5} required />
-      <div className="field-help"><span id="question-help">조건이 구체적일수록, 더 나다운 후보.</span><span id="question-count">{state.prompt.length} / 500</span></div>
-      <button className="button button--primary" type="submit" disabled={!state.prompt.trim() || state.busy || state.locked || state.storageBlocked}>월드컵 만들기 <Arrow /></button>
+      <div className="field-help"><span id="question-help">{promptLength(state.prompt) > 500 ? '입력은 그대로 보관했어요. 500자 이내로 줄여 주세요.' : '조건이 구체적일수록, 더 나다운 후보.'}</span><span id="question-count">{promptLength(state.prompt)} / 500</span></div>
+      <button className="button button--primary" type="submit" disabled={!state.prompt.trim() || promptLength(state.prompt) > 500 || state.busy || state.locked || state.storageBlocked}>월드컵 만들기 <Arrow /></button>
       <p className="input-reassurance">로그인 없이 시작해요. 후보는 먼저 확인할 수 있어요.<br />이 브라우저에서 하루 2회 · 한국 시간 자정 초기화</p>
       <div className="example-section"><p className="tiny-label">이렇게 시작해 봐도 좋아요</p>
         {examples.map((example, index) => <button className="example" type="button" key={example} disabled={state.busy || state.locked} onClick={() => actions.editPrompt(example)}>
@@ -138,6 +140,30 @@ function GeneratingScreen({ state }: ViewProps) {
       <p className="loading-status" role="status">{state.generationStatus === 'QUEUED' ? '순서가 되면 후보 준비를 시작해요.' : '후보가 준비되면 전체 미리보기로 이동해요.'}</p>
       <p className="fine-print">조금 걸릴 수 있어요. 이 화면에서 기다려 주세요.</p></>}
     <div className="generation-recap"><span className="tiny-label">YOUR WORLD CUP</span><strong>{state.size}강 · {state.size - 1}번의 선택</strong><p>{state.prompt}</p></div>
+  </section>;
+}
+
+function ClarificationScreen({ state, actions }: ViewProps) {
+  const answer = state.clarificationAnswer ?? '';
+  const validation = clarificationProblem(state.prompt, answer);
+  const count = promptLength(clarifiedPrompt(state.prompt, answer));
+  return <section className="flow-page clarification-page">
+    <Heading eyebrow="ONE QUICK QUESTION" subtitle="비교할 대상을 정하지 못해 한 번만 더 확인해요. 처음 적은 조건은 함께 보낼게요.">어떤 대상을<br /><span className="accent-text">고르고 싶나요?</span></Heading>
+    <p className="tiny-label">처음 적은 고민 · {state.size}강</p>
+    <blockquote className="prompt-quote clarification-original">{state.prompt}</blockquote>
+    <form className="prompt-panel" onSubmit={event => { event.preventDefault(); actions.submitClarification(); }}>
+      <label htmlFor="clarification-answer">{clarificationQuestion}</label>
+      <textarea id="clarification-answer" name="clarification-answer" value={answer} rows={3}
+        disabled={state.busy || state.locked || state.storageBlocked} required
+        onChange={event => actions.editClarification(event.target.value)}
+        aria-describedby="clarification-help clarification-count clarification-cost"
+        aria-invalid={!!answer.trim() && !!validation} placeholder="예: 새로 시작할 취미 중 하나를 고르고 싶어요." />
+      <div className="field-help"><span id="clarification-help">{validation ?? '처음 고민과 답변을 합쳐 새 요청으로 보냅니다.'}</span><span id="clarification-count">합계 {count} / 500</span></div>
+      <p id="clarification-cost" className="fine-print clarification-cost">앞선 요청은 실패로 끝났어요. 답변을 보내면 새로 만들며, 접수되면 하루 횟수를 1회 더 사용해요.</p>
+      <button className="button button--primary" type="submit" disabled={!!validation || state.busy || state.locked || state.storageBlocked}>답변을 더해 후보 {state.size}개 만들기 <Arrow /></button>
+      <button className="text-button" type="button" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.editInput}><Arrow direction="left" /> 처음 고민 수정하기</button>
+    </form>
+    <GenerationPolicy />
   </section>;
 }
 
@@ -264,6 +290,7 @@ export function AppView({ state, actions }: ViewProps) {
   const screens: Record<ViewState['screen'], ReactNode> = {
     input: <InputScreen state={state} actions={actions} />,
     size: <SizeScreen state={state} actions={actions} />,
+    clarification: <ClarificationScreen state={state} actions={actions} />,
     generating: <GeneratingScreen state={state} actions={actions} />,
     preview: <PreviewScreen state={state} actions={actions} />,
     play: <PlayScreen state={state} actions={actions} />,

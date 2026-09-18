@@ -18,6 +18,8 @@
 
 | 경로 | 의미 |
 | --- | --- |
+| GET /health | 프로세스 생존 상태. DB·후보 품질·AI 계정 정상임을 보장하지 않음 |
+| GET /ready | DB 조회·웹 번들·worker 설정·명시 엔진 profile 준비 시 200 READY, 아니면 503 NOT_READY. Readiness DTO만 반환, 유료 호출/쿠키 생성 없음. 품질·잔액·공급자 인증 성공 판정 아님 |
 | POST /generation-jobs | prompt/N/locale/timezone로 job 생성, 202. worker 완료 전 후보 없음 |
 | GET /generation-jobs/{jobId} | QUEUED/RUNNING/READY/FAILED. READY에 draftId, FAILED에 error |
 | GET /drafts/{draftId} | READY인 N개 전체 preview. regenerationRemaining 0/1 |

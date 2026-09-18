@@ -24,4 +24,16 @@ class HealthHttpTest extends dev.worldcup.support.PostgresSupport {
             assertThat(json.get("service").asString()).isEqualTo("dynamic-ai-world-cup");
         }
     }
+
+    @Test void backendOnlyTestServerIsLiveButNotReadyForPublicPlay() throws Exception {
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/ready")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(response.statusCode()).isEqualTo(503);
+            var json = JsonMapper.builder().build().readTree(response.body());
+            assertThat(json.get("status").asString()).isEqualTo("NOT_READY");
+            assertThat(json.get("service").asString()).isEqualTo("dynamic-ai-world-cup");
+            assertThat(response.headers().firstValue("Set-Cookie")).isEmpty();
+        }
+    }
 }

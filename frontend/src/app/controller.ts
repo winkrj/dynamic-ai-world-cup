@@ -4,6 +4,7 @@ import { advance, champion, createPlay, currentMatch, decide, ready } from '../p
 import { encodeFlow, restoreFlow } from './checkpoint.ts';
 import type { Flow, GenerationFlow, PlayFlow } from './checkpoint.ts';
 import type { Actions, UserProblem, ViewState } from './view-model.ts';
+import { clarificationProblem, clarifiedPrompt, promptLength } from './clarification.ts';
 
 type Api = ReturnType<typeof createApiClient>;
 interface StoragePort { getItem(key: string): string | null; setItem(key: string, value: string): void }
@@ -73,6 +74,10 @@ export class AppController {
           title: '후보를 준비하지 못했어요',
           detail: '이전 생성 요청이 실패했어요. 고민을 수정한 뒤 다시 만들어 주세요. 새로고침만으로 후보를 다시 생성하지는 않습니다.',
         };
+      } else if (this.flow.kind === 'generation' && !this.flow.jobId && this.flow.manualRetry) {
+        this.error = this.flow.retryAt
+          ? { ...problem(new ApiFailure('RATE_LIMITED')), retryAt: this.flow.retryAt }
+          : { title: '답변 요청을 다시 확인해 주세요', detail: '보내려던 답변은 보관했어요. 직접 다시 시도하면 같은 요청을 확인합니다. 새로고침만으로 전송하지 않아요.' };
       }
       // Verify storage before the first mutation: no paid request may precede durable operation state.
       options.storage.setItem(this.storageKey, this.raw ?? encodeFlow(this.flow, this.now()));
@@ -112,12 +117,13 @@ export class AppController {
     const candidates = preview?.candidates ?? play?.snapshot.candidates ?? shared?.snapshot.candidates;
     const saved = f.kind === 'play' && !!localChampion && f.ack?.status === 'COMPLETED'
       && f.ack.championId === localChampion.id && f.ack.nextSequence === play!.snapshot.size - 1;
-    const screen = f.kind === 'input' || f.kind === 'size' ? f.kind : f.kind === 'generation'
+    const screen = f.kind === 'input' || f.kind === 'size' || f.kind === 'clarification' ? f.kind : f.kind === 'generation'
       ? (f.previous ? 'preview' : 'generating') : f.kind === 'preview' ? 'preview' : f.kind === 'play'
         ? (play!.phase === 'completed' ? 'champion' : 'play') : shared ? 'share' : this.error ? 'share-error' : 'share-loading';
     this.view = {
       screen, prompt: 'prompt' in f ? f.prompt : 'input' in f ? f.input.prompt : '',
       size: 'size' in f ? f.size : 'input' in f ? f.input.size : play?.snapshot.size ?? shared?.snapshot.size ?? 16,
+      clarificationAnswer: f.kind === 'clarification' ? f.answer : undefined,
       preview, previewLocked: f.kind === 'generation' || (f.kind === 'preview' && !!f.startKey), play, match: play ? currentMatch(play) : undefined, champion: localChampion, shared,
       shareUrl: f.kind === 'play' ? f.share?.url : undefined,
       generationStatus: f.kind === 'generation' ? f.status : undefined,
@@ -126,7 +132,7 @@ export class AppController {
       canRetry: !!this.error && !this.busy && !this.saving && this.allowed()
         && (f.kind === 'play' || f.kind === 'share' || (f.kind === 'generation' && !f.failed)
           || (f.kind === 'preview' && !!f.startKey)),
-      canEdit: (f.kind === 'generation' && !!f.failed) || (f.kind === 'preview' && !f.startKey),
+      canEdit: f.kind === 'clarification' || (f.kind === 'generation' && !!f.failed) || (f.kind === 'preview' && !f.startKey),
       storageBlocked: this.storageBlocked, locked: this.locked,
       synthetic: candidates?.some(c => c.name.startsWith('[개발용]')) ?? false,
       homeReturnsToExisting: (this.options.path ?? '/') !== '/',
@@ -136,7 +142,7 @@ export class AppController {
   }
   async resume(): Promise<void> {
     if (!this.allowed() || this.busy || this.saving) return;
-    if (this.flow.kind === 'generation' && !this.flow.failed) await this.runGeneration();
+    if (this.flow.kind === 'generation' && !this.flow.failed && (this.flow.jobId || !this.flow.manualRetry)) await this.runGeneration();
     else if (this.flow.kind === 'preview' && this.flow.startKey) await this.start();
     else if (this.flow.kind === 'share') await (this.flow.replayKey ? this.replay() : this.loadShare());
     else if (this.flow.kind === 'play') { this.tick(); await this.upload(); }
@@ -152,27 +158,43 @@ export class AppController {
     } catch { this.failStorage(); this.emit(); }
   }
   editPrompt(value: string): void {
-    if (this.flow.kind === 'input' && this.allowed()) this.persist({ ...this.flow, prompt: value.slice(0, 500) });
+    if (this.flow.kind === 'input' && this.allowed()) { this.error = null; this.persist({ ...this.flow, prompt: value }); }
+  }
+  editClarification(value: string): void {
+    if (this.flow.kind === 'clarification' && this.allowed()) { this.error = null; this.persist({ ...this.flow, answer: value }); }
+  }
+  async submitClarification(): Promise<void> {
+    if (this.flow.kind !== 'clarification' || this.busy || !this.allowed()) return;
+    const detail = clarificationProblem(this.flow.input.prompt, this.flow.answer);
+    if (detail) { this.error = { title: '답변을 확인해 주세요', detail }; this.emit(); return; }
+    const input = { ...this.flow.input, prompt: clarifiedPrompt(this.flow.input.prompt, this.flow.answer) };
+    this.error = null; this.notice = null;
+    // Persist a fresh operation before explicit submission. A reload without a job ID never auto-POSTs it.
+    if (this.persist({ kind: 'generation', input, key: this.uuid(), clarificationUsed: true, manualRetry: true })) await this.runGeneration();
   }
   chooseSize(size: Size): void {
     if (this.flow.kind === 'size' && [8, 16, 32].includes(size)) this.persist({ ...this.flow, size });
   }
   next(): void {
     if (this.flow.kind !== 'input' || !this.flow.prompt.trim()) return;
+    if (promptLength(this.flow.prompt) > 500) {
+      this.error = { title: '고민을 조금 줄여 주세요', detail: '500자까지 보낼 수 있어요. 입력은 그대로 보관했으니 조건을 유지하며 줄여 주세요.' };
+      this.emit(); return;
+    }
     this.error = null; this.persist({ ...this.flow, kind: 'size' });
   }
   back(): void { if (this.flow.kind === 'size') this.persist({ ...this.flow, kind: 'input' }); }
   async generate(): Promise<void> {
-    if (this.flow.kind !== 'size' || !this.flow.prompt.trim() || this.busy || !this.allowed()) return;
+    if (this.flow.kind !== 'size' || !this.flow.prompt.trim() || promptLength(this.flow.prompt) > 500 || this.busy || !this.allowed()) return;
     const input: GenerationRequest = { prompt: this.flow.prompt.trim(), size: this.flow.size, locale: 'ko-KR', timezone: 'Asia/Seoul' };
     this.error = null; this.notice = null;
-    if (this.persist({ kind: 'generation', input, key: this.uuid() })) await this.runGeneration();
+    if (this.persist({ kind: 'generation', input, key: this.uuid(), clarificationUsed: this.flow.clarificationUsed })) await this.runGeneration();
   }
   async regenerate(): Promise<void> {
     if (this.flow.kind !== 'preview' || this.flow.startKey || this.flow.preview.regenerationsRemaining !== 1 || this.busy || !this.allowed()) return;
     if (this.error?.retryAt && this.now() < this.error.retryAt) return;
     this.error = null;
-    if (this.persist({ kind: 'generation', input: this.flow.input, previous: this.flow.preview, key: this.uuid() })) await this.runGeneration();
+    if (this.persist({ kind: 'generation', input: this.flow.input, previous: this.flow.preview, key: this.uuid(), clarificationUsed: this.flow.clarificationUsed })) await this.runGeneration();
   }
   private async runGeneration(): Promise<void> {
     if (this.flow.kind !== 'generation' || this.flow.failed || !this.allowed() || this.busy) return;
@@ -184,17 +206,20 @@ export class AppController {
         const result = f.previous
           ? await this.options.api.regenerate(f.previous.draftId, f.previous.version, f.key, this.request.signal)
           : await this.options.api.createGeneration(f.input, f.key, this.request.signal);
-        f = { ...f, jobId: result.jobId };
+        f = { ...f, jobId: result.jobId, manualRetry: undefined, retryAt: undefined };
         if (!this.persist(f)) return;
       }
       const job = await this.options.api.getJob(f.jobId!, this.request.signal);
       if (job.status === 'READY' && job.draftId) {
         const preview = await this.options.api.getPreview(job.draftId, this.request.signal);
-        this.persist({ kind: 'preview', input: f.input, preview });
+        this.persist({ kind: 'preview', input: f.input, preview, clarificationUsed: f.clarificationUsed });
       } else if (job.status === 'FAILED') {
         this.error = problem(job.error ? errorFromJob(job.error) : new Error());
-        if (f.previous) this.persist({ kind: 'preview', input: f.input, preview: f.previous });
-        else this.persist({ ...f, failed: true });
+        if (f.previous) this.persist({ kind: 'preview', input: f.input, preview: f.previous, clarificationUsed: f.clarificationUsed });
+        else if (job.error?.code === 'CLARIFICATION_REQUIRED' && !f.clarificationUsed) {
+          this.error = null;
+          this.persist({ kind: 'clarification', input: f.input, answer: '' });
+        } else this.persist({ ...f, failed: true });
       } else {
         this.persist({ ...f, status: job.status === 'RUNNING' ? 'RUNNING' : 'QUEUED' });
         this.timer = setTimeout(() => { void this.runGeneration(); }, this.options.pollMs ?? 1000);
@@ -207,9 +232,10 @@ export class AppController {
         if (f.previous) {
           try {
             const preview = await this.options.api.getPreview(f.previous.draftId);
-            this.persist({ kind: 'preview', input: f.input, preview });
-          } catch { this.persist({ kind: 'preview', input: f.input, preview: f.previous }); }
+            this.persist({ kind: 'preview', input: f.input, preview, clarificationUsed: f.clarificationUsed });
+          } catch { this.persist({ kind: 'preview', input: f.input, preview: f.previous, clarificationUsed: f.clarificationUsed }); }
         } else if (error.code !== 'RATE_LIMITED') this.persist({ ...f, failed: true });
+        else if (f.clarificationUsed) this.persist({ ...f, manualRetry: true, retryAt: error.retryAt ?? undefined });
       } else if (error instanceof ApiFailure && error.code === 'NOT_FOUND' && this.flow.kind === 'generation') {
         this.persist({ ...this.flow, failed: true });
       }
@@ -227,10 +253,10 @@ export class AppController {
     } catch (error) {
       this.error = problem(error);
       if (error instanceof ApiFailure && ['VERSION_CONFLICT', 'REGENERATION_EXHAUSTED'].includes(error.code)) {
-        try { const preview = await this.options.api.getPreview(f.preview.draftId); this.persist({ kind: 'preview', input: f.input, preview }); }
+        try { const preview = await this.options.api.getPreview(f.preview.draftId); this.persist({ kind: 'preview', input: f.input, preview, clarificationUsed: f.clarificationUsed }); }
         catch { /* Keep the original start operation when reconciliation is unavailable. */ }
       } else if (error instanceof ApiFailure && error.code === 'NOT_FOUND') {
-        this.persist({ kind: 'preview', input: f.input, preview: f.preview });
+        this.persist({ kind: 'preview', input: f.input, preview: f.preview, clarificationUsed: f.clarificationUsed });
       }
     } finally { this.busy = false; this.emit(); }
   }
@@ -339,12 +365,14 @@ export class AppController {
     if (this.flow.kind === 'play') {
       if (this.view.saved && this.flow.shareKey) await this.share();
       else await this.upload();
-    } else await this.resume();
+    } else if (this.flow.kind === 'generation' && !this.flow.failed) await this.runGeneration();
+    else await this.resume();
   }
   editInput(): void {
     if (!this.view.canEdit || !('input' in this.flow)) return;
     clearTimeout(this.timer); this.error = null;
-    this.persist({ kind: 'input', prompt: this.flow.input.prompt, size: this.flow.input.size });
+    const clarificationUsed = this.flow.kind === 'clarification' ? true : this.flow.clarificationUsed;
+    this.persist({ kind: 'input', prompt: this.flow.input.prompt, size: this.flow.input.size, clarificationUsed });
   }
   newCup(): void {
     if (!this.allowed() || this.busy || this.saving) return;
@@ -355,6 +383,7 @@ export class AppController {
   }
   readonly actions: Actions = {
     editPrompt: value => this.editPrompt(value), chooseSize: value => this.chooseSize(value), next: () => this.next(), back: () => this.back(),
+    editClarification: value => this.editClarification(value), submitClarification: () => { void this.submitClarification(); },
     generate: () => { void this.generate(); }, regenerate: () => { void this.regenerate(); }, start: () => { void this.start(); },
     ready: sequence => this.ready(sequence), choose: id => this.choose(id), retry: () => { void this.retry(); }, editInput: () => this.editInput(),
     newCup: () => this.newCup(), replay: () => { void this.replay(); }, share: () => { void this.share(); }, copyShare: () => { void this.copyShare(); },

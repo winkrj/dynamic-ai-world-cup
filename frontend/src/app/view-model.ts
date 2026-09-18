@@ -9,9 +9,10 @@ export interface UserProblem {
 }
 
 export interface ViewState {
-  screen: 'input' | 'size' | 'generating' | 'preview' | 'play' | 'champion' | 'share-loading' | 'share' | 'share-error';
+  screen: 'input' | 'size' | 'clarification' | 'generating' | 'preview' | 'play' | 'champion' | 'share-loading' | 'share' | 'share-error';
   prompt: string;
   size: Size;
+  clarificationAnswer?: string;
   preview?: Preview;
   previewLocked: boolean;
   play?: PlayState;
@@ -36,6 +37,8 @@ export interface ViewState {
 
 export interface Actions {
   editPrompt(value: string): void;
+  editClarification(value: string): void;
+  submitClarification(): void;
   chooseSize(size: Size): void;
   next(): void;
   back(): void;

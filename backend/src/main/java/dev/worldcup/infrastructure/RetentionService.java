@@ -1,5 +1,6 @@
 package dev.worldcup.infrastructure;
 
+import dev.worldcup.generation.reuse.ReusePolicy;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -16,6 +17,13 @@ public class RetentionService {
         var now = clock.instant();
         var day = Timestamp.from(now.minus(Duration.ofDays(1)));
         var month = Timestamp.from(now.minus(Duration.ofDays(30)));
+        jdbc.update("""
+                DELETE FROM candidate_reuse_set WHERE (state <> 'APPROVED' AND updated_at < ?)
+                    OR created_at < ? OR (state = 'APPROVED' AND expires_at <= ?)
+                """, Timestamp.from(now.minus(ReusePolicy.PENDING_RETENTION)), month, Timestamp.from(now));
+        var auditExpiry = Timestamp.from(now.minus(ReusePolicy.AUDIT_RETENTION));
+        jdbc.update("DELETE FROM candidate_reuse_review WHERE created_at < ?", auditExpiry);
+        jdbc.update("DELETE FROM candidate_reuse_use WHERE created_at < ?", auditExpiry);
         jdbc.update("DELETE FROM idempotency_request WHERE created_at < ?", day);
         jdbc.update("DELETE FROM generation_job WHERE state IN ('READY', 'FAILED') AND created_at < ?", day);
         jdbc.update("""

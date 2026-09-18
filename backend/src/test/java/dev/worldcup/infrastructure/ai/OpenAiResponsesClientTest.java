@@ -323,7 +323,18 @@ class OpenAiResponsesClientTest {
         assertThat(instructions).contains("this does not require putting both in the set",
                 "Examples, genres and complementary steps within one activity are allowed",
                 "punctuation alone is not a defect", "Do not split those examples or steps into extra candidates");
-        assertThat(instructions).containsOnlyOnce("Distinguish ordinary obtainable supplies from essential user-dependent access.");
+        assertThat(instructions).containsOnlyOnce("Distinguish realistically acquirable preparation from essential external access that buying equipment or learning cannot create.");
+        assertThat(instructions).contains("not whether they already own every tool or skill",
+                "Missing existing ownership or experience alone is not UNKNOWN",
+                "home baking can be feasible with an oven that the user can buy",
+                "state that an oven and basic utensils are needed",
+                "Separate one-time setup from recurring costs",
+                "preserve explicit startup or total-budget limits",
+                "never treat necessary purchases as free",
+                "A monthly running-cost limit does not by itself state a separate startup-cost cap",
+                "industrial equipment, structural alterations, unavailable space or a conflicting purchase budget still need assessment",
+                "Binoculars can be bought, but they cannot create birds visible from an apartment window",
+                "Do not repair an at-home activity by requiring relocation or outdoor travel");
         assertThat(instructions).containsOnlyOnce("Ordinary home space and routine personal practice are reasonable defaults unless the request states a conflicting condition.");
         assertThat(instructions).contains("harmonica practice at home can be feasible without a stated noise restriction",
                 "missing home details alone are not UNKNOWN",
@@ -331,12 +342,14 @@ class OpenAiResponsesClientTest {
                 "do not assume audible playing meets it or replace playing with silent study",
                 "does not establish a dedicated practice room, soundproofing, large-equipment space",
                 "observing wild birds nearby depends on an accessible setting where birds can actually be observed");
-        assertThat(instructions).doesNotContain("Do not assume special equipment, prior skill, suitable space");
+        assertThat(instructions).doesNotContain("Do not assume special equipment, prior skill, suitable space",
+                "Do not assume specialized equipment, prior skill");
         assertThat(instructions).contains("An unresolved essential prerequisite is UNKNOWN, not PASS",
                 "This is not a ban on birdwatching or all outdoor activities.", "Do not invent additional user constraints");
         if (phase.equals("review")) assertThat(instructions).contains(
                 "Separately return exactly one feasibility assessment for EVERY candidate, even when there are no hard constraints.",
                 "missing ordinary home details alone are not an unresolved essential prerequisite",
+                "lack of existing oven/tool ownership alone is not UNKNOWN",
                 "A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.",
                 "The public preview contains only name and tags");
         assertThat(calls).hasValue(1);

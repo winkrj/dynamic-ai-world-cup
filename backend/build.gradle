@@ -7,6 +7,10 @@ plugins {
 group = 'dev.worldcup'
 version = '0.0.1-SNAPSHOT'
 
+springBoot {
+	mainClass = 'dev.worldcup.WorldcupApplication'
+}
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)

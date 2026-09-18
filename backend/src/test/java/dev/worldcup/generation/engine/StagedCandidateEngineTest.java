@@ -41,6 +41,15 @@ class StagedCandidateEngineTest {
         assertThat(result.publicTitle()).isEqualTo(size + "강 선택 월드컵");
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
         assertThat(stages.repairs).isZero();
+        assertThat(result.certificate()).isNotNull();
+        assertThat(result.certificate().plan()).isEqualTo(result.candidates().plan());
+        assertThat(result.certificate().candidates()).isEqualTo(result.candidates().candidates());
+        assertThat(result.certificate().richCandidates()).hasSize(size);
+        assertThat(result.certificate().allocationInterpretation()).isEqualTo(faithful());
+        assertThat(result.certificate().finalReview().findings()).isEmpty();
+        assertThat(result.certificate().finalReview().feasibility()).hasSize(size);
+        String certificateJson = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(result.certificate());
+        assertThat(certificateJson).doesNotContain("\"sourceText\"", "\"prompt\"", "\"recentDirectChoices\"", input(size).prompt());
     }
     @Test void abstractCoverageWithoutEnoughConcreteIntentsCannotReachGenerationOrRepair() {
         stages.intentCountOffset = -1;
@@ -290,6 +299,9 @@ class StagedCandidateEngineTest {
         assertThat(stages.repairs).isEqualTo(1);
         assertThat(stages.reviewCount).isEqualTo(2);
         assertThat(result.candidates().candidates().getFirst().name()).contains("수정");
+        assertThat(result.certificate().richCandidates().getFirst().name()).contains("수정");
+        assertThat(result.certificate().evidence().assessments()).allMatch(a -> a.verdict() == Verdict.PASS);
+        assertThat(result.certificate().finalReview().assessments()).isEqualTo(result.certificate().evidence().assessments());
     }
     @ParameterizedTest @ValueSource(strings = {"FAIL", "UNKNOWN"})
     void ordinaryHomeFeasibilityCannotOverrideAnExplicitQuietConstraint(Verdict verdict) {

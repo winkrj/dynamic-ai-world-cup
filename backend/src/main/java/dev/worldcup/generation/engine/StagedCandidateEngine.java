@@ -6,6 +6,8 @@ import static dev.worldcup.generation.engine.EngineModels.*;
 import dev.worldcup.candidate.CandidateQualityGate;
 import dev.worldcup.generation.CandidateEngine;
 import dev.worldcup.generation.GenerationInput;
+import dev.worldcup.generation.reuse.ReusePolicy;
+import dev.worldcup.generation.reuse.ValidationCertificate;
 import dev.worldcup.shared.Failure;
 import java.text.Normalizer;
 import java.time.Clock;
@@ -58,14 +60,14 @@ public final class StagedCandidateEngine implements CandidateEngine {
                 original = new Batch(List.of()); generationVersion = "invalid-initial-output";
             }
             var inspection = inspect(fixed, original, run, "INITIAL");
-            if (inspection.validated() != null) return finish(input, inspection, generationVersion, run);
+            if (inspection.validated() != null) return finish(fixed, allocation, original, inspection, generationVersion, run);
 
             var replacementIds = replacementIds(input.size(), original, inspection.findings());
             var repaired = stages.repair(fixed, original, replacementIds, inspection.findings(), run.repairCall("REPAIR"));
             preserveUnchanged(original, repaired.value(), replacementIds);
             var checked = inspect(fixed, repaired.value(), run, "REPAIRED");
             if (checked.validated() == null) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
-            return finish(input, checked, repaired.version(), run);
+            return finish(fixed, allocation, repaired.value(), checked, repaired.version(), run);
         } catch (InvalidModelOutput invalid) {
             throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
         }
@@ -170,7 +172,7 @@ public final class StagedCandidateEngine implements CandidateEngine {
 
     private Inspection inspect(FixedPlan plan, Batch batch, Run run, String phase) {
         var findings = basicFindings(plan, batch, "INITIAL".equals(phase));
-        if (!findings.isEmpty()) return new Inspection(null, findings, "not-reviewed");
+        if (!findings.isEmpty()) return new Inspection(null, findings, "not-reviewed", null, null, null);
         Grounding grounding = plan.specification().groundingRequired()
                 || plan.specification().constraints().stream().anyMatch(c -> c.mode() == VerificationMode.GROUNDED_FACT)
                 ? stages.ground(plan, batch, run.call("GROUND_" + phase)) : Grounding.empty();
@@ -188,7 +190,8 @@ public final class StagedCandidateEngine implements CandidateEngine {
             findings.add(new Finding("CANDIDATE_QUALITY", List.of(), "Independent quality review did not pass"));
         }
         var evidence = new Evidence(review.assessments(), grounding.facts(), review.comparable(), review.noSemanticDuplicates(), result.version());
-        var checked = gate.validate(plan.gatePlan(), displayCandidates(plan, batch), evidence, clock.instant());
+        Instant validatedAt = clock.instant();
+        var checked = gate.validate(plan.gatePlan(), displayCandidates(plan, batch), evidence, validatedAt);
         for (var issue : checked.issues()) {
             var targets = issue.candidateId() == null ? List.<String>of() : List.of(issue.candidateId());
             if (issue.code() == CandidateQualityGate.Code.SEMANTIC_REVIEW_FAILED && !review.findings().isEmpty()
@@ -197,7 +200,8 @@ public final class StagedCandidateEngine implements CandidateEngine {
             }
             findings.add(new Finding(issue.code().name(), targets, issue.detail()));
         }
-        return new Inspection(findings.isEmpty() ? checked.validated().orElse(null) : null, findings, result.version());
+        return new Inspection(findings.isEmpty() ? checked.validated().orElse(null) : null, findings, result.version(),
+                evidence, review, validatedAt);
     }
 
     private List<Finding> feasibilityFindings(Set<String> candidateIds, List<FeasibilityAssessment> assessments) {
@@ -272,15 +276,20 @@ public final class StagedCandidateEngine implements CandidateEngine {
             if (repaired.candidates().stream().noneMatch(candidate::equals)) throw Failure.of(Failure.Code.QUALITY_GATE_FAILED);
         }
     }
-    private Generated finish(GenerationInput input, Inspection checked, String providerVersion, Run run) {
+    private Generated finish(FixedPlan fixed, AllocationReview allocation, Batch batch, Inspection checked,
+                             String providerVersion, Run run) {
         run.call("COMPLETE");
-        return new Generated(checked.validated(), input.size() + "강 선택 월드컵", providerVersion, checked.reviewerVersion());
+        var certificate = new ValidationCertificate(ReusePolicy.VERSION, fixed.referenceTime(), checked.validatedAt(),
+                checked.validated().plan(), checked.validated().candidates(), batch.candidates(), checked.evidence(),
+                allocation.interpretation(), allocation.comparable(), allocation.noSemanticDuplicates(), allocation.feasible(), checked.review());
+        return new Generated(checked.validated(), fixed.input().size() + "강 선택 월드컵", providerVersion, checked.reviewerVersion(), certificate);
     }
     public static List<String> allIds(int size) { return IntStream.rangeClosed(1, size).mapToObj(i -> "c" + i).toList(); }
     private static boolean identifier(String value) { return value != null && value.matches("[a-z][a-z0-9_-]{0,39}"); }
     private static String normalize(String value) { return value == null ? "" : Normalizer.normalize(value, Normalizer.Form.NFKC).replaceAll("(?U)\\s+", " ").strip(); }
     private static boolean blank(String value) { return normalize(value).isEmpty(); }
-    private record Inspection(CandidateQualityGate.ValidatedSet validated, List<Finding> findings, String reviewerVersion) {}
+    private record Inspection(CandidateQualityGate.ValidatedSet validated, List<Finding> findings, String reviewerVersion,
+                              Evidence evidence, Review review, Instant validatedAt) {}
     private final class Run {
         private final Context context; private final Instant deadline;
         private boolean repairUsed;

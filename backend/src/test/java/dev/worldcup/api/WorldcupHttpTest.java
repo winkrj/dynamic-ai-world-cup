@@ -95,6 +95,15 @@ class WorldcupHttpTest extends PostgresSupport {
         assertThat(job.get("status").asString()).isEqualTo("READY");
         return job.get("draftId").asString();
     }
+    @Test void readinessFailureMatchesContractWithoutStartingGeneration() throws Exception {
+        var browser = new Browser();
+        var response = browser.get("/ready");
+        var body = accepted(response, 503, "Readiness");
+        assertThat(body.get("status").asString()).isEqualTo("NOT_READY");
+        assertThat(body.get("service").asString()).isEqualTo("dynamic-ai-world-cup");
+        assertThat(response.headers().firstValue("Set-Cookie")).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM generation_job", Integer.class)).isZero();
+    }
     @ParameterizedTest @ValueSource(ints = {8, 16, 32})
     void completeLifecycleMatchesContractAndSharesSameBracket(int size) throws Exception {
         var owner = new Browser(); var outsider = new Browser();

@@ -53,19 +53,28 @@ public final class OpenAiCandidateStages implements EngineStages {
             Do not disguise an unsuitable activity as reading about it, keeping a log, or doing a tiny silent fragment of it.
             Reading or record-keeping CAN be a genuine hobby; assess its core appeal in this set, not a global blacklist.
             Similar domains can still contain distinct activities. Judge the actual choice experience, not only tags.
-            Distinguish ordinary obtainable supplies from essential user-dependent access.
-            Low-cost ordinary materials, basic tools, small instruments or generally accessible resources can be feasible without proof of existing ownership,
-            when acquisition and recurring use fit the actual budget, time and other conditions. Do not invent exact prices.
+            Distinguish realistically acquirable preparation from essential external access that buying equipment or learning cannot create.
+            Feasibility asks whether the user can start and sustain the activity with reasonable preparation, not whether they already own every tool or skill.
+            Materials, tools, household appliances, instruments and learnable beginner skills can be obtained or learned for a new hobby.
+            Missing existing ownership or experience alone is not UNKNOWN. State the concrete preparation instead of inventing an ownership requirement.
+            Acquisition and repeated use must still fit the user's actual budget, time, space, noise and other explicit conditions.
+            Separate one-time setup from recurring costs; preserve explicit startup or total-budget limits and never treat necessary purchases as free.
+            A monthly running-cost limit does not by itself state a separate startup-cost cap. Do not invent exact prices or ignore an explicit cap.
+            For example, home baking can be feasible with an oven that the user can buy; state that an oven and basic utensils are needed.
+            Do not mark baking UNKNOWN solely because oven ownership is unmentioned, or disguise it as a different no-equipment activity.
+            This is not approval of every purchasable object: industrial equipment, structural alterations, unavailable space or a conflicting purchase budget still need assessment.
             Ordinary home space and routine personal practice are reasonable defaults unless the request states a conflicting condition.
             Do not require proof of a normal room or permission for ordinary home practice solely because the user did not describe it.
             For example, harmonica practice at home can be feasible without a stated noise restriction; missing home details alone are not UNKNOWN.
             An explicit quiet/no-sound condition still applies: do not assume audible playing meets it or replace playing with silent study.
             This default does not establish a dedicated practice room, soundproofing, large-equipment space or tolerance for unusually loud activity.
-            Do not assume specialized equipment, prior skill, dedicated facilities, local natural conditions, a partner or restricted access.
+            Do not assume dedicated facilities, local natural conditions, another person's participation, permissions or restricted access.
             For each activity identify its essential prerequisites, including unstated ones, and a realistic way to begin and repeat it.
             An unresolved essential prerequisite is UNKNOWN, not PASS; a known conflict is FAIL. Naming a prerequisite does not satisfy it.
             For example, observing wild birds nearby depends on an accessible setting where birds can actually be observed;
             the existence of birds in general does not establish that setting for this user. Explicitly supplied access may resolve it.
+            Binoculars can be bought, but they cannot create birds visible from an apartment window. Do not presume that environment for an at-home request.
+            Do not repair an at-home activity by requiring relocation or outdoor travel when the user's location condition excludes it.
             This is not a ban on birdwatching or all outdoor activities. Ordinary paper-and-pencil drawing can be feasible
             without the user having listed paper and pencils. Evaluate each request and activity, not a keyword blacklist.
             Do not invent additional user constraints from these eligibility checks or hide uncertainty in 'if available'.
@@ -236,6 +245,7 @@ public final class OpenAiCandidateStages implements EngineStages {
                 or unresolved obstacle. A generic 'feasible' label is not a reason. PASS requires a realistic start and repeated use
                 when a hobby is requested, without assuming unknown essential access. Ordinary supplies and routine home practice may qualify
                 under the shared eligibility rule; missing ordinary home details alone are not an unresolved essential prerequisite.
+                Assess realistically acquirable preparation separately from uncontrollable external access; lack of existing oven/tool ownership alone is not UNKNOWN.
                 Feasibility is candidate eligibility, not a new user constraint or evidence of factual availability.
                 A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.
                 The public preview contains only name and tags, not internal descriptions or requirements. Judge the actual named
