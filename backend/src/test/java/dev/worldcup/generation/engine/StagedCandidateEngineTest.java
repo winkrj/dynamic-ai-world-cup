@@ -208,6 +208,46 @@ class StagedCandidateEngineTest {
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
         assertThat(stages.repairs + stages.intentRepairs).isZero();
     }
+    @Test void neutralUnitPreservesMandatoryConditionsAndPreferencesThroughSingleRepair() {
+        var request = new GenerationInput("혼자 하는 걸 좋아하고 조용한 취미를 원해", 8, "ko-KR", "Asia/Seoul");
+        var preferences = List.of("혼자 하는 활동 선호");
+        stages.planTransform = p -> new PlanProposal(p.decision(), "반복 가능한 취미 활동", p.hobby(), p.groundingRequired(),
+                p.constraints(), p.coverage(), preferences);
+        rejectLastIntentUntilRepaired();
+        var result = engine.generate(request, context());
+        assertThat(result.candidates().plan().unit()).isEqualTo("반복 가능한 취미 활동");
+        assertThat(result.candidates().plan().hardConstraints()).containsExactly(new HardConstraint("quiet", VerificationMode.SEMANTIC_ESTIMATE));
+        assertThat(stages.allocationPlans).allSatisfy(p -> {
+            assertThat(p.unit()).isEqualTo("반복 가능한 취미 활동");
+            assertThat(p.constraints()).isEqualTo(stages.originalPlan.constraints());
+            assertThat(p.softPreferences()).isEqualTo(preferences);
+        });
+        assertThat(stages.seenPlans).allSatisfy(p -> {
+            assertThat(p.specification().softPreferences()).isEqualTo(preferences);
+            assertThat(p.gatePlan().hardConstraints()).containsExactly(new HardConstraint("quiet", VerificationMode.SEMANTIC_ESTIMATE));
+        });
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS", "ALLOCATE_REPAIRED", "GENERATE", "REVIEW_INITIAL");
+        assertThat(stages.intentRepairs).isEqualTo(1);
+        assertThat(stages.repairs).isZero();
+    }
+    @ParameterizedTest @CsvSource({"allocation,FAIL", "allocation,UNKNOWN", "final,FAIL", "final,UNKNOWN"})
+    void unitInterpretationFailureIsNeverRepairedOrRewrittenIntoPass(String phase, Verdict verdict) {
+        var request = new GenerationInput("혼자 하는 걸 좋아하고 조용한 취미를 원해", 8, "ko-KR", "Asia/Seoul");
+        stages.planTransform = p -> new PlanProposal(p.decision(), "혼자만 가능한 취미", p.hobby(), p.groundingRequired(),
+                p.constraints(), p.coverage(), List.of("혼자 하는 활동 선호"));
+        var interpretation = new InterpretationReview(verdict, List.of(new InterpretationFinding(
+                InterpretationField.UNIT, "혼자 하는 걸 좋아하고", "선호를 필수 비교 범위로 강화함")));
+        if (phase.equals("allocation")) stages.allocationFunction = p -> new AllocationReview(interpretation,
+                Verdict.PASS, Verdict.PASS, Verdict.PASS, p.intents().stream().map(ActivityIntent::id).toList(), List.of());
+        else stages.reviewFunction = (batch, count) -> new Review(interpretation, Verdict.PASS, Verdict.PASS,
+                Verdict.PASS, assessments(batch), feasibility(batch), List.of());
+        qualityFailure(() -> engine.generate(request, context()));
+        assertThat(stages.calls).doesNotContain("REPAIR", "REPAIR_INTENTS");
+        if (phase.equals("allocation")) assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE");
+        else assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
+        assertThat(stages.originalPlan.unit()).isEqualTo("혼자만 가능한 취미");
+        assertThat(stages.repairs + stages.intentRepairs).isZero();
+    }
     @ParameterizedTest @ValueSource(strings = {"allocation", "final"})
     void malformedOrContradictoryInterpretationEvidenceNeverAllowsRepair(String phase) {
         var finding = new InterpretationFinding(InterpretationField.CONSTRAINTS, "조용한", "해석 불일치");

@@ -262,6 +262,12 @@ class OpenAiResponsesClientTest {
     private void assertVerificationInstructions() {
         assertThat(request.path("instructions").asString()).contains(
                 "Every entry in constraints is mandatory", "Verification mode is NOT requirement strength",
+                "unit names what ONE option is and its comparison granularity",
+                "Preserve the requested option type and granularity; do not generalize a specific choice domain into all activities",
+                "keep restrictions in constraints and preferences in softPreferences, not concatenated into unit",
+                "Preferences must shape relevance and coverage without becoming automatic hard exclusions",
+                "'I like doing things alone' guides solo-compatible choices; 'it must be possible alone' requires a constraint",
+                "Explicit exclusions and mandatory budget, time, location or participant conditions still belong in constraints",
                 "SEMANTIC_ESTIMATE evaluates general activity fit", "FAIL or UNKNOWN assessments still block",
                 "GROUNDED_FACT requires external evidence", "Explicit or numeric wording alone does not require web evidence",
                 "never downgrade externally verifiable entity facts");
@@ -307,6 +313,12 @@ class OpenAiResponsesClientTest {
             default -> throw new AssertionError(phase);
         }
         var instructions = request.path("instructions").asString();
+        assertVerificationInstructions();
+        assertThat(instructions).containsOnlyOnce("unit names what ONE option is and its comparison granularity");
+        if (phase.equals("allocate") || phase.equals("review")) {
+            assertThat(instructions).contains("a concise unit need not repeat conditions faithfully captured in constraints",
+                    "still reject actual promotion, omission or weakening of conditions");
+        }
         assertThat(instructions).containsOnlyOnce("one coherent choice, not a menu of independent alternatives");
         assertThat(instructions).contains("this does not require putting both in the set",
                 "Examples, genres and complementary steps within one activity are allowed",

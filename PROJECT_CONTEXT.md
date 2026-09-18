@@ -27,6 +27,10 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
+TD-41/v19: unit의 뜻이 불명확했던 v18 경로를 보완해 비교 대상의 종류·수준과 기존 constraints/softPreferences를 명확히 분리한다. 공통 프롬프트/버전과 합성 회귀 검증만 변경하며 독립 해석 FAIL/UNKNOWN 차단은 유지한다. 실제 v19 평가 미실행·추가 유료 호출 미승인, DB 재사용은 제안 상태다. v18/사람 평가 실패를 소급 승인하지 않는다.
+
+v19 구현 검증 완료: 관련 123개, 독립 리뷰 Critical/High/actionable 0, 최종 verify Java 249개 실행/유료 1개 제외·프론트 50개·handoff 6개·fixture 5개·HTTP 159개/8 schemas·웹/두 jar 통과. 추가 과금 0, 누적 장부 $4.5240143 유지. 실제 후보 품질 개선과 전체 Goal 완료를 의미하지 않는다.
+
 최신 TD-39/40(2026-09-18): 실험 상한 $6과 v18 hobby-solo/32 1회 승인 후 실행 완료. 72.170초/2회 호출/$0.0728365, 사전 해석 UNIT FAIL로 `QUALITY_GATE_FAILED`, 상세 후보/preview·Repair·검색 없음. 현재 누적 장부 **$4.5240143 / $6**(사용량 추정 $4.0240143 + 이전 미확인 예약 $0.50), 잔여 $1.4759857. 자동 충전 OFF 유지, 추가 유료 재실행 승인 없음. 하모니카는 사전 검토만 승인됐으며 최종 후보 품질 검증은 이루어지지 않았다. 기존 사람 FAIL은 유지한다.
 
 익명 브라우저별 하루 2회(서울 자정, 생성+재생성+접수 후 FAILED) 정책을 확정해 서버·UI에 반영했다. 기존 idempotency/rollback, 공유 AI 0회, burst/IP/전역 비용 guard는 유지한다. 신규 DB/HTTP 12개 포함 Java 244개 실행·프론트 50개·handoff 6개·fixture 5개·HTTP 159개/8 schemas·웹/두 jar 통과, 독립 리뷰 Critical/High/actionable 0. 360/1280px·긴 대기·수동 동일 key 재시도와 자동 POST 없음도 합성 브라우저에서 확인했다. 후보 DB 우선 재사용은 TECH_DESIGN 8절의 후속 설계 제안이며 아직 구현하지 않는다. 아래 검증·비용은 각 이전 시점의 보존 기록이다.

@@ -23,6 +23,7 @@ Context/Constraint → Candidate Unit → Historical Preference → Coverage Pla
 
 - `GenerationRequest`: 원래 고민, N, locale/timezone, 해석 기준일, 서버에서 읽은 history.
 - `CandidatePlan`: 단일 비교 단위, hard/soft constraint, 동적 coverage bucket과 quota. quota 합=N. 모델이 생성 중 규칙을 완화하지 못하도록 생성 출력과 독립 보관한다.
+- TD-41 표현 경계: unit은 한 후보가 나타내는 선택 대상의 종류·비교 수준이다. 예산·장소·참여 조건과 선호를 합친 요약 문장이 아니며 기존 constraints/softPreferences에 각각 보존한다. 명시한 선택 범위를 무조건 ‘활동’으로 일반화하지 않는다. 선호에 맞는 후보를 고르는 것과 선호를 필수 제외 조건으로 강화하는 것을 구별하고 실제 해석 FAIL/UNKNOWN은 계속 차단한다.
 - `CandidateSet`: N개의 내부 candidate. id/name/unit/coverage bucket, display 태그 ≤2, grounded-claim requirement.
 - `ValidationEvidence`: 생성기와 분리된 semantic review + constraint별 assessment + 필요 출처. 후보 생성기의 `valid=true`를 그대로 믿지 않는다.
 - `CandidateQualityGate`: schema, 개수, 정규화 중복, 단위, quota, 독립 assessment, 근거 freshness, semantic review를 검사한다. 위반 code/대상 id를 반환한다.
