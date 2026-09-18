@@ -60,9 +60,16 @@ public final class EngineModels {
     public record Finding(String code, List<String> candidateIds, String detail) {
         public Finding { candidateIds = List.copyOf(candidateIds); }
     }
+    /** Independent contextual eligibility, including prerequisites not stated as user constraints. */
+    public record FeasibilityAssessment(String candidateId, Verdict verdict, String reason) {}
     public record Review(InterpretationReview interpretation, Verdict comparable, Verdict noSemanticDuplicates,
-                         Verdict candidateQuality, List<Assessment> assessments, List<Finding> findings) {
-        public Review { assessments = List.copyOf(assessments); findings = List.copyOf(findings); }
+                         Verdict candidateQuality, List<Assessment> assessments,
+                         List<FeasibilityAssessment> feasibility, List<Finding> findings) {
+        public Review {
+            assessments = List.copyOf(assessments);
+            feasibility = List.copyOf(feasibility);
+            findings = List.copyOf(findings);
+        }
     }
     public record FactCheck(String candidateId, String claimKey, Verdict verdict, String sourceUrl,
                             String excerpt, String requestApplicability) {}

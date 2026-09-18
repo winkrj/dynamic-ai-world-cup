@@ -179,6 +179,7 @@ public final class StagedCandidateEngine implements CandidateEngine {
         // Candidate repair must never hide omitted constraints or an invalid interpretation.
         requireFaithfulInterpretation(plan.input(), review.interpretation());
         Set<String> ids = batch.candidates().stream().map(Proposal::id).collect(java.util.stream.Collectors.toSet());
+        findings.addAll(feasibilityFindings(ids, review.feasibility()));
         for (var finding : review.findings()) {
             if (blank(finding.code()) || blank(finding.detail()) || !ids.containsAll(finding.candidateIds())) throw new InvalidModelOutput();
         }
@@ -197,6 +198,23 @@ public final class StagedCandidateEngine implements CandidateEngine {
             findings.add(new Finding(issue.code().name(), targets, issue.detail()));
         }
         return new Inspection(findings.isEmpty() ? checked.validated().orElse(null) : null, findings, result.version());
+    }
+
+    private List<Finding> feasibilityFindings(Set<String> candidateIds, List<FeasibilityAssessment> assessments) {
+        Set<String> assessed = new HashSet<>();
+        var findings = new ArrayList<Finding>();
+        for (var assessment : assessments) {
+            if (!candidateIds.contains(assessment.candidateId()) || !assessed.add(assessment.candidateId())
+                    || assessment.verdict() == null || blank(assessment.reason()) || assessment.reason().length() > 300) {
+                throw new InvalidModelOutput();
+            }
+            if (assessment.verdict() != Verdict.PASS) {
+                findings.add(new Finding("FEASIBILITY_UNVERIFIED", List.of(assessment.candidateId()), assessment.reason()));
+            }
+        }
+        // Aggregate quality approval cannot stand in for any candidate's missing eligibility check.
+        if (!assessed.equals(candidateIds)) throw new InvalidModelOutput();
+        return findings;
     }
 
     private List<Finding> basicFindings(FixedPlan plan, Batch batch, boolean initial) {

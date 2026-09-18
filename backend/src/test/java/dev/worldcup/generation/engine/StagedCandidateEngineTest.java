@@ -19,6 +19,7 @@ import java.util.function.Function;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class StagedCandidateEngineTest {
@@ -130,7 +131,7 @@ class StagedCandidateEngineTest {
         stages.malformedGeneration = failure.equals("malformed");
         stages.groundingRequired = failure.equals("grounding");
         if (failure.equals("semantic")) stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS,
-                Verdict.PASS, Verdict.FAIL, assessments(batch), List.of(new Finding("FILLER", List.of("c1"), "Invalid detail")));
+                Verdict.PASS, Verdict.FAIL, assessments(batch), feasibility(batch), List.of(new Finding("FILLER", List.of("c1"), "Invalid detail")));
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.intentRepairs).isEqualTo(1);
         assertThat(stages.repairs).isZero();
@@ -166,7 +167,7 @@ class StagedCandidateEngineTest {
     @Test void repairMayUseAnUnusedApprovedAlternativeWithoutChangingQuotaOrOtherCandidates() {
         stages.useAlternative = true;
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS,
-                count == 1 ? Verdict.FAIL : Verdict.PASS, assessments(batch),
+                count == 1 ? Verdict.FAIL : Verdict.PASS, assessments(batch), feasibility(batch),
                 count == 1 ? List.of(new Finding("FILLER", List.of("c1"), "Detail is unsuitable")) : List.of());
         var result = engine.generate(input(8), context());
         assertThat(result.candidates().candidates().getFirst().name()).isEqualTo("대체 활동");
@@ -180,7 +181,7 @@ class StagedCandidateEngineTest {
     }
     @Test void incompletePlanFailsWithoutRepairingAwayUserConditions() {
         stages.omitConstraints = true;
-        stages.reviewFunction = (batch, count) -> new Review(unfaithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
+        stages.reviewFunction = (batch, count) -> new Review(unfaithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), feasibility(batch), List.of());
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.originalPlan.constraints()).isEmpty();
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
@@ -191,7 +192,7 @@ class StagedCandidateEngineTest {
                 new ConstraintSpec("quiet", "조용하게 가능", "집에서 조용한", VerificationMode.SEMANTIC_ESTIMATE));
         stages.planTransform = p -> new PlanProposal(p.decision(), p.unit(), p.hobby(), p.groundingRequired(), constraints, p.coverage(), p.softPreferences());
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS,
-                batch.candidates().stream().flatMap(c -> constraints.stream().map(condition -> new Assessment(c.id(), condition.id(), Verdict.PASS))).toList(), List.of());
+                batch.candidates().stream().flatMap(c -> constraints.stream().map(condition -> new Assessment(c.id(), condition.id(), Verdict.PASS))).toList(), feasibility(batch), List.of());
         var result = engine.generate(input(8), context());
         assertThat(result.candidates().plan().hardConstraints()).containsExactly(
                 new HardConstraint("home", VerificationMode.SEMANTIC_ESTIMATE), new HardConstraint("quiet", VerificationMode.SEMANTIC_ESTIMATE));
@@ -222,7 +223,7 @@ class StagedCandidateEngineTest {
             stages.calls.clear();
             stages.allocationFunction = plan -> new AllocationReview(phase.equals("allocation") ? review : faithful(),
                     Verdict.PASS, Verdict.PASS, Verdict.PASS, plan.intents().stream().map(ActivityIntent::id).toList(), List.of());
-            stages.reviewFunction = (batch, count) -> new Review(review, Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
+            stages.reviewFunction = (batch, count) -> new Review(review, Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), feasibility(batch), List.of());
             qualityFailure(() -> engine.generate(input(8), context()));
             assertThat(stages.calls).doesNotContain("REPAIR", "REPAIR_INTENTS");
             if (phase.equals("allocation")) assertThat(stages.calls).doesNotContain("GENERATE");
@@ -232,7 +233,7 @@ class StagedCandidateEngineTest {
         var request = new GenerationInput("조용한 실내 장소, 오늘 영업 중인 곳", 8, "ko-KR", "Asia/Seoul");
         var interpretation = new InterpretationReview(Verdict.UNKNOWN, List.of(new InterpretationFinding(
                 InterpretationField.GROUNDING_REQUIRED, "오늘 영업 중인 곳", "계획에 현재 영업 확인 요구가 없음")));
-        stages.reviewFunction = (batch, count) -> new Review(interpretation, Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
+        stages.reviewFunction = (batch, count) -> new Review(interpretation, Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), feasibility(batch), List.of());
         qualityFailure(() -> engine.generate(request, context()));
         assertThat(stages.originalPlan.groundingRequired()).isFalse();
         assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
@@ -242,7 +243,7 @@ class StagedCandidateEngineTest {
         stages.reviewFunction = (batch, count) -> {
             var assessments = new ArrayList<>(assessments(batch));
             if (count == 1) assessments.set(0, new Assessment("c1", "quiet", Verdict.UNKNOWN));
-            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments, List.of());
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments, feasibility(batch), List.of());
         };
         var result = engine.generate(input(8), context());
         assertThat(stages.lastReplacementIds).containsExactly("c1");
@@ -250,9 +251,82 @@ class StagedCandidateEngineTest {
         assertThat(stages.reviewCount).isEqualTo(2);
         assertThat(result.candidates().candidates().getFirst().name()).contains("수정");
     }
+    @ParameterizedTest
+    @CsvSource({"8, UNKNOWN, false", "8, FAIL, false", "16, UNKNOWN, false", "16, FAIL, false", "32, UNKNOWN, false", "32, FAIL, false",
+            "8, UNKNOWN, true", "8, FAIL, true", "16, UNKNOWN, true", "16, FAIL, true", "32, UNKNOWN, true", "32, FAIL, true"})
+    void candidateFeasibilityRequiresTargetedRepairDespiteAllAggregatePasses(int size, Verdict verdict, boolean noConstraints) {
+        stages.omitConstraints = noConstraints;
+        stages.useAlternative = true;
+        stages.reviewFunction = (batch, count) -> {
+            var evidence = new ArrayList<>(feasibility(batch));
+            if (count == 1) evidence.set(size - 1, new FeasibilityAssessment("c" + size, verdict, "필수 관찰 환경에 접근할 수 있는지 확인되지 않음"));
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS,
+                    noConstraints ? List.of() : assessments(batch), evidence, List.of());
+        };
+
+        var result = engine.generate(input(size), context());
+
+        assertThat(result.candidates().candidates()).hasSize(size);
+        assertThat(result.candidates().candidates().getLast().name()).isEqualTo("대체 활동");
+        assertThat(result.candidates().candidates().subList(0, size - 1).stream().map(Candidate::name))
+                .containsExactlyElementsOf(IntStream.range(1, size).mapToObj(i -> "합성 취미 " + i).toList());
+        assertThat(stages.lastReplacementIds).containsExactly("c" + size);
+        assertThat(stages.lastFindings).containsExactly(new Finding("FEASIBILITY_UNVERIFIED", List.of("c" + size), "필수 관찰 환경에 접근할 수 있는지 확인되지 않음"));
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL", "REPAIR", "REVIEW_REPAIRED");
+        assertThat(stages.repairs).isEqualTo(1);
+        assertThat(stages.reviewCount).isEqualTo(2);
+    }
+    @ParameterizedTest @ValueSource(strings = {"UNKNOWN", "FAIL"})
+    void feasibilityFailureAfterRepairNeverExposesTheSetOrRepairsAgain(Verdict verdict) {
+        stages.reviewFunction = (batch, count) -> {
+            var evidence = new ArrayList<>(feasibility(batch));
+            evidence.set(0, new FeasibilityAssessment("c1", verdict, "필수 접근 조건이 여전히 충족되지 않음"));
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), evidence, List.of());
+        };
+        qualityFailure(() -> engine.generate(input(32), context()));
+        assertThat(stages.lastReplacementIds).containsExactly("c1");
+        assertThat(stages.repairs).isEqualTo(1);
+        assertThat(stages.reviewCount).isEqualTo(2);
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL", "REPAIR", "REVIEW_REPAIRED");
+    }
+    @ParameterizedTest @ValueSource(strings = {"empty", "missing", "duplicate", "extra", "unknown-id", "null-id", "blank-reason", "null-reason", "long-reason", "null-verdict"})
+    void malformedFeasibilityEvidenceIsTerminalWithoutRepair(String mode) {
+        stages.reviewFunction = (batch, count) -> {
+            var evidence = new ArrayList<>(feasibility(batch));
+            switch (mode) {
+                case "empty" -> evidence.clear();
+                case "missing" -> evidence.removeLast();
+                case "duplicate" -> evidence.set(7, evidence.getFirst());
+                case "extra" -> evidence.add(new FeasibilityAssessment("c9", Verdict.PASS, "불필요한 평가"));
+                case "unknown-id" -> evidence.set(7, new FeasibilityAssessment("invented", Verdict.PASS, "잘못된 식별자"));
+                case "null-id" -> evidence.set(7, new FeasibilityAssessment(null, Verdict.PASS, "식별자 누락"));
+                case "blank-reason" -> evidence.set(7, new FeasibilityAssessment("c8", Verdict.PASS, " \n\t"));
+                case "null-reason" -> evidence.set(7, new FeasibilityAssessment("c8", Verdict.PASS, null));
+                case "long-reason" -> evidence.set(7, new FeasibilityAssessment("c8", Verdict.PASS, "가".repeat(301)));
+                case "null-verdict" -> evidence.set(7, new FeasibilityAssessment("c8", null, "판정 누락"));
+                default -> throw new AssertionError(mode);
+            }
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), evidence, List.of());
+        };
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.repairs + stages.intentRepairs).isZero();
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "GENERATE", "REVIEW_INITIAL");
+    }
+    @Test void priorIntentRepairLeavesNoBudgetForAnUnverifiedEssentialPrerequisite() {
+        rejectLastIntentUntilRepaired();
+        stages.reviewFunction = (batch, count) -> {
+            var evidence = new ArrayList<>(feasibility(batch));
+            evidence.set(0, new FeasibilityAssessment("c1", Verdict.UNKNOWN, "필수 환경 접근 가능 여부가 알려지지 않음"));
+            return new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), evidence, List.of());
+        };
+        qualityFailure(() -> engine.generate(input(8), context()));
+        assertThat(stages.intentRepairs).isEqualTo(1);
+        assertThat(stages.repairs).isZero();
+        assertThat(stages.calls).containsExactly("PLAN", "ALLOCATE", "REPAIR_INTENTS", "ALLOCATE_REPAIRED", "GENERATE", "REVIEW_INITIAL");
+    }
     @Test void semanticDuplicateRepairChangesOnlyIdentifiedCandidate() {
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS,
-                count == 1 ? Verdict.FAIL : Verdict.PASS, Verdict.PASS, assessments(batch),
+                count == 1 ? Verdict.FAIL : Verdict.PASS, Verdict.PASS, assessments(batch), feasibility(batch),
                 count == 1 ? List.of(new Finding("DUPLICATE_ACTIVITY", List.of("c2"), "Same core activity")) : List.of());
         engine.generate(input(8), context());
         assertThat(stages.lastReplacementIds).containsExactly("c2");
@@ -260,7 +334,7 @@ class StagedCandidateEngineTest {
     }
     @Test void qualityFailureAfterOneRepairNeverLoopsOrShrinksSize() {
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.FAIL,
-                assessments(batch), List.of(new Finding("FILLER", List.of("c1"), "Forced filler")));
+                assessments(batch), feasibility(batch), List.of(new Finding("FILLER", List.of("c1"), "Forced filler")));
         qualityFailure(() -> engine.generate(input(32), context()));
         assertThat(stages.repairs).isEqualTo(1);
         assertThat(stages.seenPlans).allMatch(p -> p.input().size() == 32);
@@ -269,7 +343,7 @@ class StagedCandidateEngineTest {
     @Test void repairCannotModifyAnUnflaggedCandidate() {
         stages.modifyUnflagged = true;
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.FAIL,
-                assessments(batch), List.of(new Finding("FILLER", List.of("c1"), "Forced filler")));
+                assessments(batch), feasibility(batch), List.of(new Finding("FILLER", List.of("c1"), "Forced filler")));
         qualityFailure(() -> engine.generate(input(8), context()));
         assertThat(stages.reviewCount).isEqualTo(1);
     }
@@ -303,6 +377,9 @@ class StagedCandidateEngineTest {
         assertThat(stages.calls).isEmpty();
     }
     private List<Assessment> assessments(Batch batch) { return batch.candidates().stream().map(c -> new Assessment(c.id(), "quiet", Verdict.PASS)).toList(); }
+    private List<FeasibilityAssessment> feasibility(Batch batch) {
+        return batch.candidates().stream().map(c -> new FeasibilityAssessment(c.id(), Verdict.PASS, "일반 준비물로 반복할 수 있는 합성 활동")).toList();
+    }
     private AllocationReview allocation(PlanProposal plan, List<String> ids) {
         return new AllocationReview(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, ids,
                 plan.intents().stream().filter(i -> !ids.contains(i.id())).map(i -> new IntentRejection(i.id(), "합성 부적합 활동")).toList());
@@ -320,11 +397,11 @@ class StagedCandidateEngineTest {
         boolean modifyUnflagged, malformedGeneration, groundingRequired, slowGeneration, slowAllocation, readingVariants, changeCore, useAlternative, omitConstraints, semanticIntentIds;
         PlanProposal originalPlan;
         String patchMode = "valid";
-        String source = "조용한"; List<String> lastReplacementIds;
+        String source = "조용한"; List<String> lastReplacementIds; List<Finding> lastFindings;
         VerificationMode constraintMode = VerificationMode.SEMANTIC_ESTIMATE;
         Function<PlanProposal, PlanProposal> planTransform = Function.identity();
         Function<PlanProposal, AllocationReview> allocationFunction = plan -> allocation(plan, plan.intents().stream().map(ActivityIntent::id).toList());
-        BiFunction<Batch, Integer, Review> reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), List.of());
+        BiFunction<Batch, Integer, Review> reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.PASS, assessments(batch), feasibility(batch), List.of());
         @Override public StageResult<PlanProposal> plan(GenerationInput input, List<CandidateEngine.Preference> history, Instant time, CallContext call) {
             var intents = IntStream.rangeClosed(1, input.size() + intentCountOffset)
                     .mapToObj(i -> new IntentSpec((semanticIntentIds ? "original_activity_" : "i") + i, "핵심 활동 " + i, "합성 적합성 설명")).toList();
@@ -365,7 +442,7 @@ class StagedCandidateEngineTest {
             calls.add(call.stage()); seenPlans.add(plan); return new StageResult<>(reviewFunction.apply(batch, ++reviewCount), "independent-fake-review");
         }
         @Override public StageResult<Batch> repair(FixedPlan plan, Batch original, List<String> ids, List<Finding> findings, CallContext call) {
-            calls.add(call.stage()); seenPlans.add(plan); repairs++; lastReplacementIds = ids;
+            calls.add(call.stage()); seenPlans.add(plan); repairs++; lastReplacementIds = ids; lastFindings = findings;
             var sourceBatch = original.candidates().isEmpty() ? batch(plan) : original;
             return new StageResult<>(new Batch(sourceBatch.candidates().stream().map(c -> {
                 if (useAlternative && ids.contains(c.id())) {

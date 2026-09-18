@@ -47,7 +47,18 @@ public final class OpenAiCandidateStages implements EngineStages {
             Do not disguise an unsuitable activity as reading about it, keeping a log, or doing a tiny silent fragment of it.
             Reading or record-keeping CAN be a genuine hobby; assess its core appeal in this set, not a global blacklist.
             Similar domains can still contain distinct activities. Judge the actual choice experience, not only tags.
-            Do not assume equipment, prior skill, space or budget that the user never supplied. State prerequisites briefly.
+            Distinguish ordinary obtainable supplies from essential user-dependent access.
+            Low-cost ordinary materials or generally accessible resources can be feasible without proof of existing ownership,
+            when acquisition and recurring use fit the actual budget, time and other conditions. Do not invent exact prices.
+            Do not assume special equipment, prior skill, suitable space, local natural conditions, a partner or restricted access.
+            For each activity identify its essential prerequisites, including unstated ones, and a realistic way to begin and repeat it.
+            An unresolved essential prerequisite is UNKNOWN, not PASS; a known conflict is FAIL. Naming a prerequisite does not satisfy it.
+            For example, observing wild birds nearby depends on an accessible setting where birds can actually be observed;
+            the existence of birds in general does not establish that setting for this user. Explicitly supplied access may resolve it.
+            This is not a ban on birdwatching or all outdoor activities. Ordinary paper-and-pencil drawing can be feasible
+            without the user having listed paper and pencils. Evaluate each request and activity, not a keyword blacklist.
+            Do not invent additional user constraints from these eligibility checks or hide uncertainty in 'if available'.
+            User-dependent access cannot be established by a generic web result. Specific entity facts still require grounding.
             Preparation, waiting and cleanup count toward a requested time limit. A conditional escape clause is not proof.
             For general activities vs specific venues/products, keep units separate. No invented brands, images or facts.
             """;
@@ -131,6 +142,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 The server derives coverage quotas from the first N, so rejecting a domain does not leave a mandatory empty slot.
                 comparable/noSemanticDuplicates/feasible judge the APPROVED pool, not the rejected intents. If fewer than N qualify,
                 return that shorter list; never copy rejected IDs to fill it. Unknown contextual fit is not feasible.
+                Reject individual intents with unresolved essential prerequisites, naming the missing access or condition.
+                A rejected intent does not make the remaining approved pool infeasible. Judge that pool on its own merits.
                 Partition every proposed intent exactly once: either approvedIntentIds or rejections.
                 For each rejected intent give one concise actionable reason (violated condition, overlap with a named retained ID,
                 or specific quality problem). Do not hide an unassessed intent by omitting it from both lists.
@@ -204,6 +217,15 @@ public final class OpenAiCandidateStages implements EngineStages {
         var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + FACT_SCOPE + """
                 INDEPENDENT REVIEW. You have no generator conversation or generator score. Judge the actual full set, not labels.
                 For every candidate x hard constraint return exactly one PASS/FAIL/UNKNOWN assessment; missing facts are UNKNOWN.
+                Separately return exactly one feasibility assessment for EVERY candidate, even when there are no hard constraints.
+                Independently inspect the core activity, description, repeatability and requirements against the original request.
+                Give its candidateId, PASS/FAIL/UNKNOWN verdict and a brief reason naming the essential prerequisite and its basis
+                or unresolved obstacle. A generic 'feasible' label is not a reason. PASS requires a realistic start and repeated use
+                when a hobby is requested, without assuming unknown essential access. Ordinary obtainable supplies may qualify.
+                Feasibility is candidate eligibility, not a new user constraint or evidence of factual availability.
+                A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.
+                The public preview contains only name and tags, not internal descriptions or requirements. Judge the actual named
+                choice; do not rescue an unsuitable choice with an invisible conditional workaround or a different activity.
                 Do not treat the candidate's requirements field or conditional wording as independent evidence of compliance.
                 For GROUNDED_FACT use only supplied factual assessments; their PASS labels are not proof.
                 Independently compare each excerpt with the complete condition and return UNKNOWN when support is insufficient.

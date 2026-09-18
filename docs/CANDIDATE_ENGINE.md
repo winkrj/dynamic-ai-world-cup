@@ -1,8 +1,30 @@
 # Candidate Engine — CE-002 구현 설계
 
-2026-09-16 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 완료 증거는 마지막에 기록한다.
+2026-09-18 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 실제 검증 범위는 버전별로 구별한다.
 
-## 현재 구현: 조건을 먼저 쓰는 계획 응답
+## v17 구현: 후보별 필수 전제와 실행 가능성
+
+사용자가 수정 보류를 해제했다. `ce002-v17-context-feasibility`는 기존 최종 독립 검토 호출에 `feasibility[{candidateId, verdict, reason}]`를 추가한다. 기존 `requirements`는 생성기의 설명일 뿐, 사용자에게 그 환경이 있다는 근거가 아니었다. 명시 constraint가 없는 요청에서도 정확히 N개의 고유 후보 판정과 비어 있지 않은 이유를 요구한다. 누락·중복·잘못된 ID/판정/이유는 실패 종료한다. 유효한 FAIL/UNKNOWN은 해당 후보의 `FEASIBILITY_UNVERIFIED` finding이 되어 기존 Repair 경로로 간다. 전체 품질 PASS나 조건 PASS로 이를 덮을 수 없다.
+
+일반적으로 구입·준비 가능한 재료와 사용자 의존 필수 접근 전제를 구별한다. 전자는 실제 예산·준비/정리 시간·반복 사용 조건을 충족하면 소유 여부가 미기재여도 가능할 수 있다. 특정 환경·장비·동반자·접근권을 가정해야 하는 후보는 주어진 맥락으로 확인되지 않으면 UNKNOWN이다. 새 관찰 자체를 금지하지 않으며 후보 이름 기반 분류기는 없다. 사용자 개인 환경은 일반 검색 결과만으로 확인할 수 없고, 특정 시설/가격 사실에는 기존 grounding이 별도로 필요하다.
+
+사전 배정에서도 같은 기준으로 해당 intent를 탈락시키되 남은 승인 pool을 독립 평가한다. 상세 Repair는 승인된 의도·quota·N을 유지한다. 환경 문제를 같은 활동에 ‘가능하면’이라고 덧붙여 숨기지 않으며, 승인된 대안이 없거나 사전 Repair를 이미 사용했다면 실패 종료한다. Repair는 사전/상세 **합계 최대 1회**다.
+
+추가 호출·새 모델·DB/public DTO·프론트 변경 없음. 내부 출력 토큰은 늘 수 있으며 실제 비용/latency/판정 정확도 영향은 미측정이다. 이름·태그만 보이는 preview의 정보 충분성을 이 내부 판정만으로 해결했다고 주장하지 않는다. 이전 사람 검토의 비교 단위/실행 가능성 FAIL은 유지하고, 5축 참고 점수로 품질 승인하지 않는다. 이는 [OpenAI 평가 원칙](https://developers.openai.com/api/docs/guides/evaluation-best-practices)의 실제 사례별 평가와 사람 판단 대조를 적용한 코드 보완이지, 실사용 평가의 대체가 아니다.
+
+다음 실제 평가에서 사용할 대조 기준(아래는 기대값이며 아직 실행 결과가 아님):
+
+| 후보 / 맥락 | 기대 판정 | 구별할 근거 |
+| --- | --- | --- |
+| 주변 새 관찰 / 관찰 가능한 환경 정보 없음 | UNKNOWN | 새가 일반적으로 존재하는 것과 사용자 접근 가능한 관찰 환경은 다름 |
+| 같은 활동 / 사용자가 매일 새를 볼 수 있는 접근 가능한 정원을 명시 | 다른 조건도 맞으면 PASS 가능 | 이름 블랙리스트나 일괄 야외 배제 금지 |
+| 연필 드로잉 / 월 10만원, 종이·연필 소유 미기재 | 다른 조건도 맞으면 PASS 가능 | 일반 저비용 준비물을 특수 접근권처럼 취급하지 않음 |
+| 천체 촬영 / 망원경·촬영 장비·관찰 환경 미확인 | UNKNOWN | 필수 장비/환경 가정, 조건부 설명으로 구제 금지 |
+| 특정 시설 체험 / 출처가 접근성·현재 제공 여부를 입증하지 않음 | grounding UNKNOWN 유지 | feasibility PASS로 외부 사실 검사를 우회하지 않음 |
+
+v17 검증(2026-09-18): 관련 엔진/client 테스트 **116/116 통과**, 독립 리뷰 1회 **Critical 0 / High 0 / actionable 0**. 이후 코드 변경 없이 `./scripts/verify.sh` 통과: Java **230개 실행 / 실패·오류 0 / 유료 1개 제외**, 프론트 48개, handoff 6개, fixture 5개, 실제 HTTP 응답 159개/8 schemas, 웹 build·bootJar·appJar. 8/16/32·명시 조건 없는 경우, 판정 누락/중복/잘못된 값, 표적 Repair/재검토 실패, 사전 Repair 뒤 추가 Repair 금지를 합성 대역으로 확인했다. 공개 계약·프론트·DB 변경 없음. v17 실제 provider 호출은 아직 없으며 추가 과금 0. 기존 비용/seed/사람 평가 현황은 아래 v16 체크포인트를 그대로 유지한다.
+
+## v16 구현: 조건을 먼저 쓰는 계획 응답
 
 v15 실제 요청에서 PLAN의 속성 순서가 실행마다 달랐고, solo/32는 unit→coverage→…→constraints 순서로 후보를 먼저 생성했다. 서버의 `Map.of`로 만든 속성 목록이 원인이며 응답도 같은 순서를 따랐다. [Structured Outputs의 속성 순서 규칙](https://developers.openai.com/api/docs/guides/structured-outputs#key-ordering)에 맞춰 v16(`ce002-v16-context-first`)은 PLAN 최상위 속성을 constraints→softPreferences→unit→hobby→groundingRequired→decision→coverage로 고정한다. 문장별 임시 분류 규칙이나 별도 모델 호출을 추가하지 않고 기존 Context/Constraint→Unit→Coverage 설계를 출력 구조에 반영한다.
 

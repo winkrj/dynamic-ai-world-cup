@@ -297,7 +297,7 @@ class OpenAiResponsesClientTest {
             }
             case "review" -> {
                 response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS,
-                        Verdict.PASS, List.of(), List.of())));
+                        Verdict.PASS, List.of(), feasibility(8), List.of())));
                 stages.review(fixed, batch, Grounding.empty(), call);
             }
             case "repair" -> {
@@ -311,6 +311,13 @@ class OpenAiResponsesClientTest {
         assertThat(instructions).contains("this does not require putting both in the set",
                 "Examples, genres and complementary steps within one activity are allowed",
                 "punctuation alone is not a defect", "Do not split those examples or steps into extra candidates");
+        assertThat(instructions).containsOnlyOnce("Distinguish ordinary obtainable supplies from essential user-dependent access.");
+        assertThat(instructions).contains("An unresolved essential prerequisite is UNKNOWN, not PASS",
+                "This is not a ban on birdwatching or all outdoor activities.", "Do not invent additional user constraints");
+        if (phase.equals("review")) assertThat(instructions).contains(
+                "Separately return exactly one feasibility assessment for EVERY candidate, even when there are no hard constraints.",
+                "A feasibility FAIL/UNKNOWN blocks that candidate even if candidateQuality or every hard assessment is PASS.",
+                "The public preview contains only name and tags");
         assertThat(calls).hasValue(1);
         assertThat(request.path("tools").size()).isZero();
     }
@@ -325,6 +332,65 @@ class OpenAiResponsesClientTest {
         var fields = json.valueToTree(AiSchemas.batch(fixed)).path("properties").path("candidates").path("items").path("properties");
         assertThat(fields.path("intentId").path("enum").toString()).isEqualTo("[\"approved-intent\"]");
         assertThat(fields.path("bucketId").path("enum").toString()).isEqualTo("[\"active-bucket\"]");
+    }
+    @ParameterizedTest @ValueSource(ints = {8, 16, 32})
+    void reviewSchemaRequiresExactCandidateFeasibilityEvenWithoutHardConstraints(int size) {
+        var schema = json.valueToTree(AiSchemas.review(size, 0));
+        assertThat(schema.path("required")).isEqualTo(json.valueToTree(List.of(
+                "assessments", "candidateQuality", "comparable", "feasibility", "findings", "interpretation", "noSemanticDuplicates")));
+        var evidence = schema.path("properties").path("feasibility");
+        assertThat(evidence.path("type").asString()).isEqualTo("array");
+        assertThat(evidence.path("minItems").asInt()).isEqualTo(size);
+        assertThat(evidence.path("maxItems").asInt()).isEqualTo(size);
+        assertThat(evidence.path("items").path("required")).isEqualTo(json.valueToTree(List.of("candidateId", "reason", "verdict")));
+        assertThat(evidence.path("items").path("additionalProperties").asBoolean()).isFalse();
+        var fields = evidence.path("items").path("properties");
+        assertThat(fields.path("candidateId").path("enum")).isEqualTo(json.valueToTree(
+                java.util.stream.IntStream.rangeClosed(1, size).mapToObj(i -> "c" + i).toList()));
+        assertThat(fields.path("verdict").path("enum")).isEqualTo(json.valueToTree(List.of("PASS", "FAIL", "UNKNOWN")));
+        assertThat(fields.path("reason").path("type").asString()).isEqualTo("string");
+        assertThat(fields.path("reason").path("maxLength").asInt()).isEqualTo(300);
+        assertThat(schema.path("properties").path("assessments").path("maxItems").asInt()).isZero();
+    }
+    @ParameterizedTest @ValueSource(strings = {"missing", "null", "null-item", "missing-id", "null-id", "missing-verdict", "null-verdict", "missing-reason", "null-reason"})
+    void reviewCannotOmitOrNullCandidateFeasibilityAtProviderBoundary(String mode) {
+        var evidence = new LinkedHashMap<String, Object>();
+        evidence.put("candidateId", "c1"); evidence.put("verdict", "PASS"); evidence.put("reason", "일반 준비물로 실행 가능");
+        var output = new LinkedHashMap<String, Object>();
+        output.put("interpretation", new InterpretationReview(Verdict.PASS, List.of()));
+        output.put("comparable", "PASS"); output.put("noSemanticDuplicates", "PASS"); output.put("candidateQuality", "PASS");
+        output.put("assessments", List.of()); output.put("findings", List.of()); output.put("feasibility", List.of(evidence));
+        switch (mode) {
+            case "missing" -> output.remove("feasibility");
+            case "null" -> output.put("feasibility", null);
+            case "null-item" -> output.put("feasibility", Collections.singletonList(null));
+            case "missing-id" -> evidence.remove("candidateId");
+            case "null-id" -> evidence.put("candidateId", null);
+            case "missing-verdict" -> evidence.remove("verdict");
+            case "null-verdict" -> evidence.put("verdict", null);
+            case "missing-reason" -> evidence.remove("reason");
+            case "null-reason" -> evidence.put("reason", null);
+            default -> throw new AssertionError(mode);
+        }
+        response = completed(json.writeValueAsString(output));
+        assertThatThrownBy(() -> client.complete("gpt-5.6-terra", "trusted instructions", Map.of("request", "취미"),
+                AiSchemas.review(8, 0), Review.class, false, new CallContext("job", 1, "REVIEW_INITIAL", Instant.now().plusSeconds(10))))
+                .isInstanceOf(InvalidModelOutput.class);
+        assertThat(calls).hasValue(1);
+        assertThat(ledger.completed).isEqualTo(1);
+        assertThat(ledger.failed).isZero();
+    }
+    @Test void independentFeasibilityEvidenceDoesNotChangeThePublicCandidateShape() {
+        var internal = new Review(new InterpretationReview(Verdict.PASS, List.of()), Verdict.PASS, Verdict.PASS,
+                Verdict.PASS, List.of(), feasibility(8), List.of());
+        assertThat(json.valueToTree(internal).has("feasibility")).isTrue();
+        var display = json.valueToTree(new dev.worldcup.candidate.DisplayCandidate("c1", "합성 취미", List.of("합성"), null));
+        assertThat(display.propertyNames()).containsExactlyInAnyOrder("id", "name", "tags", "imageUrl");
+        assertThat(display.has("feasibility")).isFalse();
+    }
+    private List<FeasibilityAssessment> feasibility(int size) {
+        return java.util.stream.IntStream.rangeClosed(1, size)
+                .mapToObj(i -> new FeasibilityAssessment("c" + i, Verdict.PASS, "일반 준비물로 반복할 수 있는 합성 활동")).toList();
     }
     @Test void intentRepairRequestOnlyExposesRejectedIdsAndExistingGroupsAsWritableFields() {
         var plan = new PlanProposal(Decision.READY, "취미", true, false, List.of(),
@@ -363,7 +429,7 @@ class OpenAiResponsesClientTest {
                     .value().interpretation()).isEqualTo(interpretation);
         } else {
             response = completed(json.writeValueAsString(new Review(interpretation, Verdict.PASS, Verdict.PASS, Verdict.FAIL,
-                    List.of(), List.of(new Finding("FILLER", List.of("c1"), "별도의 후보 문제")))));
+                    List.of(), feasibility(8), List.of(new Finding("FILLER", List.of("c1"), "별도의 후보 문제")))));
             var fixed = new FixedPlan(input, Instant.now(), plan, new Plan(8, "취미", false, List.of(),
                     List.of(new CoverageBucket("group", 8))), plan.intents());
             var reviewed = stages.review(fixed, new Batch(List.of()), Grounding.empty(),

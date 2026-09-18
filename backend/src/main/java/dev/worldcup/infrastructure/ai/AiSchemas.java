@@ -47,6 +47,7 @@ final class AiSchemas {
         return object(Map.of("interpretation", interpretation(), "comparable", verdict(), "noSemanticDuplicates", verdict(),
                 "candidateQuality", verdict(),
                 "assessments", array(object(Map.of("candidateId", candidateId(size), "constraintId", identifier(), "verdict", verdict())), 0, size * constraints),
+                "feasibility", array(object(Map.of("candidateId", candidateId(size), "verdict", verdict(), "reason", string(300))), size, size),
                 "findings", array(object(Map.of("code", string(60), "candidateIds", array(candidateId(size), 0, size), "detail", string(300))), 0, 64)));
     }
     static Map<String, Object> facts(int size, List<String> claimIds) {
