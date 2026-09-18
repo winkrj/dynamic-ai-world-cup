@@ -26,6 +26,8 @@ API token/개인 원문은 저장하지 않는다. 실제 결과는 `reports/loc
 
 ## 실행 현황과 구분
 
+2026-09-18 v17 `hobby-solo/32` 후속 비교: 만료 키로 종료한 시도 뒤 별도 승인된 재시도 1회를 마쳤다. 인증 복구/6회 HTTP 200/32개 상세 후보 생성은 확인했으나 최종 하모니카 연습 환경 UNKNOWN으로 `QUALITY_GATE_FAILED`, preview 없음이다. 사전 Repair 1회, 검색 0회, 180.132초/$0.218444. 내부 64개 조건 PASS와 feasibility PASS 31/UNKNOWN 1을 구별하며 사람 품질 통과로 세지 않는다. 새 seed 첫 실행이 아니므로 아래 11/18 및 최초 결과는 바꾸지 않는다. 최신 누적 장부와 잔여 한도는 `docs/CANDIDATE_ENGINE.md` TD-37 결과를 따른다. 추가 승인도 사용 완료해 새 승인 전 유료 재시도하지 않는다.
+
 2026-09-16: `seed-v1` 고유 **11/18세트**를 처음 실행했다. 첫 결과는 READY 5세트(home/8, social/32, solo/8·16·32), `QUALITY_GATE_FAILED` 6세트(social/8·16, home/16·32, seoul-indoor/8, seoul-parent/8)다. 일반 취미 9세트의 최초 실행을 마쳤고 외부 사실이 필요한 7세트는 미실행이다. 후속 비교는 첫 결과를 덮어쓰지 않는다. v15 solo/32는 사전 Repair 후 preview까지 연결됐지만 퍼즐·그림·독서 분할과 비운동 제외 조건의 soft 분류를 자동 검토가 통과시켜 사람 기준을 충족했다고 보지 않는다. home/32는 시간 조건 해석과 포괄적인 강좌 후보 문제로 차단됐다. 이전 Terra/Luna 생성-only 4회와 별도 `hobby-calibration`은 seed 완료로 세지 않는다. 버전별 실행·비용·검색 예약 제약은 `docs/CANDIDATE_ENGINE.md`에 통합 기록한다. 2명 독립 사람 평가는 미완료다.
 
 유료 harness는 `CANDIDATE_LIVE_CASE`로 이 파일의 사례 ID를 선택하며 질문 원문을 변경하지 않는다. 기본 `hobby-calibration`은 datasetVersion `calibration-2026-09-15`로 별도 표시한다. `CANDIDATE_LIVE_SIZE=8|16|32`; 일반 검증에서는 `CANDIDATE_LIVE_TEST=false`로 실제 과금을 막는다. 정확한 실행 환경·키/예산 주입·누적 비용 대조는 `docs/CANDIDATE_ENGINE.md`를 따른다.
