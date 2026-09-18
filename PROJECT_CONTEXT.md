@@ -11,7 +11,7 @@
 - `contracts/openapi.json` v1.0.0, 공유 fixture, 자동생성 TS, Java preview 직렬화 비교 테스트.
 - CE-001 구현: fixed plan, candidate count/duplicate/unit/coverage, hard assessment, grounded evidence validity, independent semantic-review gate. 검증 통과 타입만 preview mapper에 넘긴다.
 - 실제 HTTP 구현: health, 익명 생성 job/preview/전체 재생성, freeze/snapshot, 선택 batch, 공유/새 세션 API. cookie 소유권, idempotency, rate limit, worker lease/복구, 보존 정리 포함.
-- 프론트는 개발 상태와 고정 fixture를 보여주는 초기 shell이다. 게임/공유 화면과 배포는 미구현이다.
+- 프론트는 `feat/product/split-deck-flow`에서 시안 4/A 상하 카드 기반 입력·preview·게임·Champion·공유와 실제 API 연결을 구현했다. 로컬 합성 서버로 전체 흐름을 검증했으며 후보 품질 승인·클라우드 배포는 별도다.
 - `CandidateEngine` port 뒤에 CE-002의 OpenAI plan/생성/선택적 hosted search/독립 검토/Repair 최대 1회를 연결했다. `live`는 명시적 키/누적 예산이 필요하며 dev 혼용은 금지한다. dev 합성 후보는 개발용 표시, 기본 profile은 계속 실패 처리한다. 구현과 실제 검증 범위는 `docs/CANDIDATE_ENGINE.md`를 따른다.
 - 직접 선택 history 최대 50건 중 관련 있는 선택만 계획에 반영하도록 했다. 이 호출 경계 구현과 실제 개인화 가중치 품질(CE-003)은 구별한다.
 
@@ -27,7 +27,9 @@ GitHub: https://github.com/winkrj/dynamic-ai-world-cup (public, winkrj). 2026-09
 
 ## 다음 작업
 
-현재 우선순위는 **시안 4 기반 제품 통합**이다. 사용자가 대결 A(상하 카드)를 선택했다. [제품 통합 Spec](docs/INTEGRATION_SPEC.md)에 기획·화면·공개 API·실제 코드 차이와 A/B 소유 경계를 묶었다. 후보 엔진의 추가 수정/유료 실험은 보류하고 통합용 현재 버전을 사용하되 운영 품질 승인을 의미하지 않는다. `feat/server/design-integration`에서 B는 동일 origin app jar와 공유 deep-link 진입을 구현한다. A의 실제 화면·전체 완주는 별도이며, GitHub 프론트 브랜치는 아직 초기 shell이다. 아래는 보존된 엔진 체크포인트다.
+2026-09-18 제품 통합 검증: 프론트 48개, Java 192개 실행(유료 1개 제외), handoff 6개, fixture 5개·HTTP 159개/8 schemas, 웹/기본 jar/app jar 통과. 브라우저에서 360px 8/16/32의 7/15/31개 선택 저장 및 같은 snapshot·새 세션 공유 replay를 검증했다. 실패 후 새로고침 복구·느린 이미지 2초 fallback·긴 이름·360/1280·키보드 선택도 별도 합성 응답으로 통과했다. 독립 리뷰 최초 High 1/Medium 1을 수정하고 재리뷰 Critical/High/actionable 0. 추가 유료 호출 0. 상세/잔여 한계는 `docs/INTEGRATION_SPEC.md` 10절이다.
+
+현재 우선순위는 **시안 4 기반 제품 통합**이다. 사용자가 A(상하 카드)를 선택하고 프론트도 직접 맡기로 하여 인계 대기를 해제했다. `feat/product/split-deck-flow`에서 프론트·백엔드·PM·디자인 관점으로 병렬 구현하며 경계/이견 처리 규칙은 AGENTS에 명시한다. [제품 통합 Spec](docs/INTEGRATION_SPEC.md)의 제품·화면·API 기준을 따르고, 이미 구현된 동일 origin app jar/공유 진입 위에 실제 화면·게임·저장·복원을 연결한다. 후보 엔진의 추가 수정/유료 실험은 보류하며 운영 품질 승인을 의미하지 않는다. 아래는 보존된 엔진 체크포인트다.
 
 2026-09-16 최신 CE-002/v16: 실행마다 PLAN schema 속성 순서가 달라 후보를 조건보다 먼저 쓰던 구조적 불일치를 고쳤다. 조건·선호→비교 단위/성격·grounding→결정→coverage 순서를 고정한다. 새 필드·모델 호출 없이 기존 Context/Constraint→Unit→Coverage 설계를 반영한다. v15의 단일 선택 기준, 조건별 근거/독립 검토, 사전·상세 Repair **합계 최대 1회**, 시간/비용 한도와 공개 API는 그대로다.
 
@@ -41,8 +43,8 @@ v15의 미실행 일반 취미 3세트를 각각 한 번 확인했다. **solo/8 
 
 v16 최종 `verify`: Java **171개 실행/실패·오류 0(유료 1개 제외)**, handoff 6개, fixture 5개, 실제 HTTP 102개/8개 schema, 웹 build/bootJar 통과. 집중 테스트 120개 후 독립 리뷰 1회 Critical/High/actionable 0, 이후 코드 변경 없이 전체 검증했다. 별도 live HTTP 69개도 schema 적합(실패 응답 포함). 누적 실험 추정 **$3.7327338 / 승인 $5**, 제공자 124회, 미확인 비용 예약 없음, 자동 충전 OFF 유지. seed **11/18세트**의 첫 실행 READY 5/FAILED 6은 그대로이며 일반 취미 9세트는 모두 최초 실행했고 외부 사실 7세트와 2명 사람 평가는 남아 있다. **잔여 $1.2672662 < 검색 예약 $2.00**여서 추가 유료 검색은 보류한다. 한도/예약을 임의로 완화하지 않으며 배포·프론트 완주 완료를 뜻하지 않는다.
 
-- A: [프론트 시작 안내](docs/FRONTEND_HANDOFF.md)와 [FE-001 상세 티켓](docs/tickets/FE-001.md)에서 입력·강수·미리보기를 시작한다. PR #1 미병합 시점에는 `feat/server/backend-api`를 내려받고 새 `feat/play/fe-001-integration` 브랜치를 만든다. 이전 `feat/play/fe-001-preview`는 초기 기반이라 최신 서버가 없다. fixture로 화면을 만들거나 로컬 dev API로 연동할 수 있다.
-- B: `feat/engine/ce-002-generation`에서 외부 사실의 출처/적용 범위, 큰 후보군의 활동 분할·filler를 우선 보완하고 미실행 사례를 확인한다. 사용자 A 선호를 반영한 Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다.
+- A/B 현재 작업: 최신 통합 브랜치에서 전체 React 흐름과 dev 서버를 연결하고, 독립 리뷰·상태 단위 테스트·격리 DB HTTP 테스트·실제 브라우저 완주로 검증한다. 예전 FE-001 시작 안내와 별도 팀원의 clone 절차는 역사적 인수인계 자료다.
+- B 엔진 후속(현재 보류): 외부 사실의 출처/적용 범위, 큰 후보군의 분할·filler 및 사람 평가. Terra는 개발 기본값이며 최종 모델 선정/2명 품질 평가 완료가 아니다. 화면 통합을 이유로 유료 실험을 재개하지 않는다.
 - OpenAI API는 별도 사용자 결제/키와 기존 누적 실험 예산 $5 범위에서 사용한다. 자동 충전 OFF. 저장소에 키나 실제 비공개 평가 원문을 추가하지 않는다. 원래 PRD/Design/AC/Decision 첨부 원문을 확보하면 복원본과 대조한다.
 - GitHub collaborator 초대는 역할별 실제 계정이 정해진 뒤 한다. 현 단계에서 팀원 초대/branch protection을 완료했다고 주장하지 않는다.
 - 외부 공유 개발 API/Swagger UI와 최종 화면 시안은 아직 없다. OpenAPI JSON·생성 TS 타입·fixture가 전달물이며, `npm run api:smoke`는 로컬 dev API의 생성부터 공유 replay까지 연결을 확인한다. 실제 AI 품질이나 프론트 완주 UI 테스트를 대신하지 않는다.

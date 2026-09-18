@@ -126,6 +126,68 @@ class WorldcupHttpTest extends PostgresSupport {
         assertThat(replay.get("sessionId")).isNotEqualTo(started.get("sessionId"));
         assertThat(engine.calls.get()).isEqualTo(calls);
     }
+    @ParameterizedTest @ValueSource(ints = {8, 16, 32})
+    void partialSelectionUploadsKeepCachedAcksAndReplayResultsIndependent(int size) throws Exception {
+        var owner = new Browser(); var replayOwner = new Browser();
+        String draft = ready(owner, size);
+        var started = accepted(owner.post("/drafts/" + draft + "/start", Map.of("expectedVersion", 1)), 201, "SessionStart");
+        String session = started.get("sessionId").asString();
+        String selections = "/sessions/" + session + "/selections";
+        var snapshot = json.read(started.get("snapshot").toString(), BracketSnapshot.class);
+        var events = PlaySessionTest.complete(snapshot, false);
+
+        String firstKey = UUID.randomUUID().toString();
+        var firstBatch = Map.of("events", events.subList(0, 2));
+        var firstAck = accepted(owner.post(selections, firstBatch, firstKey), 200, "SelectionAck");
+        assertThat(firstAck.get("nextSequence").asInt()).isEqualTo(2);
+        assertThat(firstAck.get("status").asString()).isEqualTo("PLAYING");
+        assertThat(firstAck.get("championId").isNull()).isTrue();
+        assertThat(accepted(owner.post(selections, firstBatch, firstKey), 200, "SelectionAck")).isEqualTo(firstAck);
+
+        // A restored queue can include an already accepted prefix, but only with a new key for its new body.
+        var overlapBatch = Map.of("events", events.subList(1, 4));
+        rejected(owner.post(selections, overlapBatch, firstKey), 409, "IDEMPOTENCY_CONFLICT");
+        var overlapAck = accepted(owner.post(selections, overlapBatch), 200, "SelectionAck");
+        assertThat(overlapAck.get("nextSequence").asInt()).isEqualTo(4);
+        assertThat(overlapAck.get("status").asString()).isEqualTo("PLAYING");
+        assertThat(accepted(owner.post(selections, firstBatch, firstKey), 200, "SelectionAck")).isEqualTo(firstAck);
+
+        String shareKey = UUID.randomUUID().toString();
+        String shares = "/sessions/" + session + "/shares";
+        rejected(owner.post(shares, null, shareKey), 409, "SESSION_NOT_COMPLETED");
+        var completed = accepted(owner.post(selections, Map.of("events", events.subList(4, events.size()))), 200, "SelectionAck");
+        assertThat(completed.get("nextSequence").asInt()).isEqualTo(size - 1);
+        assertThat(completed.get("status").asString()).isEqualTo("COMPLETED");
+        assertThat(completed.get("championId").asString()).isEqualTo(snapshot.initialOrder().getFirst());
+        // Retrying the first upload returns its original ACK, not the latest session state.
+        assertThat(accepted(owner.post(selections, firstBatch, firstKey), 200, "SelectionAck")).isEqualTo(firstAck);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pairwise_selection WHERE session_id = ?", Integer.class, session))
+                .isEqualTo(size - 1);
+
+        var share = accepted(owner.post(shares, null, shareKey), 201, "ShareCreated");
+        assertThat(share.get("championId")).isEqualTo(completed.get("championId"));
+        String publicPath = "/shares/" + share.get("token").asString();
+        var originalShare = accepted(replayOwner.get(publicPath), 200, "SharedBracket");
+        rejected(replayOwner.get("/snapshots/" + snapshot.snapshotId()), 404, "NOT_FOUND");
+
+        int calls = engine.calls.get();
+        var replay = accepted(replayOwner.post(publicPath + "/sessions", null), 201, "SessionStart");
+        assertThat(replay.get("sessionId")).isNotEqualTo(started.get("sessionId"));
+        assertThat(replay.get("snapshot")).isEqualTo(started.get("snapshot"));
+        assertThat(accepted(replayOwner.get("/snapshots/" + snapshot.snapshotId()), 200, "Snapshot"))
+                .isEqualTo(started.get("snapshot"));
+        String replaySession = replay.get("sessionId").asString();
+        var replayCompleted = accepted(replayOwner.post("/sessions/" + replaySession + "/selections",
+                Map.of("events", PlaySessionTest.complete(snapshot, true))), 200, "SelectionAck");
+        assertThat(replayCompleted.get("status").asString()).isEqualTo("COMPLETED");
+        assertThat(replayCompleted.get("nextSequence").asInt()).isEqualTo(size - 1);
+        assertThat(replayCompleted.get("championId").asString()).isEqualTo(snapshot.initialOrder().getLast());
+        assertThat(replayCompleted.get("championId")).isNotEqualTo(completed.get("championId"));
+        var replayShare = accepted(replayOwner.post("/sessions/" + replaySession + "/shares", null), 201, "ShareCreated");
+        assertThat(replayShare.get("championId")).isEqualTo(replayCompleted.get("championId"));
+        assertThat(accepted(owner.get(publicPath), 200, "SharedBracket")).isEqualTo(originalShare);
+        assertThat(engine.calls.get()).isEqualTo(calls);
+    }
     @Test void issuesHashedAnonymousCookieAndKeepsPrivateResourcesPrivate() throws Exception {
         var browser = new Browser();
         var response = browser.post("/generation-jobs", input(8));

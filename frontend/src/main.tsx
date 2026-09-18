@@ -1,29 +1,42 @@
-import { StrictMode } from 'react';
+import { StrictMode, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createApiClient } from './api/client.ts';
+import { AppController } from './app/controller.ts';
+import { AppView } from './ui/AppView.tsx';
 import './style.css';
-import { fixturePreview } from './api/fixtures';
+
+// Outside React: StrictMode remounts must not create another paid operation or timer.
+const controller = new AppController({
+  api: createApiClient(),
+  storage: { getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) },
+  path: window.location.pathname,
+  visible: () => document.visibilityState === 'visible',
+  copy: text => navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('Clipboard unavailable')),
+  navigate: path => { window.location.assign(path); },
+  locked: true,
+});
 
 function App() {
-  return (
-    <main>
-      <header><span className="brand">WORLD CUP</span><span className="badge">개발 기반 · v0.1</span></header>
-      <section className="intro">
-        <p className="eyebrow">THINK LESS. PICK ONE.</p>
-        <h1>고민은 짧게.<br />선택은 너답게.</h1>
-        <p>후보를 준비하고, 둘 중 하나씩.<br />마지막에 남는 건 너의 선택.</p>
-      </section>
-      <section className="preview" aria-labelledby="preview-title">
-        <div className="section-title"><h2 id="preview-title">취미 8강 · 계약 예제</h2><span>8 candidates</span></div>
-        <p className="notice">화면 개발용 고정 예제입니다. AI 생성과 실제 플레이는 아직 연결되지 않았습니다.</p>
-        <ol className="candidate-grid">
-          {fixturePreview.candidates.map((candidate, index) => (
-            <li key={candidate.id}><span className="number">{String(index + 1).padStart(2, '0')}</span><strong>{candidate.name}</strong><small>{candidate.tags.join(' · ')}</small></li>
-          ))}
-        </ol>
-      </section>
-      <footer>플레이 경험과 후보 품질, 두 영역에서 개발을 시작합니다.</footer>
-    </main>
-  );
+  const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
+  return <AppView state={state} actions={controller.actions} />;
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
+
+// A route has one writable tab. Browser releases the lock on unload/crash.
+// No session cookie is copied into local storage. Unsupported browsers stay read-only.
+if (navigator.locks) {
+  void navigator.locks.request(`worldcup:tab:${window.location.pathname}`, { ifAvailable: true }, async lock => {
+    if (!lock) return;
+    controller.setLocked(false);
+    void controller.resume();
+    await new Promise<void>(resolve => {
+      window.addEventListener('pagehide', () => { controller.dispose(); resolve(); }, { once: true });
+    });
+  });
+}
+const ticker = window.setInterval(() => controller.tick(), 50);
+document.addEventListener('visibilitychange', () => controller.tick());
+window.addEventListener('storage', () => controller.storageChanged());
+window.addEventListener('pagehide', () => window.clearInterval(ticker), { once: true });
+window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });

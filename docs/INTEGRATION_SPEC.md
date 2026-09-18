@@ -76,7 +76,7 @@
 | B — 서버·통합 | 동일 origin 배포 산출물과 공유 deep-link 진입 연결, 기존 API 상태 설명 정합성 | `backend/**`, `scripts/**`, 루트 빌드. 기본 backend jar와 별도 app jar, 실제 HTTP route 및 API 404 보존 |
 | 공동 | DTO/오류/추가 질문/취소 등 계약 변화가 필요한 경우만 paired review | `contracts/**`; 현재 공개 DTO·경로·규칙 변경 없음 |
 
-프론트 팀원의 checkout/브랜치나 HTML 원본은 변경하지 않는다. 새 프론트 브랜치는 현재 통합 기준에서 만들거나 필요한 서버 변경을 동료가 반영한다. PR #1과 엔진 변경은 아직 main에 병합되지 않았으므로 main만 받으면 최신 API/엔진이 없다는 점을 합류 안내에서 확인한다.
+2026-09-18 사용자가 프론트도 맡아 현재 작업에서 A/B를 모두 구현하도록 승인했다. 외부 프론트 인계 대기는 해제한다. `feat/product/split-deck-flow`에서 PM/통합·순수 게임/API·UI/디자인·서버 테스트를 파일별로 분리하고 루트 AGENTS의 경계를 따른다. 타인의 checkout과 HTML 원본은 변경하지 않는다. PR #1과 엔진 변경은 아직 main에 병합되지 않았으므로 main만 받으면 최신 API/엔진이 없다는 점을 합류 안내에서 확인한다.
 
 ## 7. 이번 B 구현: 동일 origin 진입
 
@@ -105,3 +105,31 @@ PUBLIC_ORIGIN=http://127.0.0.1:8080 java -jar backend/build/libs/worldcup-0.0.1-
 제품 완성: A의 실제 화면에서 8/16/32 입력→preview/재생성→N−1 경기→Champion 저장→공유→새 session까지 완주, 실패/숨김/복원/접근성 확인. 기존 서버 테스트나 디자인 데모만으로 AC-10~13/17·전체 제품 완성을 주장하지 않는다. 후보의 운영 품질과 배포 완료도 별도다.
 
 2026-09-18 이번 B 구현 검증: 관련 HTTP 18개 통과 후 독립 리뷰 Critical 0 / High 0 / 남은 actionable 0. 이후 `./scripts/verify.sh` 통과 — Java 189개 실행, 실패/오류 0, opt-in 유료 1개 제외; handoff 6개, fixture 5개, 기존 HTTP 응답 102개/8 schemas, 웹 build와 기본/app 두 jar 성공. 별도 실제 app jar를 격리 PostgreSQL·dev·AI worker OFF로 실행해 14개 HTTP 점검을 통과했다. 두 페이지의 실제 빌드 HTML, JS/CSS 바이트 일치, HEAD/405, API 및 없는 자산/경로 404를 확인했다. 기본 jar에 웹 문서/테스트 fixture가 없고 app jar에만 정적 자산이 포함되는 것도 확인했다. bundle 누락 때 appJar가 실패하는 경로는 임시 격리 프로젝트에서 검증했다. 유료 호출 0회. 시안의 브라우저 렌더링과 실제 프론트 완주는 미검증이며 사용자 HTML 원본·frontend 소스는 변경하지 않았다.
+
+## 9. A/B 통합 구현 규약
+
+현재 통합 브랜치는 `feat/product/split-deck-flow`다. 기존 API/DB/후보 엔진을 그대로 사용하며 실제 화면과 게임을 React에 연결한다.
+
+- `frontend/src/api`는 생성된 wire 타입과 동일 origin HTTP만 담당한다. 성공 DTO도 개수/ID/규칙/공유 우승 등 공개 불변 조건을 검사한다. dev 합성 후보는 화면에서 명시한다.
+- `play`는 불변 snapshot과 순수 준비/활성/피드백/완료 상태를 담당한다. RNG/시각을 주입해 경계값을 검증한다. `ui`는 A 상하 레이아웃과 카드 준비·접근성만 담당한다.
+- `app`은 생성 job, preview, key/body, 로컬 checkpoint, 전송 queue와 서버 ACK를 소유한다. 선택은 저장 실패로 되돌리지 않으며 실패한 batch를 보존한다. 새로고침 후 완료 ACK/공유의 캐시를 신뢰하지 않고 저장된 event를 서버에 재확인한다.
+- 브라우저 저장소와 Web Locks가 가능한 최신 브라우저에서 동작한다. 같은 경로의 쓰기 탭은 하나만 허용한다. 저장 불가·다른 탭 충돌·지원 불가 때 조용히 진행하지 않는다. checkpoint가 손상/만료되면 이전 경기를 재시작하지 않고 안내한다. job/draft는 24시간, play는 30일 복원 기간을 서버 보존 정책에 맞춘다.
+- 로그인이나 설정 화면을 추가하지 않는다. 이 기기의 진행을 위한 prompt/checkpoint만 로컬에 보관하고 쿠키·비밀키는 JS 저장소에 복사하지 않는다. 공유 페이지는 서버의 공개 snapshot만 사용한다.
+
+`npm run test:web`는 Node 24 내장 테스트로 순수 상태/API/워크플로를 확인한다. 실제 브라우저 회귀를 재현하기 위해 Playwright를 **개발 의존성으로만** 추가했다. 설치된 Chrome과 별도로 띄운 합성 `dev` 서버·격리 DB에서 다음을 실행한다.
+
+```sh
+WORLDCUP_SYNTHETIC_E2E=1 npm run test:browser -- http://127.0.0.1:8080
+```
+
+이 명령은 생성 job 4개와 선택/공유 데이터를 만든다. live 서버에 실행하지 않는다. rate limit을 풀지 않으며 반복 검증은 별도의 임시 DB를 사용한다. 캡처는 ignore된 `reports/local/browser`에 저장한다. 숨김은 브라우저 visibility 이벤트 시뮬레이션이며 OS/모바일 절전 모드 자체를 검증했다는 뜻은 아니다. 전체 브라우저 결과와 독립 리뷰 수치는 실행 후 기록한다.
+
+`npm run test:browser:states -- http://127.0.0.1:8080`은 API/이미지를 전부 가로채는 합성 UI 예외 테스트다. 생성 실패 후 새로고침·고민 수정, 이미지 2초 fallback, 360/1280의 긴 이름·상하 A·키보드 선택을 확인하며 서버 생성 요청을 하지 않는다. 본문/강조의 원안 주황은 유지하고 작은 흰 글자 버튼은 대비를 위해 `#d92b10`으로 어둡게 조정했다. 폰트는 재배포 불명확한 번들을 복사하지 않고 시스템 한글 fallback을 사용한다.
+
+## 10. 2026-09-18 통합 검증 결과
+
+- `./scripts/verify.sh`: 프론트 48개·handoff 6개, fixture 5개/생성 타입, 웹 build, Java **192개 실행/실패·오류 0**(opt-in 유료 1개 제외), 기본/app 두 jar 성공. 실제 HTTP 응답 159개/8개 schema 검사 통과.
+- 최종 app jar + PostgreSQL 17 격리 DB + 명시적 dev: 브라우저 360px에서 8/16/32 preview와 7/15/31개 결정·서버 COMPLETED·공유 성공. 8강 전체 재생성 1회, active 새로고침 deadline 유지, 숨김 이벤트 후 만료 경기 1개 처리, 두 번째 탭 선택 잠금, 다른 익명 사용자의 동일 snapshot/새 session 완주를 확인했다. 생성 POST는 의도한 4개뿐, 공유 replay의 생성 POST 0개, 브라우저 예외 0개다.
+- 합성 UI 예외: 생성 FAILED→reload에서도 수정 가능하며 자동 POST 0개. 늦은 이미지 동안 deadline null, 2초 fallback 뒤 7초 시작, 360/1280 긴 이름·상하 배치·44px 카드·키보드 선택, reduced-motion 설정을 확인했다. 추가 브라우저 점검에서 360px·reduced-motion으로 8강의 7경기를 모두 키보드 Enter로 완주하고 합성 ACK 완료를 확인했다. 캡처로 입력/미리보기/대결/Champion/공유를 점검했다.
+- 독립 리뷰 1회차 Critical 0/High 1/Medium 1: terminal 생성 실패 복원 시 오류 UI가 사라지던 문제, 공유 화면의 새 월드컵 문구와 기존 진행 복귀 동작 불일치. 안전한 복원 안내와 명시적 복귀 문구로 수정하고 회귀 테스트 추가. **2회차 Critical 0/High 0/남은 actionable 0**, 이후 전체 verify 통과.
+- 후보 엔진·OpenAPI/생성 schema·DB migration 변경 없음. API 키/live profile 없이 검증했으며 유료 호출 0회다. 실제 후보의 사람 평가 FAIL·외부 사실 eval·운영 품질 승인은 미해결이며 main 병합·공개 배포를 하지 않았다. 실제 휴대폰 OS 절전/백그라운드, 보조기술의 전체 수동 인수, 구체 보충 질문/생성 취소 계약은 별도 확인/후속 범위다.

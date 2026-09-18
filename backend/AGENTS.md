@@ -17,3 +17,5 @@ HTTP DTO는 contracts와 맞춰 테스트하고 내부 plan/evidence를 그대�
 DB schema 변경은 새 Flyway migration으로 추가한다. 이미 배포/공유된 migration을 편집하거나 snapshot UPDATE/DELETE trigger를 해제하지 않는다. tests는 PostgresSupport가 만든 격리 DB만 초기화한다. 개발자 DB를 test 대상이나 cleanup 대상으로 쓰지 않는다.
 
 전체 검증에는 실행 중인 Docker가 필요하다. `WorldcupHttpTest`의 실제 응답 샘플을 `scripts/check-contracts.mjs --http`가 schema 검사한다. 새로운 endpoint/DTO는 HTTP 테스트와 이 검사에 추가한다. 스케줄러/동시성/보존 정책을 변경하면 해당 DB 테스트도 함께 실행한다.
+
+현재 제품 통합에서는 엔진/유료 실험을 동결한다. 기존 API가 입력부터 공유까지 지원하므로 필요한 근거 없이 endpoint/DB를 확장하지 않는다. 프론트의 부분 batch 업로드·동일 key 재시도·cached ACK·공유 전 완료 판정·새 actor replay를 실제 HTTP로 검증한다. 재시도 응답이 과거 ACK라는 계약을 바꾸어 클라이언트 버그를 숨기지 않는다.
