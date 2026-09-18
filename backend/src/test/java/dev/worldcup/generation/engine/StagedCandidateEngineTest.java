@@ -427,6 +427,16 @@ class StagedCandidateEngineTest {
         assertThat(stages.seenPlans).allMatch(p -> p.input().size() == 32);
         assertThat(stages.seenPlans).allSatisfy(p -> assertThat(p).isSameAs(stages.seenPlans.getFirst()));
     }
+    @ParameterizedTest @ValueSource(strings = {"FAIL", "UNKNOWN"})
+    void serverNeverReinterpretsAnIndependentQualityFailureAsSubjectiveApproval(String verdict) {
+        // Even an inconsistent reviewer must not be bypassed by keyword-based server approval.
+        stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.valueOf(verdict),
+                assessments(batch), feasibility(batch), List.of(new Finding("APPEAL", List.of("c1"), "평범해서 덜 매력적임")));
+        qualityFailure(() -> engine.generate(input(32), context()));
+        assertThat(stages.repairs).isEqualTo(1);
+        assertThat(stages.reviewCount).isEqualTo(2);
+        assertThat(stages.seenPlans).allMatch(p -> p.input().size() == 32);
+    }
     @Test void repairCannotModifyAnUnflaggedCandidate() {
         stages.modifyUnflagged = true;
         stages.reviewFunction = (batch, count) -> new Review(faithful(), Verdict.PASS, Verdict.PASS, Verdict.FAIL,

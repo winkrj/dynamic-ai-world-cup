@@ -330,6 +330,24 @@ class OpenAiResponsesClientTest {
                     "promoting a relative preference with an explicitly acceptable alternative to a hard exclusion");
         }
         assertThat(instructions).containsOnlyOnce("one coherent choice, not a menu of independent alternatives");
+        assertThat(instructions).containsOnlyOnce("Separate mandatory eligibility from subjective appeal.");
+        assertThat(instructions).contains("not every candidate must be a likely winner",
+                "Do not reject an otherwise eligible candidate solely for low novelty",
+                "Optimize relevance, diversity and coverage across the complete set",
+                "required factual evidence for EVERY candidate",
+                "Uncertainty about those requirements still blocks approval",
+                "not aliases, parent/child concepts, or variants of one core activity",
+                "chores, admin tasks or one-off missions are not filler hobbies");
+        assertThat(instructions).doesNotContain("genuine appeal and sustained practice",
+                "Do not approve a weak intent", "weak sustained appeal", "filler, poor appeal");
+        if (phase.equals("allocate")) assertThat(instructions).contains(
+                "Do not approve an ineligible intent just to reach N",
+                "Subjective appeal can help rank eligible choices; it is not by itself a rejection reason",
+                "'Boring' or 'unlikely to win' alone is not a defect");
+        if (phase.equals("review")) assertThat(instructions).contains(
+                "candidateQuality checks substantive suitability, not whether every candidate is highly attractive",
+                "Name the concrete defect in findings",
+                "Do not create a FAIL/UNKNOWN or finding solely because an otherwise eligible option is ordinary, niche or less exciting");
         assertThat(instructions).contains("this does not require putting both in the set",
                 "Examples, genres and complementary steps within one activity are allowed",
                 "punctuation alone is not a defect", "Do not split those examples or steps into extra candidates");

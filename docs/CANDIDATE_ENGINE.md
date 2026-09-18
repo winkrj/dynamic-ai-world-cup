@@ -2,6 +2,31 @@
 
 2026-09-18 갱신. B(후보 품질과 서버) 소유. AC-02~07/14/18이 대상이며 공개 OpenAPI와 프론트 소유 경로는 변경하지 않는다. 이 문서는 구현 설계이며 실제 검증 범위는 버전별로 구별한다.
 
+## TD-49 — 사용자 기준의 1차 버전: 필수 적격성과 주관적 매력 분리
+
+사용자는 모든 입력에서 32개 전부가 매력적이어야 하는 것은 아니며 일부 평범하거나 호불호 있는 후보가 있어도 괜찮다고 판단했다. 이에 따라 16강 기본·8/16/32를 유지하며 1차 버전을 마무리한다. 특정 32강이 성공할 때까지 반복 수정하는 방식 대신, 명시 조건과 실제 선택 경험을 지키는지 검증한다. 32강 제거와 실행 중 자동 축소는 이번에 구현하지 않는다.
+
+기존 공통 지침과 ALLOCATE/REVIEW에는 `genuine appeal`, `weak intent`, `weak sustained appeal`, `poor appeal`이 탈락 사유로 읽힐 표현이 있었다. `ce002-v22-eligibility-before-appeal`은 이를 필수 적격성과 구분한다. 평범함·낮은 신선함·예상 인기·우승 가능성이 낮다는 이유만으로 후보를 거절하지 않고, 매력은 적격 후보의 순위와 세트의 관련성·다양성·범위를 개선하는 데 사용한다. 모든 후보의 최소 흥미 점수를 새로 만들지 않는다. [OpenAI 프롬프트 지침](https://developers.openai.com/api/docs/guides/prompt-engineering)의 해야 할 일과 하지 말아야 할 일을 명확히 적는 원칙을 참고했다.
+
+명시 조건, 비교 단위, 의미 중복, 반복 가능한 취미인지, 실행 가능성, 필요한 외부 사실 근거는 여전히 필수다. 관련 없는 후보·취미로 위장한 잡일/일회성 과제·반복할 수 없는 활동은 구체적인 이유와 함께 거절한다. 실패 세트를 서버가 이름·이유의 키워드만 보고 PASS로 바꾸지 않는다. 과거 v20의 그림 중복 실패나 R의 비교 단위·실행 가능성 FAIL은 소급 승인하지 않는다.
+
+변경은 생성/검토 공통 지침·버전과 재사용 정책 `approved-complete-set-v3-engine-v22`에 한정한다. 모델·schema·API·프론트·저장 구조·시간/비용 한도·Repair 합계 1회는 그대로다. 기존 1회 진단은 v21에 고정된 소진 기록으로 남기며 v22 검증용으로 재사용하지 않는다. 관련 오프라인 207개 PASS, 독립 리뷰 Critical/High/actionable 0 뒤 전체 verify PASS(Java 327개 실행/유료 2개 제외·프론트 60개·HTTP 166개/9 schemas·웹/두 JAR)다. 모의 검토가 매력 부족을 이유로 FAIL/UNKNOWN을 반환하더라도 서버는 기존 차단을 유지하는 회귀를 추가했다. 이는 실제 모델이 새 기준을 일관되게 적용한다는 증거가 아니다.
+
+### 후속 승인된 실제 16강 1회
+
+기본 강수의 실제 생성→저장→공유 연결을 위해 사용자가 검색 없는 `seed-v1/hobby-solo/16` 1회를 별도로 승인했다. v22/Terra 결과는 **FAILED / QUALITY_GATE_FAILED**, 47.849초·4회 HTTP 200·$0.063963·검색 0·사전 Repair 1회다. 상세 GENERATE와 최종 REVIEW 전 종료라 preview/저장·공유 검증은 실행되지 않았다. 실제 테스트 1개는 READY 기대 불충족으로 FAIL이며 오프라인 PASS와 구별한다.
+
+| 단계 | 관측 |
+| --- | --- |
+| PLAN | 16개 활동. 비운동과 월 10만원은 필수 조건, 혼자 하기는 선호. unit에는 “한 사람이 반복해서 하는 비운동 취미 활동”을 사용 |
+| ALLOCATE | 해석 PASS, 15/16 승인. 보드게임 또는 카드 게임이라는 선택 메뉴 1개만 거절. 손 스케치와 디지털 일러스트는 함께 승인 |
+| REPAIR_INTENTS | 거절된 메뉴를 스도쿠로 1회 교체 |
+| ALLOCATE_REPAIRED | 같은 unit을 혼자 선호의 필수화로 해석해 UNIT FAIL. 초기 승인한 디지털 일러스트도 손 스케치의 매체 변형이라고 거절해 15/16 승인 |
+
+실패 이유는 평범함·낮은 매력이 아니다. 변경하지 않은 계획 해석과 정상 활동을 두 검토가 다르게 판정했다. 생성기와 검토기의 일관성 문제를 관측한 것이며 모든 16강 실패나 v22의 개선/악화율로 일반화하지 않는다. 서버가 반환된 FAIL을 집행한 사실과 그 의미 판정의 타당성을 구별한다. 모델 이유를 제품의 새 중복 규칙으로 확정하거나 UNIT FAIL을 코드에서 무시하지 않았다.
+
+비공개 근거는 gitignored `reports/local/live-engine/2026-09-18T10-12-53.496812Z-size16/`다. 4개 요청 모두 tools 빈 배열·장부 search_calls=0·COMPLETED를 확인했다. 누적 provider 시도 148회, 사용량 기반 추정 $4.4355993 + 기존 미확인 예약 $0.50 = **$4.9355993/$6**, 잔여 $1.0644007이다. 실행 전 자동 충전 OFF를 재확인했고 키/설정은 변경하지 않았다. 승인 소진·재시도 없음이며 잔여액은 새 승인이나 운영 예산이 아니다. 과거 R FAIL·최신 실제 완주·외부 사실 검증·공개 배포의 미완료는 유지한다.
+
 ## TD-48 v21 실제 단일 진단 — 제외 조건 오분류 검출
 
 사용자가 승인한 진단 1회를 실행했다. 기존 v20 첫 ALLOCATE의 요청·기준 시각·계획을 그대로 두고 v21 검토기만 호출했다. 원본 hash와 실제 전송 input JSON의 동등성을 확인했다. Terra **1회 HTTP 200·17.382초·$0.021828·검색 0**이며 새 PLAN/상세 생성/Repair/preview는 없다. `LiveInterpretationDiagnosticTest` 1개 PASS, skipped 0이다.
@@ -416,3 +441,21 @@ v15 비용 합계 **$0.393268**, 누적 **$3.4827758 / 승인 $5**, 제공자 **
 사람 평가와 명확한 통과/실패 기준을 함께 사용하는 [OpenAI 평가 지침](https://developers.openai.com/api/docs/guides/evaluation-best-practices)을 참고했다. 기존 평가 축·기준은 유지한다. 이번 인계는 기존 결과를 재사용했으며 추가 유료 호출은 없다. 같은 후보를 계속 재생성하거나 사람 의견을 AI 점수로 대신하지 않는다. 다음 판단은 후보 경계·지속성에 대한 두 사람의 독립 피드백이고, 외부 사실 7세트의 유료 실행은 기존 검색 예약액과 남은 예산 때문에 별도 보류한다.
 
 공식 근거: [Responses](https://developers.openai.com/api/reference/cli/resources/responses/methods/create), [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Web search와 실제 sources](https://developers.openai.com/api/docs/guides/tools-web-search), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna), [GPT-5.6 prompting best practices](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.6). 2026-09-15 확인, Terra·prompting·Structured outputs의 의미 오류 한계와 속성 순서는 2026-09-16 재확인.
+
+### 후속 사용자 평가 보존 — R 미리보기 한 세트
+
+위 인계 이후 사용자가 대화에 직접 제출한 판정은 다음과 같다. 빈 원본 시트는 그대로 두고 제출 결과를 여기에 구분해 보존한다. 한 사람의 미리보기 평가이며 두 사람의 독립 평가 완료나 내부 근거 검증으로 확대하지 않는다.
+
+| 필수 항목 | 사용자 제출 판정 |
+| --- | --- |
+| 개수 | PASS |
+| 명시 조건 | PASS |
+| 중복 | PASS |
+| 비교 단위 | FAIL |
+| 실행 가능성 | FAIL |
+
+사용자는 주변에 새가 없으면 새 관찰을 할 수 없다는 접근 전제를 지적했다. 함께 제출한 점수는 Relevance 5 / Diversity 5 / Coverage 5 / Tournament Playability 3 / Context Fit 4다. 점수 자체는 보존하지만 필수 항목 FAIL이 있으므로 합격 평균을 계산하거나 품질 승인으로 사용하지 않는다. 이후 하모니카·오븐에 대한 판단은 각각 TD-38/44의 환경 경계 보완이며 이 원 평가를 소급 변경하지 않는다.
+
+R의 10번 손글씨·레터링과 14번 연필 드로잉이 함께 있는 목록에 사용자는 중복 PASS를 주었다. 이는 해당 미리보기에서 이 조합을 중복으로 거절하지 않았다는 근거다. 모든 캘리그래피/드로잉 조합의 무조건 허용이나 v20 계획 승인으로 일반화하지 않는다. TD-48의 자동 거절과 사람 판단을 대조할 자료로 사용하며, 모델 판정을 사용자 결정으로 옮겨 적지 않는다.
+
+현재 제안인 ‘주 활동이 다른 집밥 요리/홈베이킹은 구분하되 요리 전반/홈베이킹처럼 포함되는 선택은 겹침으로 판단’은 사용자 답변 전의 **미확정 기준**이다. 이 대조만으로 프롬프트·판정 코드·재사용 정책을 변경하거나 추가 유료 호출을 실행하지 않았다.

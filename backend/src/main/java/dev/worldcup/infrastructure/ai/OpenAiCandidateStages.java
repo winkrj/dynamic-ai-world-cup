@@ -47,7 +47,13 @@ public final class OpenAiCandidateStages implements EngineStages {
             Conversely, never downgrade externally verifiable entity facts to semantic judgment to avoid missing evidence.
             """;
     private static final String QUALITY = """
-            Candidate quality outranks filling slots. Keep one comparison unit and comparable abstraction level.
+            Mandatory eligibility outranks filling slots. Keep one comparison unit and comparable abstraction level.
+            Separate mandatory eligibility from subjective appeal. The tournament lets the user eliminate less preferred choices.
+            Familiar, ordinary, niche or less exciting choices can be eligible; not every candidate must be a likely winner.
+            Do not reject an otherwise eligible candidate solely for low novelty, predicted popularity or subjective lack of excitement.
+            Optimize relevance, diversity and coverage across the complete set, with both familiar and accessible unfamiliar choices.
+            This is not permission for irrelevant padding: preserve explicit conditions, genuine distinction, the requested option type,
+            realistic feasibility and required factual evidence for EVERY candidate. Uncertainty about those requirements still blocks approval.
             Each intent and display card must offer one coherent choice, not a menu of independent alternatives.
             Choose the actual activity instead of 'play chess or play Go'; this does not require putting both in the set.
             Examples, genres and complementary steps within one activity are allowed; punctuation alone is not a defect.
@@ -57,7 +63,7 @@ public final class OpenAiCandidateStages implements EngineStages {
             A hobby must be repeatable and deepen over weeks; chores, admin tasks or one-off missions are not filler hobbies.
             Novelty alone is not quality: include familiar options and accessible unfamiliar options without a fixed ratio.
             Do not disguise an unsuitable activity as reading about it, keeping a log, or doing a tiny silent fragment of it.
-            Reading or record-keeping CAN be a genuine hobby; assess its core appeal in this set, not a global blacklist.
+            Reading or record-keeping CAN be a genuine hobby; assess its actual activity and repeatability, not a global blacklist.
             Similar domains can still contain distinct activities. Judge the actual choice experience, not only tags.
             Distinguish realistically acquirable preparation from essential external access that buying equipment or learning cannot create.
             Feasibility asks whether the user can start and sustain the activity with reasonable preparation, not whether they already own every tool or skill.
@@ -116,7 +122,7 @@ public final class OpenAiCandidateStages implements EngineStages {
             Conversely, promoting a relative preference with an explicitly acceptable alternative to a hard exclusion is also a CONSTRAINTS finding.
             An interpretation FAIL/UNKNOWN requires a finding naming the affected interpretation field, a verbatim
             request excerpt in sourceText, and a concise explanation of the mismatch/uncertainty. PASS requires no such findings.
-            Candidate noncompliance, filler, poor appeal or duplicates belong in intent rejections or candidate findings,
+            Candidate noncompliance, non-hobby filler or duplicates belong in intent rejections or candidate findings,
             not interpretation findings. An unsuitable candidate does not itself make the interpretation unfaithful.
             Example: omitting 'quiet' from a constrained request is an interpretation CONSTRAINTS issue;
             a noisy candidate under a correctly captured quiet constraint is a candidate issue instead.
@@ -166,10 +172,11 @@ public final class OpenAiCandidateStages implements EngineStages {
         var reply = client.complete(reviewModel, BOUNDARY + QUALITY + REQUEST_SCOPE + INTERPRETATION + """
                 INDEPENDENT ALLOCATION REVIEW before quota freeze or detailed generation.
                 Do not repair the interpretation, invent new intents, or trust the planner's fit statements as proof.
-                Filter the proposed intents for realistic contextual fit, comparable granularity, genuine appeal and sustained practice
+                Filter the proposed intents for realistic contextual fit, comparable granularity and sustained practice
                 where appropriate. Remove aliases, forced filler and core-activity variants, considering the entire pool jointly.
                 Return only jointly distinct eligible intent IDs, ranked: the first N form a balanced complete set, any remainder
-                must also be distinct from that set and each other. Do not approve a weak intent just to reach N.
+                must also be distinct from that set and each other. Do not approve an ineligible intent just to reach N.
+                Subjective appeal can help rank eligible choices; it is not by itself a rejection reason.
                 The server derives coverage quotas from the first N, so rejecting a domain does not leave a mandatory empty slot.
                 comparable/noSemanticDuplicates/feasible judge the APPROVED pool, not the rejected intents. If fewer than N qualify,
                 return that shorter list; never copy rejected IDs to fill it. Unknown contextual fit is not feasible.
@@ -177,7 +184,8 @@ public final class OpenAiCandidateStages implements EngineStages {
                 A rejected intent does not make the remaining approved pool infeasible. Judge that pool on its own merits.
                 Partition every proposed intent exactly once: either approvedIntentIds or rejections.
                 For each rejected intent give one concise actionable reason (violated condition, overlap with a named retained ID,
-                or specific quality problem). Do not hide an unassessed intent by omitting it from both lists.
+                or concrete defect in the requested activity type or repeatability). 'Boring' or 'unlikely to win' alone is not a defect.
+                Do not hide an unassessed intent by omitting it from both lists.
                 Current entity facts are only provisionally plausible here, never verified: require the appropriate grounding
                 classification in the plan and leave proof of current prices/accessibility/availability to the later web verifier.
                 """, Map.of("request", input, "referenceTime", referenceTime, "proposal", proposal),
@@ -262,7 +270,10 @@ public final class OpenAiCandidateStages implements EngineStages {
                 Do not treat the candidate's requirements field or conditional wording as independent evidence of compliance.
                 For GROUNDED_FACT use only supplied factual assessments; their PASS labels are not proof.
                 Independently compare each excerpt with the complete condition and return UNKNOWN when support is insufficient.
-                Mark candidateQuality FAIL for forced filler, chores posing as hobbies, weak sustained appeal, padding or fit issues.
+                candidateQuality checks substantive suitability, not whether every candidate is highly attractive.
+                Mark candidateQuality FAIL for an unrelated choice, a chore or one-off mission posing as a hobby,
+                or an activity without a credible way to repeat it when a hobby is requested. Name the concrete defect in findings.
+                Do not create a FAIL/UNKNOWN or finding solely because an otherwise eligible option is ordinary, niche or less exciting.
                 Comparable units and noSemanticDuplicates must be assessed separately. Renamed subtypes and broad parent/child overlap fail.
                 Names/descriptions/requirements must express the linked approved intent, not disguise another activity behind its ID.
                 Allocation approval is not proof: independently check the actual detailed candidates and their facts.

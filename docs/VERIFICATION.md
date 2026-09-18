@@ -1,5 +1,22 @@
 # 검증 기록
 
+후속 TD-50은 향후 실제 평가를 순차 1건씩 실행하는 사전 승인이다. 아래 TD-49의 1회 실패 결과를 바꾸거나 추가 실행을 이미 했다는 뜻은 아니다. 누적 $6·검색 없음·자동 충전 OFF·기존 예약·반복 한도를 유지하며 현재 장부는 $4.9355993이다. [OpenAI 선불 결제 안내](https://help.openai.com/en/articles/8264644)에 따르면 잔액 소진 후 차단에 처리 지연이 생길 수 있어, 사용자 승인 상한을 별도 장부로 유지한다(2026-09-18 확인).
+
+## 2026-09-18 TD-49 — 1차 버전 기준 반영과 실제 16강 1회
+
+주관적 매력과 필수 적격성을 분리하는 v22 공통 지침·재사용 정책을 반영했다. 명시 조건·중복·비교 단위·취미 지속성·실행 가능성·필수 근거 및 FAIL/UNKNOWN 집행은 유지한다. 16강 기본·8/16/32와 공개 계약·프론트·모델·Repair/시간/비용 경계는 바뀌지 않았다.
+
+- 집중 오프라인 검증: client 52개·engine 77개·reuse service 36개·quality gate 42개, **207개 PASS**. 모든 유료 플래그 false, loopback 모의 응답만 사용.
+- read-only Reviewer cycle 1: **Critical 0 / High 0 / actionable 0**. 이후 production/test 수정 없이 전체 검증.
+- 최종 전체 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false ./scripts/verify.sh` 종료 0: **Java 327개 실행/실패·오류 0/유료 2개 제외(총 329)**, frontend 60개, handoff 6개, release 13개, fixture 5개·생성 TS, HTTP 166개/9 schemas, 웹 build·bootJar·appJar PASS. Java는 실제 실행했고 두 JAR도 갱신했다.
+- 후속 승인된 실제 `LiveEngineHttpTest`만 별도 실행: **1개 FAIL**, 제외 0, Gradle 종료 1. `hobby-solo/16`, v22/Terra, 47.849초/4회 HTTP 200/$0.063963/검색 0/사전 Repair 1회. 재검토에서 UNIT 해석 FAIL 및 활동 15/16으로 QUALITY_GATE_FAILED. 공개 QUEUED/FAILED HTTP 응답 2개는 계약 PASS지만 preview/저장·공유 검증은 실행되지 않았다.
+
+실제 검토 사이에서 혼자 선호와 unit의 해석, 손 스케치/디지털 그림 중복 판정이 달라졌다. 원시 기록과 세부 한계는 `CANDIDATE_ENGINE.md` TD-49 절에 보존한다. 테스트의 실패를 런타임 예외나 모든 후보가 재미없다는 결과로 바꾸지 않는다. 서버 차단은 작동했지만 실제 생성 안정화는 미완료다. 실패 이후 프롬프트/코드 변경이나 유료 재실행은 하지 않았다.
+
+실행 전 장부 $4.8716363을 다시 합산하고 격리 DB 예산은 잔여 $1.1283637만 허용했다. 모든 요청 tools=[]·search_calls=0·장부 COMPLETED 4건, 최종 누적 **$4.9355993/$6**(미확인 예약 $0.50 포함), provider 시도 148회다. 자동 충전 OFF를 UI로 확인했고 키는 권한 600의 gitignored 파일에서 자식 프로세스 환경에만 주입했다. 승인 소진·재시도 없음, 기본 유료 플래그는 false다.
+
+v22은 JAR까지 검증했다. 기존 x86 runtime/브라우저의 증거는 아래 당시 기록이며 새 이미지·AWS 자원·운영 배포는 만들지 않았다. 코드 검증 완료를 사람 품질 승인이나 공개 서비스 완료로 보고하지 않는다.
+
 ## 2026-09-18 TD-48 — 승인된 조건 해석 진단 1회
 
 코드 d85ab97 상태에서 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=true`로 `LiveInterpretationDiagnosticTest`만 실행했다. **1개 실행/PASS/실패·오류·제외 0**, Gradle 종료 0, 테스트 22.501초/provider 17.382초다. 원본 v20 첫 ALLOCATE와 실제 전송 input JSON이 동일함을 대조했고 provider 장부/응답 각 1건, HTTP 200, tools 빈 배열/search_calls 0, 새 generation_job 0을 확인했다.
