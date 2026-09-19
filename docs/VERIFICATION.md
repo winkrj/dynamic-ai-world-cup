@@ -1,5 +1,16 @@
 # 검증 기록
 
+## 2026-09-19 TD-54 — DB 우선 단일 호출 (로컬 완료, 운영 미적용)
+
+신규 catalog 전략과 V4의 AI 편집 seed64개를 추가했다. 기존 strict gate는 유지하며 FAST_BEST_EFFORT acceptance에 독립 certificate를 합성하지 않는다. 세부 설계·전체 실험표·한계는 [DB 우선 엔진](CATALOG_ENGINE.md)에 있다.
+
+- 관련 단위/실제 격리 DB/HTTP 생성·재생성·15경기·공유·새 세션 및 기존 strict/reuse 회귀 PASS. 최종 전체 검사에서 catalog DB-only worker 관측 12ms(AI0, production SLA 아님).
+- 최종 `CANDIDATE_LIVE_TEST=false CANDIDATE_INTERPRETATION_DIAGNOSTIC=false ./scripts/verify.sh` PASS: Java451 실행/실패·오류0/유료2 제외(총453), 프론트 테스트·TypeScript/웹 build, handoff6·release13·deployment28, fixture5·실제 HTTP166개/9schemas, bootJar/appJar.
+- 독립 리뷰1회차 Critical0/High0/Medium1: 최신 사실 거절 사례를 READY만 기대하던 평가 harness 문제. 기대 FAILED/CLARIFICATION_REQUIRED·draft 없음·이후 preview/play 미실행으로 분기하고 합성 회귀 및 실제 거절 사례로 확인했다. 최종2회차 Critical0/High0/actionable0. 이후 수정은 결과 문서 기록뿐이다.
+- 같은 최종 코드에서 worker crash 회복 시 추가 유료 composition을 금지하고 DB 전용 복구만 허용한다. 기존 staged 복구 정책·예약/누적 상한은 바꾸지 않는다.
+- 실제 합성8개 실험/유료7회/검색0/추가$0.09224, 누적실험$5.3877598/$6(미확인$.50포함). v1 식사 내용 보류를 보존하고 1회 프롬프트 보완 뒤 v2 비교. v2 취미2.147초/$0.0118365·식사6.368초/$0.016708, 최신 사실 요청은2.455초/$0.010446에 기대 거절. 순수DB preset은AI0/연결전체0.391초. 실제 속도·품질은 소수 표본이며 일반 p95/성공률이 아니다.
+- 유료 실험 종료. 원격 Git push·운영 카탈로그 migration·새 이미지 배포·실제 브라우저 새 전략 측정은 실행하지 않았다. 운영 기본값은 staged다. 프론트 애니메이션 변경은 이번 범위가 아니다.
+
 ## 2026-09-19 운영 실행 완료 — TD-52/53
 
 최종 앱은 source `a917a482534ae8c32461c463ac1971df4060e2a3`, image `sha256:a7cf6219da1d034298db3ecf8bea4a873a6f11519520dd13c5ce7300edf88382`다. 인프라 호환 수정 `13e55a1`은 앱 소스를 바꾸지 않는다. 실제 [공개 서비스](https://dcti7vhb3wkpw.cloudfront.net)에서 다음을 확인했다.
@@ -261,3 +272,10 @@ smoke는 로컬 DB에 개발용 생성 작업 2개와 경기/공유 기록을 �
 독립 리뷰 1회차: Critical 0 / High 0 / Medium 1. 연결된 Fork 안내가 다른 브랜치를 push하고 main을 PR base로 고정하는 불일치를 확인했다. 현재 브랜치 `HEAD` push와 PR #1 병합 전후 base 절차로 통일했다. 2회차 리뷰는 clean, Critical 0 / High 0 / 남은 actionable finding 0이다. 수정 후 전체 verify 재실행과 문서 로컬 링크 46개·diff whitespace 검사를 통과했다. Java 작업은 다시 UP-TO-DATE였다.
 
 확인에 사용한 dev 서버와 이 프로젝트 전용 compose DB는 중지했고 데이터 volume은 유지했다. 다른 운영체제의 새 clone이나 실제 Fork UI 절차는 직접 실행하지 않았다. 이후 변경은 이 검증 기록뿐이다.
+# TD-55 제출 준비 — 2026-09-20
+
+최종 전체 verify PASS: Java454중452실행/유료2제외·실패/오류0, frontend61, handoff6, release13, runtime20+AWS12, fixture5/HTTP166개9schemas, TypeScript/Vite/bootJar/appJar. 최종 재실행은 변경 없는 Java test 결과를 Gradle up-to-date로 재사용했다. 독립 Reviewer1차 Critical0/High0/actionable0. 최종 UI/runtime/compact-v3를 포함하며 이전TD54 리뷰를 대신 인용하지 않았다.
+
+통합JAR+전용 로컬DB의 실제 브라우저8/16/32(7/15/31경기)·재생성·timeout·복원·중복탭·공유새세션 PASS, 생성POST4/공유추가생성0/브라우저오류0. 새애니메이션4조합(360/1280×일반/reduced)·기존fallback/clarification/generation-policy 검증도 PASS. 350ms진입/280ms피드백/7000ms선택 불변. local release smoke는asset2개·health/ready·404 포함PASS. 합성브라우저를 실제모델품질로 혼동하지 않는다.
+
+실제32강2요청과 미해결 의미유사성은 docs/CATALOG_ENGINE.md에 기록했다. 추가$0.032856, 실험누적$5.4206158/$6, 검색0. 새 운영이미지 적용·V4/전략·공개16강최종연결은 AWS 재로그인 대기 중으로 미완료다. 최신 전달 상태는 docs/V1_SUBMISSION.md.

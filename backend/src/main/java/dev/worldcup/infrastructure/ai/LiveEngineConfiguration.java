@@ -1,11 +1,14 @@
 package dev.worldcup.infrastructure.ai;
 
 import dev.worldcup.generation.CandidateEngine;
+import dev.worldcup.generation.catalog.CandidateCatalog;
+import dev.worldcup.generation.catalog.FastCandidateEngine;
 import dev.worldcup.generation.engine.StagedCandidateEngine;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -28,6 +31,9 @@ public class LiveEngineConfiguration {
         return new OpenAiResponsesClient(key, ledger, clock, Duration.ofSeconds(attemptSeconds));
     }
     @Bean CandidateEngine liveCandidateEngine(OpenAiResponsesClient client, Clock clock, Environment environment,
+            ObjectProvider<CandidateCatalog> catalog,
+            @Value("${worldcup.ai.strategy:staged}") String strategy,
+            @Value("${worldcup.ai.fast-timeout-seconds:30}") int fastSeconds,
             @Value("${worldcup.ai.generation-model:gpt-5.6-terra}") String generationModel,
             @Value("${worldcup.ai.review-model:gpt-5.6-terra}") String reviewModel,
             @Value("${worldcup.ai.attempt-timeout-seconds:90}") int attemptSeconds,
@@ -37,6 +43,14 @@ public class LiveEngineConfiguration {
                 || operationSeconds < attemptSeconds || operationSeconds > 280 || leaseSeconds < operationSeconds + 5) {
             throw new IllegalArgumentException("Live engine requires isolated profile and consistent bounded deadlines");
         }
+        if ("catalog".equals(strategy)) {
+            if (fastSeconds < 1 || fastSeconds > 60 || fastSeconds > operationSeconds) {
+                throw new IllegalArgumentException("Catalog engine requires a bounded fast deadline");
+            }
+            return new FastCandidateEngine(catalog.getObject(), new OpenAiCatalogComposer(client, generationModel),
+                    clock, Duration.ofSeconds(fastSeconds));
+        }
+        if (!"staged".equals(strategy)) throw new IllegalArgumentException("Unknown candidate engine strategy");
         return new StagedCandidateEngine(new OpenAiCandidateStages(client, clock, generationModel, reviewModel), clock, Duration.ofSeconds(operationSeconds));
     }
 }

@@ -17,8 +17,8 @@ interface Options {
 function problem(error: unknown): UserProblem {
   const failure = error instanceof ApiFailure ? error : undefined;
   const messages: Record<string, [string, string]> = {
-    QUALITY_GATE_FAILED: ['후보를 충분히 준비하지 못했어요', '조건을 지키면서 비교할 만한 후보가 부족했어요. 고민이나 조건을 조금 더 구체적으로 적어 주세요.'],
-    CLARIFICATION_REQUIRED: ['어떤 선택인지 조금 더 알려 주세요', '고르고 싶은 대상과 꼭 필요한 조건을 입력해 주세요.'],
+    QUALITY_GATE_FAILED: ['후보를 충분히 준비하지 못했어요', '이번 요청의 후보를 완성하지 못했어요. 고민과 조건을 확인한 뒤 다시 만들어 주세요.'],
+    CLARIFICATION_REQUIRED: ['요청을 조금 더 확인해 주세요', '비교할 대상과 조건을 확인해 주세요. 최신 장소·가격 확인이 필요한 추천은 지원하지 않아요.'],
     UNSUPPORTED_REQUEST: ['이 고민은 지금 준비하기 어려워요', '비교해서 고를 수 있는 대상과 조건으로 다시 적어 주세요.'],
     RATE_LIMITED: ['잠시 쉬었다 다시 시도해 주세요', '지금은 새로운 후보를 만들 수 없어요. 대기 후 직접 다시 시도해 주세요.'],
     NOT_FOUND: ['정보를 찾을 수 없어요', '주소가 잘못됐거나 저장 기간이 지났을 수 있어요. 쿠키를 지웠다면 이전의 비공개 진행을 찾을 수 없습니다.'],

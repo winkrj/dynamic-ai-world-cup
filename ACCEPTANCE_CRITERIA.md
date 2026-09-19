@@ -2,6 +2,15 @@
 
 구현 완료와 설계 확정을 구별한다. 초기 구현 범위는 `docs/TICKETS.md`와 `PROJECT_CONTEXT.md`에 기록한다.
 
+TD-54(2026-09-19) 예외 범위: 아래 AC-03의 사전 quota 승인, AC-04/06의 독립 의미 판정, AC-07의 Repair, AC-20의 모든 gate 유지 조건은 기존 `staged` 전략에 적용된다. 사용자 승인한 신규 `catalog` 전략은 원문 조건을 최우선으로 하는 best-effort 단일 선택·보충 + 명시적 서버 구조 검사로 바꾼다. 미수행 검토를 PASS로 만들지 않는다. 최신 사실 필요 판단은 단일 모델에 의존하고 GROUNDING_REQUIRED를 반환하면 종료하며, 실제 외부 사실 검증 성공은 주장하지 않는다. 나머지 게임/계약/일일/비용 기준은 유지한다. 추가 검증 기준은 다음과 같다.
+
+| ID | catalog 완료 기준 |
+| --- | --- |
+| AC-21 | 정확한 편집 preset/개인 이력 없음/후보 충분 시 DB로 생성, AI 0회. 조건이 추가된 문장을 정확 hit로 처리하지 않음 |
+| AC-22 | 일반 요청의 DB ID 선택·부족분 보충은 provider 최대 1회. 검색/reviewer/Repair/느린 엔진 자동 fallback 없음. 실제 공급 ID만 허용, 알려진 이름/family 중복·N·단위·필드 검사 |
+| AC-23 | FAST_BEST_EFFORT와 validatorVersion 구별, 독립 certificate 없음, 공용 승인 세트로 자동 승격 안 함. 프롬프트 의미 정확도/목표 속도를 실측 완료로 위장하지 않음 |
+| AC-24 | V4 편집 후보의 provenance/time-independent/active를 확인. 새 private 생성 원문/결과 자동 공용화 없음. DB preset 생성·재생성·freeze·완주·동일 공유 연결에서 추가 AI 0회 |
+
 | ID | 완료 기준 | 티켓 / 검증 |
 | --- | --- | --- |
 | AC-01 | 8/16/32만 허용, 빈 고민 거절, no-login 생성 | B-002 API 및 FE-001 |

@@ -30,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Fixed official endpoint, no redirects/tools except explicit search, no automatic retries. */
 public final class OpenAiResponsesClient {
     public static final String PROMPT_VERSION = "ce002-v23-generate-review-repair";
+    public static final String COMPACT_PROMPT_VERSION = "ce003-v3-core-experience";
     private static final Set<String> MODELS = Set.of("gpt-5.6-terra", "gpt-5.6-luna");
     private static final int MAX_OUTPUT = 8192;
     private static final int MAX_SEARCH_CALLS = 4;
@@ -75,12 +76,22 @@ public final class OpenAiResponsesClient {
     record Exchange(CallContext context, String requestBody, int status, String responseBody, long latencyMs) {}
     public <T> Reply<T> complete(String model, String instructions, Object input, Map<String, Object> schema,
                                   Class<T> outputType, boolean search, CallContext context) {
+        return complete(model, instructions, input, schema, outputType, search, context, MAX_OUTPUT, "medium", PROMPT_VERSION);
+    }
+    /** Compact catalog composition: one provider request, no tools or hidden reviewer/repair. */
+    public <T> Reply<T> completeCompact(String model, String instructions, Object input, Map<String, Object> schema,
+                                         Class<T> outputType, CallContext context) {
+        return complete(model, instructions, input, schema, outputType, false, context, 4096, "none", COMPACT_PROMPT_VERSION);
+    }
+    private <T> Reply<T> complete(String model, String instructions, Object input, Map<String, Object> schema,
+                                  Class<T> outputType, boolean search, CallContext context, int maxOutput,
+                                  String reasoningEffort, String promptVersion) {
         if (!MODELS.contains(model)) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
         long timeoutMs = remainingMillis(context);
         var request = new LinkedHashMap<String, Object>();
         request.put("model", model); request.put("instructions", instructions); request.put("input", json.writeValueAsString(input));
-        request.put("store", false); request.put("service_tier", "default"); request.put("max_output_tokens", MAX_OUTPUT);
-        request.put("reasoning", Map.of("effort", "medium"));
+        request.put("store", false); request.put("service_tier", "default"); request.put("max_output_tokens", maxOutput);
+        request.put("reasoning", Map.of("effort", reasoningEffort));
         request.put("text", Map.of("verbosity", "low", "format", Map.of("type", "json_schema", "name", "candidate_" + context.stage().toLowerCase(), "strict", true, "schema", schema)));
         request.put("tools", search ? List.of(Map.of("type", "web_search", "search_context_size", "low")) : List.of());
         if (search) { request.put("include", List.of("web_search_call.action.sources")); request.put("tool_choice", "required"); request.put("max_tool_calls", MAX_SEARCH_CALLS); }
@@ -105,7 +116,7 @@ public final class OpenAiResponsesClient {
             JsonNode root = json.readTree(response.body());
             if (!model.equals(root.path("model").asString()) || !"default".equals(root.path("service_tier").asString())) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
             var usage = usage(root);
-            if (usage.outputTokens() > MAX_OUTPUT || usage.searches() > (search ? MAX_SEARCH_CALLS : 0)) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
+            if (usage.outputTokens() > maxOutput || usage.searches() > (search ? MAX_SEARCH_CALLS : 0)) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
             String responseId = root.path("id").asString();
             if (responseId.isBlank() || responseId.length() > 200) throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);
             BigDecimal cost = cost(model, usage);
@@ -132,7 +143,7 @@ public final class OpenAiResponsesClient {
             try { result = json.readValue(text.toString(), outputType); }
             catch (RuntimeException malformed) { throw new InvalidModelOutput(); }
             if (result == null) throw new InvalidModelOutput();
-            return new Reply<>(result, "openai/" + model + "/" + PROMPT_VERSION + "/" + responseId,
+            return new Reply<>(result, "openai/" + model + "/" + promptVersion + "/" + responseId,
                     sources, new String(response.body(), StandardCharsets.UTF_8));
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt(); throw Failure.of(Failure.Code.PROVIDER_UNAVAILABLE);

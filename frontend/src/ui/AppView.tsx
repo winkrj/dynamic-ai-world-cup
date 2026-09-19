@@ -122,6 +122,7 @@ function SizeScreen({ state, actions }: ViewProps) {
       </label>)}
     </fieldset>
     <p className="fine-print">대결마다 7초. 시간이 지나면 둘 중 하나가 무작위로 진출해요.</p>
+    {state.size === 32 && <p className="fine-print size-quality-note">32강은 비슷한 후보가 섞일 수 있어요. 빠른 선택에는 16강을 추천해요.</p>}
     <GenerationPolicy />
     <div className="action-stack"><button className="button button--primary" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.generate}>후보 {state.size}개 만들기 <Arrow /></button>
       <button className="text-button" disabled={state.busy || state.locked} onClick={actions.back}><Arrow direction="left" /> 고민으로 돌아가기</button></div>
@@ -148,7 +149,7 @@ function ClarificationScreen({ state, actions }: ViewProps) {
   const validation = clarificationProblem(state.prompt, answer);
   const count = promptLength(clarifiedPrompt(state.prompt, answer));
   return <section className="flow-page clarification-page">
-    <Heading eyebrow="ONE QUICK QUESTION" subtitle="비교할 대상을 정하지 못해 한 번만 더 확인해요. 처음 적은 조건은 함께 보낼게요.">어떤 대상을<br /><span className="accent-text">고르고 싶나요?</span></Heading>
+    <Heading eyebrow="ONE QUICK QUESTION" subtitle="지금은 이 요청의 후보를 준비하기 어려워요. 비교할 대상과 조건을 확인해 주세요. 최신 장소·가격 확인이 필요한 추천은 지원하지 않아요. 처음 적은 조건은 함께 보낼게요.">어떤 대상을<br /><span className="accent-text">고르고 싶나요?</span></Heading>
     <p className="tiny-label">처음 적은 고민 · {state.size}강</p>
     <blockquote className="prompt-quote clarification-original">{state.prompt}</blockquote>
     <form className="prompt-panel" onSubmit={event => { event.preventDefault(); actions.submitClarification(); }}>
@@ -174,6 +175,7 @@ function PreviewScreen({ state, actions }: ViewProps) {
     <Heading eyebrow="04 / MEET THE CONTENDERS" subtitle={<>대결 전에 후보 {preview.size}개를 모두 살펴봐요.<br />시작하면 후보와 대진은 바뀌지 않아요.</>}>이 중에,<br /><span className="accent-text">너의 선택은?</span></Heading>
     <div className="roster-heading"><h2>{preview.candidateUnit} <span>{preview.size}강</span></h2><span className="tiny-label">{twoDigits(preview.candidates.length)} CANDIDATES</span></div>
     <CandidateList candidates={preview.candidates} />
+    <p className="fine-print preview-quality-note">후보는 선택을 돕는 추천이에요. 시작 전에 예산·준비물 등 내 조건에 맞는지 확인해 주세요.</p>
     {state.busy && <p className="notice" role="status">처리 중이에요. 완료될 때까지 현재 후보를 그대로 보여드려요.</p>}
     <div className="preview-actions action-stack">
       <button className="button button--primary" onClick={actions.start} disabled={state.previewLocked || state.busy || state.locked || state.storageBlocked}>이대로 시작 <Arrow /></button>
@@ -237,7 +239,7 @@ function MatchView({ state, actions }: ViewProps) {
           <span className="card-arrow" aria-hidden="true">↗</span>
         </button>;
       })}
-      <span className="versus" aria-hidden="true">VS</span>
+      <span className="match-divider" aria-hidden="true"><span className="match-spark" /><span className="versus"><span>VS</span></span></span>
     </div>
     <p className={`match-note ${lastEvent?.reason === 'TIMEOUT_RANDOM' ? 'match-note--timeout' : ''}`} role="status">{note}</p>
     <div className="match-progress" aria-label={`${play.events.length} / ${total} 경기 완료`}>
@@ -255,7 +257,7 @@ function ChampionScreen({ state, actions }: ViewProps) {
   const random = events.length - direct;
   return <section className="flow-page champion-page">
     <Heading eyebrow="THE LAST ONE STANDING" subtitle="많은 가능성 끝에, 오늘의 선택.">너의 <span className="accent-text">챔피언.</span></Heading>
-    <div className="champion-card"><span className="champion-ribbon">CHAMPION / 01</span><CandidateArt candidate={candidate} number="01" />
+    <div className="champion-card"><span className="champion-ribbon">CHAMPION / 01</span><CandidateArt candidate={candidate} number="01" /><span className="champion-stamp" aria-hidden="true">WINNER</span>
       <div className="champion-copy"><p className="tiny-label">YOUR FINAL PICK</p><h2>{candidate.name}</h2><Tags candidate={candidate} /></div><span className="champion-star" aria-hidden="true">✳</span>
     </div>
     <div className="result-stats"><div><strong>{events.length}</strong><span>번의 선택</span></div><div><strong>{direct}</strong><span>직접 선택</span></div><div><strong>{random}</strong><span>랜덤 진출</span></div></div>

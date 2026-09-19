@@ -24,4 +24,13 @@ class LiveEvalCaseTest {
         assertThat(selected.prompt()).isEqualTo("집에서 혼자 조용히 하루 30분씩 꾸준히 할 취미를 고르고 싶어");
         assertThat(selected.datasetVersion()).isNotEqualTo("seed-v1");
     }
+    @Test void catalogFactExperimentRequiresRefusalRatherThanRewardingInventedReady() {
+        var json = new JsonMapper();
+        var refused = json.readTree("{\"status\":\"FAILED\",\"draftId\":null,\"error\":{\"code\":\"CLARIFICATION_REQUIRED\"}}");
+        var ready = json.readTree("{\"status\":\"READY\",\"draftId\":\"invented\",\"error\":null}");
+        assertThat(LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", refused)).isTrue();
+        assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", ready)).isInstanceOf(AssertionError.class);
+        assertThat(LiveEngineHttpTest.assertExpectedTerminal("catalog-hobby", ready)).isFalse();
+        assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal("catalog-hobby", refused)).isInstanceOf(AssertionError.class);
+    }
 }

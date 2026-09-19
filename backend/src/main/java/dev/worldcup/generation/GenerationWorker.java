@@ -38,7 +38,9 @@ public class GenerationWorker {
         var job = claimed.get();
         try {
             var choices = history.recentDirectChoices(job.actorId(), clock.instant().minus(Duration.ofDays(30)));
-            var context = new CandidateEngine.Context(job.id(), job.attempt(), job.leaseUntil(), choices);
+            var previousNames = job.draftId() == null ? java.util.List.<String>of() : jobs.ownedDraft(job.actorId(), job.draftId(), false)
+                    .map(d -> d.content().candidates().stream().map(c -> c.name()).toList()).orElse(java.util.List.of());
+            var context = new CandidateEngine.Context(job.id(), job.attempt(), job.leaseUntil(), choices, previousNames);
             String previousMembership = job.draftId() == null ? null : jobs.ownedDraft(job.actorId(), job.draftId(), false)
                     .map(draft -> ReusePolicy.membershipHash(draft.content().candidates().stream().map(c -> c.name()).toList()))
                     .orElseThrow(() -> Failure.of(Failure.Code.QUALITY_GATE_FAILED));

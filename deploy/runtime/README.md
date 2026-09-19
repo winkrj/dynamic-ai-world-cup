@@ -8,7 +8,7 @@ Amazon Linux 2023 / `linux/amd64` / 초기 2 GiB 호스트용이다. CloudFront 
 | --- | --- |
 | `/opt/worldcup/runtime` | 이 폴더의 배포 파일. root 소유, 다른 사용자 쓰기 금지. `init-worldcup.sh` 실행 비트 보존 |
 | `/etc/worldcup` | root 소유·0700. 아래 네 파일은 root 소유·0600, symlink 금지 |
-| `runtime.env` | `APP_IMAGE`, `NGINX_IMAGE`, `POSTGRES_IMAGE`, `PUBLIC_HOST`, `BACKUP_BUCKET`, `AWS_REGION`, `CANDIDATE_BUDGET_USD` |
+| `runtime.env` | 필수: `APP_IMAGE`, `NGINX_IMAGE`, `POSTGRES_IMAGE`, `PUBLIC_HOST`, `BACKUP_BUCKET`, `AWS_REGION`, `CANDIDATE_BUDGET_USD`. 선택: `CANDIDATE_ENGINE_STRATEGY`, `CANDIDATE_FAST_TIMEOUT_SECONDS` |
 | `app.env` | `DATABASE_PASSWORD`, `OPENAI_API_KEY`만 |
 | `postgres.env` | `POSTGRES_PASSWORD`(관리자), `WORLDCUP_PASSWORD`(앱 암호와 동일)만 |
 | `proxy.env` | CloudFront origin의 `X-Origin-Verify`와 동일한 `ORIGIN_VERIFY_TOKEN`만 |
@@ -33,6 +33,10 @@ bash /opt/worldcup/runtime/run.sh status
 `start`는 매번 호스트 역할로 ECR 인증 갱신 → 고정 digest pull → PostgreSQL TCP 준비 → 앱 `/api/v1/ready` 200 → nginx 순서로 기다린다. AWS CLI 토큰은 `docker login --password-stdin`에 파이프로만 전달한다. 0700 임시 `DOCKER_CONFIG`와 0600 token 설정을 사용하고 성공/실패 종료 시 해당 파일을 삭제한다. 원래 사용자 Docker 인증 설정은 덮어쓰거나 지우지 않는다. 이전 로그인 만료 후 재배포도 새 인증으로 시작한다. 실패하면 배포를 성공으로 표시하지 않고 상태와 비밀 없는 오류를 확인한다. 자동 DB 삭제·major 업그레이드·복원·무한 재시도는 없다. `stop`은 이 프로젝트의 컨테이너만 정지하며 volume을 삭제하지 않는다.
 
 앱은 `prod,live,proxy`, 같은 기존 Terra 모델, 하루 2회, **DB 전체 운영 누적 $5**다. 일/월 자동 재설정이 아니며 API 잔액 소진만을 안전장치로 삼지 않는다. 복구/비용 대조 동안은 `CANDIDATE_BUDGET_USD=0`으로 시작한다. 런타임 validator는 `0` 또는 승인한 `5`만 허용한다. 예산을 바꾸면 컨테이너를 다시 생성해야 하며 파일 변경만으로 실행 중 프로세스가 바뀌지 않는다. 초기 메모리 상한은 앱 768 MiB(`-Xmx384m`), DB 384 MiB, nginx 64 MiB다. 이는 검증할 시작 설정이며 처리량/무장애를 보장하지 않는다.
+
+후보 엔진은 `runtime.env`에 `CANDIDATE_ENGINE_STRATEGY=catalog`, `CANDIDATE_FAST_TIMEOUT_SECONDS=30`을 명시해 DB 우선·최대 1회 AI 경로로 전환한다. 해당 코드와 V4 migration을 포함한 이미지가 선행해야 한다. 전략은 `catalog` 또는 `staged`만, 운영 fast timeout은 `30`만 허용한다. 기존 설정 파일에 두 키가 없으면 `staged`/`30`을 유지하며 호출한 shell의 동명 변수는 덮어쓴다. `app.env`에 추가하지 않는다. 30초는 fast engine 실행 상한이지 대기열·네트워크를 포함한 응답 SLA가 아니다.
+
+배포 시 새 image digest와 두 설정을 외부 `runtime.env`에 적용한 뒤 `check` → `start` → HTTPS readiness/생성/공유 점검을 수행한다. `start`가 변경 환경으로 앱을 재생성한다. 긴급 비용 중단은 예산 `0`, 엔진만 되돌릴 때는 **같은 새 이미지에서** 전략 `staged`로 설정 후 다시 `check` → `start`한다. staged는 기존 다단계 호출로 돌아가므로 더 느리고 비용이 높을 수 있다. V4/기존 snapshot/비용 장부를 지우지 않으며 DB rollback이나 예산 초기화는 하지 않는다. 이전 이미지로 되돌리는 작업은 Flyway 호환성을 따로 검증해야 하므로 엔진 설정 rollback과 구분한다.
 
 앱 UID10001, nginx UID101, DB UID70으로 실행한다. 모두 read-only root, capability 제거, no-new-privileges와 제한된 tmpfs를 쓴다. DB만 EBS에 쓴다. Docker 로그는 서비스당 10 MiB ×3으로 제한하고 nginx access log는 끈다. `docker inspect`, `docker compose config`, `nginx -T`는 비밀을 보여줄 수 있으므로 채팅·SSM 출력·CI 로그에 출력하지 않는다. 스크립트의 Compose 확인은 `config --quiet`뿐이다. 설정 파일은 어떤 백업/릴리스 archive에도 넣지 않는다.
 
@@ -64,6 +68,6 @@ worldcup DB만 관리자 역할로 `pg_dump -Fc`한다. 암호는 CLI 인자에 
 
 ## 검증 근거와 한계
 
-저장소 루트에서 `node --test scripts/check-deployment-runtime.test.mjs`는 16개 계약 검사, 비밀 없는 설정 fixture, 실제 `docker compose config --format json`, shell parse를 검사한다. ECR 인증의 성공/실패·토큰 stdin 전달·임시 설정 제거는 가짜 CLI만 사용하는 회귀 테스트로 확인한다. Docker daemon/실제 AWS/paid provider는 호출하지 않는다. 실제 컨테이너 시작, 비root 파일 권한, DB 역할/Flyway, nginx token/XFF 전달, 공개 HTTPS, S3 dump 업로드/격리 복원, 실제 2 GiB 메모리 사용은 배포 통합 검증으로 따로 확인해야 한다.
+저장소 루트에서 `node --test scripts/check-deployment-runtime.test.mjs`는 비밀 없는 설정 fixture, 실제 `docker compose config --format json`, shell parse를 검사한다. catalog/staged 전달·구 설정 기본값·잘못된 설정 차단·비밀 파일 미변경도 확인한다. ECR 인증의 성공/실패·토큰 stdin 전달·임시 설정 제거는 가짜 CLI만 사용하는 회귀 테스트로 확인한다. Docker daemon/실제 AWS/paid provider는 호출하지 않는다. 실제 컨테이너 시작, 비root 파일 권한, DB 역할/Flyway, nginx token/XFF 전달, 공개 HTTPS, S3 dump 업로드/격리 복원, 실제 2 GiB 메모리 사용은 배포 통합 검증으로 따로 확인해야 한다.
 
 공식 참고: [Compose 환경 파일](https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/), [Compose 서비스 제약](https://docs.docker.com/reference/compose-file/services/), [nginx 전달 헤더](https://nginx.org/en/docs/http/ngx_http_proxy_module.html), [PostgreSQL 공식 이미지 초기화 동작](https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh). 템플릿 치환은 nginx 변수까지 치환하지 않도록 두 허용 변수만 지정한다.

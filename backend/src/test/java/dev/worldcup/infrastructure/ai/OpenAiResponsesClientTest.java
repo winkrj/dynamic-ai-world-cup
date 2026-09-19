@@ -73,6 +73,19 @@ class OpenAiResponsesClientTest {
         assertThat(ledger.failed).isZero();
         assertThat(ledger.cost).isEqualByComparingTo("0.00104");
     }
+    @Test void compactCompositionUsesOneToolFreeNonReasoningRequestAndSameLedger() {
+        var reply = client.completeCompact("gpt-5.6-terra", "compact", Map.of("request", "synthetic"),
+                Map.of("type", "object"), Result.class, new CallContext("job", 1, "COMPOSE", Instant.now().plusSeconds(10)));
+        assertThat(reply.value().value()).isEqualTo("ok");
+        assertThat(reply.version()).contains(OpenAiResponsesClient.COMPACT_PROMPT_VERSION);
+        assertThat(calls).hasValue(1);
+        assertThat(request.path("max_output_tokens").asInt()).isEqualTo(4096);
+        assertThat(request.path("reasoning").path("effort").asString()).isEqualTo("none");
+        assertThat(request.path("tools").size()).isZero();
+        assertThat(request.has("tool_choice")).isFalse();
+        assertThat(ledger.completed).isEqualTo(1);
+        assertThat(ledger.cost).isEqualByComparingTo("0.00104");
+    }
     @ParameterizedTest @ValueSource(strings = {"null", "{}", "{\"value\":null}", "{\"value\":123}", "{\"value\":\"ok\",\"extra\":1}", "{broken"})
     void malformedOutputIsStillPaidAndNeverRetried(String output) {
         response = completed(output);

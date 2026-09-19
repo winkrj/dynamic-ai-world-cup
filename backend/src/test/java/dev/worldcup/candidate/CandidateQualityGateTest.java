@@ -51,6 +51,27 @@ class CandidateQualityGateTest {
         assertThat(preview.status()).isEqualTo("READY");
     }
     @Test void rejectsMissingInput() { rejects(null, candidates(8), evidence(8), INVALID_SCHEMA); }
+    @Test void bestEffortAcceptanceIsNotIndependentEvidenceAndRetainsDeclaredConstraints() {
+        var result = gate.acceptBestEffort(plan(16), candidates(16));
+        assertThat(result.passed()).isTrue();
+        var accepted = result.validated().orElseThrow();
+        assertThat(accepted.policy()).isEqualTo(CandidateQualityGate.AcceptancePolicy.FAST_BEST_EFFORT);
+        assertThat(accepted.plan().hardConstraints()).isEqualTo(plan(16).hardConstraints());
+        rejects(plan(16), candidates(16), new Evidence(List.of(), List.of(), Verdict.UNKNOWN, Verdict.UNKNOWN, ""), SEMANTIC_REVIEW_FAILED);
+        assertThatThrownBy(() -> new dev.worldcup.generation.CandidateEngine.Generated(accepted, "16강", "catalog-v1", "independent"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void bestEffortStillRejectsBadCountDuplicatesAndFactualAttestations() {
+        assertThat(gate.acceptBestEffort(plan(16), candidates(8)).passed()).isFalse();
+        var duplicate = candidates(8); duplicate.set(1, duplicate.get(0));
+        assertThat(gate.acceptBestEffort(plan(8), duplicate).passed()).isFalse();
+        var grounded = new Plan(8, "취미 활동", true, List.of(), plan(8).coverage());
+        assertThat(gate.acceptBestEffort(grounded, candidates(8)).issues())
+                .extracting(CandidateQualityGate.Issue::code).contains(GROUNDING_UNVERIFIED);
+        var factConstraint = new Plan(8, "취미 활동", false,
+                List.of(new HardConstraint("price", VerificationMode.GROUNDED_FACT)), plan(8).coverage());
+        assertThat(gate.acceptBestEffort(factConstraint, candidates(8)).passed()).isFalse();
+    }
     @Test void rejectsNullCandidate() {
         var list = candidates(8); list.set(0, null);
         rejects(plan(8), list, evidence(8), INVALID_SCHEMA);

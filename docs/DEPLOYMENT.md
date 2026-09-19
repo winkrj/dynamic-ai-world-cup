@@ -170,3 +170,8 @@ node scripts/smoke-release.mjs http://127.0.0.1:8080
 `/api/v1/health`는 현재 프로세스의 liveness 응답이다. `/api/v1/ready`는 DB `SELECT 1`, 번들된 웹 문서, worker 활성화와 엔진 profile 구성을 확인해 200 `READY` 또는 503 `NOT_READY`를 반환한다. 플랫폼의 readiness probe는 `/api/v1/ready`를 사용한다. 실제 worker 진행, 제공자 연결·잔액·후보 품질까지 검사하지 않으며 유료 호출도 없다. 이 점검은 실제 브라우저 선택/복원·Secure 쿠키의 mutation 동작·실제 모델 후보 품질·비용 통제 운영을 대체하지 않는다. `npm run api:smoke`는 로컬 합성 dev 전용으로 DB에 생성·경기 기록을 만드는 별도 점검이므로 운영에서 대신 실행하지 않는다.
 
 최종 공개 완료 기록에는 소스 revision/이미지 digest, 실제 HTTPS 주소, DB backup/복원 결과, proxy/IP 제한 검증, 읽기 전용 smoke 결과, 별도 승인된 실제 후보 평가 결과와 남은 한계를 구분해 남긴다. 이 값들이 정해지거나 실행되기 전에는 배포 완료로 표기하지 않는다.
+# TD-55 새 제출 버전 배포 대기 — 2026-09-20
+
+DB-first catalog·compact-v3·A상하애니메이션의 코드/로컬통합/독립리뷰를 완료했다. **아래 기존 운영배포 기록은 새 버전 적용을 뜻하지 않는다.** 배포용 AWS 로그인 세션이 만료되어 새 이미지·runtime·V4를 아직 적용하지 않았다. 현재 운영전략을 catalog로 바꿨다고 보고하지 않는다. 전체 상태/재개순서는 [1차 제출본](V1_SUBMISSION.md)을 따른다.
+
+새 runtime은 `CANDIDATE_ENGINE_STRATEGY=catalog`와 `CANDIDATE_FAST_TIMEOUT_SECONDS=30`을 외부 runtime.env에 명시해야 한다. 기존파일에서 미기재는 staged/30으로 유지한다. app.env의 비밀키/DB암호나 누적예산$5는 변경하지 않는다. 새 이미지에서 staged로 되돌리는 것은 전략 rollback이며, V4 이후 오래된 이미지가 새 Flyway버전을 허용하는지 확인 없이 옛digest로 교체하지 않는다. 비용긴급차단은예산0이며 장부삭제/DB초기화가 아니다.

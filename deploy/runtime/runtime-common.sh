@@ -10,7 +10,7 @@ runtime_private_file() {
 }
 
 runtime_read_env() {
-    local wc_file="$1" wc_prefix="$2" wc_allowed="$3" wc_line wc_key wc_value wc_seen='|'
+    local wc_file="$1" wc_prefix="$2" wc_allowed="$3" wc_required_keys="${4:-$3}" wc_line wc_key wc_value wc_seen='|'
     runtime_private_file "$wc_file"
     while IFS= read -r wc_line || [[ -n "$wc_line" ]]; do
         case "$wc_line" in ''|'#'*) continue ;; esac
@@ -25,7 +25,7 @@ runtime_read_env() {
     done < "$wc_file"
     local wc_required
     local IFS='|'
-    for wc_required in $wc_allowed; do
+    for wc_required in $wc_required_keys; do
         case "$wc_seen" in *"|$wc_required|"*) ;; *) runtime_fail 'A required environment key is missing.' ;; esac
     done
 }
@@ -35,7 +35,12 @@ runtime_load() {
     RUNTIME_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
     SECRET_DIR=$(cd -- "$(dirname -- "$wc_config")" && pwd -P)
     export SECRET_DIR
-    runtime_read_env "$wc_config" wc_cfg_ 'APP_IMAGE|NGINX_IMAGE|POSTGRES_IMAGE|PUBLIC_HOST|BACKUP_BUCKET|AWS_REGION|CANDIDATE_BUDGET_USD'
+    # Existing installations remain on staged until runtime.env explicitly opts
+    # in. Never inherit these choices from the invoking shell.
+    wc_cfg_CANDIDATE_ENGINE_STRATEGY=staged
+    wc_cfg_CANDIDATE_FAST_TIMEOUT_SECONDS=30
+    local wc_required_config='APP_IMAGE|NGINX_IMAGE|POSTGRES_IMAGE|PUBLIC_HOST|BACKUP_BUCKET|AWS_REGION|CANDIDATE_BUDGET_USD'
+    runtime_read_env "$wc_config" wc_cfg_ "$wc_required_config|CANDIDATE_ENGINE_STRATEGY|CANDIDATE_FAST_TIMEOUT_SECONDS" "$wc_required_config"
     [[ "$wc_cfg_APP_IMAGE" =~ ^[0-9]{12}\.dkr\.ecr\.ap-northeast-2\.amazonaws\.com/[a-z0-9][a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'APP_IMAGE must be a Seoul private ECR release image digest.'
     [[ "$wc_cfg_NGINX_IMAGE" =~ ^nginx:stable-alpine@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'NGINX_IMAGE must pin the official stable-alpine digest.'
     [[ "$wc_cfg_POSTGRES_IMAGE" =~ ^postgres:17-alpine@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'POSTGRES_IMAGE must pin the official PostgreSQL 17 alpine digest.'
@@ -43,8 +48,10 @@ runtime_load() {
     [[ "$wc_cfg_BACKUP_BUCKET" =~ ^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$ ]] || runtime_fail 'Invalid private backup bucket name.'
     [[ "$wc_cfg_AWS_REGION" == ap-northeast-2 ]] || runtime_fail 'This deployment is scoped to the Seoul region.'
     [[ "$wc_cfg_CANDIDATE_BUDGET_USD" == 0 || "$wc_cfg_CANDIDATE_BUDGET_USD" == 5 ]] || runtime_fail 'Only cumulative AI budgets 0 or approved 5 are allowed.'
+    [[ "$wc_cfg_CANDIDATE_ENGINE_STRATEGY" == catalog || "$wc_cfg_CANDIDATE_ENGINE_STRATEGY" == staged ]] || runtime_fail 'Only catalog or staged candidate strategies are allowed.'
+    [[ "$wc_cfg_CANDIDATE_FAST_TIMEOUT_SECONDS" == 30 ]] || runtime_fail 'The production fast candidate timeout must be 30 seconds.'
     local wc_name wc_val
-    for wc_name in APP_IMAGE NGINX_IMAGE POSTGRES_IMAGE PUBLIC_HOST BACKUP_BUCKET AWS_REGION CANDIDATE_BUDGET_USD; do
+    for wc_name in APP_IMAGE NGINX_IMAGE POSTGRES_IMAGE PUBLIC_HOST BACKUP_BUCKET AWS_REGION CANDIDATE_BUDGET_USD CANDIDATE_ENGINE_STRATEGY CANDIDATE_FAST_TIMEOUT_SECONDS; do
         wc_val="wc_cfg_$wc_name"; wc_val=${!wc_val}
         case "$wc_val" in *REPLACE*|*replace*|*placeholder*|*example*|*@sha256:0000000000000000000000000000000000000000000000000000000000000000)
             runtime_fail 'A deployment placeholder is not a usable configuration.' ;;

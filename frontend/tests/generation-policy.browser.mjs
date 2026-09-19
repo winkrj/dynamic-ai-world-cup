@@ -17,7 +17,12 @@ async function openSize(page) {
   assert.match(await page.locator('.input-reassurance').textContent(), /이 브라우저에서 하루 2회 · 한국 시간 자정 초기화/);
   await page.getByRole('textbox').fill('합성 생성 정책 검증');
   await page.getByRole('button', { name: /월드컵 만들기/ }).click();
+  assert.equal(await page.locator('input[value="16"]').isChecked(), true, '16 remains the default.');
+  assert.equal(await page.locator('.size-quality-note').count(), 0);
+  await page.locator('input[value="32"]').check();
+  assert.match(await page.locator('.size-quality-note').textContent(), /비슷한 후보가 섞일 수 있어요/);
   await page.locator('input[value="8"]').check();
+  assert.equal(await page.locator('.size-quality-note').count(), 0, 'The 32-candidate guidance is scoped to that choice.');
   assert.match(await page.locator('.generation-policy').textContent(), /같은 요청 재전송·공유 플레이는 차감하지 않아요/);
 }
 async function assertFits(page) {
@@ -42,6 +47,7 @@ try {
     await generate.focus();
     await page.keyboard.press('Enter');
     await page.getByTestId('screen-preview').waitFor();
+    assert.match(await page.locator('.preview-quality-note').textContent(), /내 조건에 맞는지 확인해 주세요/);
     assert.match(await page.locator('.generation-policy').textContent(), new RegExp(policyText));
     const regenerate = page.getByRole('button', { name: /전체 다시 만들기 교체 남은 1회/ });
     assert.equal(await regenerate.count(), 1, 'Draft replacement allowance is not presented as remaining daily quota');

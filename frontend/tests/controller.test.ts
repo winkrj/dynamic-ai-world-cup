@@ -145,6 +145,19 @@ test('terminal generation failure stops polling and retry; editing requires expl
   assert.equal(h.controller.getSnapshot().prompt, input.prompt);
 });
 
+test('generation error copy does not invent a semantic cause or imply current facts are supported', async t => {
+  for (const code of ['QUALITY_GATE_FAILED', 'CLARIFICATION_REQUIRED'] as const) {
+    const h = harness(t, { api: client({
+      createGeneration: async () => { throw new ApiFailure(code, { retryable: false }); },
+    }) });
+    h.controller.editPrompt(input.prompt); h.controller.next(); await h.controller.generate();
+    const detail = h.controller.getSnapshot().error?.detail ?? '';
+    assert.doesNotMatch(detail, /후보가 부족|조건을 지키면서|대상을 정하지 못/);
+    if (code === 'CLARIFICATION_REQUIRED') assert.match(detail, /최신 장소·가격 확인이 필요한 추천은 지원하지 않아요/);
+    else assert.match(detail, /이번 요청의 후보를 완성하지 못했어요/);
+  }
+});
+
 test('failed generation reload exposes safe recovery without networking until explicit edit and new generation', async t => {
   const storage = memory();
   const keys: string[] = [];

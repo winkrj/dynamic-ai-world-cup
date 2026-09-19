@@ -19,6 +19,8 @@ const metadata = {
   BACKUP_BUCKET: 'worldcup-unit-test-backups',
   AWS_REGION: 'ap-northeast-2',
   CANDIDATE_BUDGET_USD: '5',
+  CANDIDATE_ENGINE_STRATEGY: 'catalog',
+  CANDIDATE_FAST_TIMEOUT_SECONDS: '30',
 };
 const secrets = {
   'app.env': `DATABASE_PASSWORD=${'b'.repeat(64)}\nOPENAI_API_KEY=sk-unit-test-not-a-real-api-key-123456789\n`,
@@ -28,7 +30,8 @@ const secrets = {
 function fixture(t, overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'worldcup-runtime-test-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const config = Object.entries({ ...metadata, ...overrides }).map(([key, value]) => `${key}=${value}`).join('\n') + '\n';
+  const config = Object.entries({ ...metadata, ...overrides }).filter(([, value]) => value !== undefined)
+    .map(([key, value]) => `${key}=${value}`).join('\n') + '\n';
   for (const [name, value] of Object.entries({ 'runtime.env': config, ...secrets })) {
     writeFileSync(join(dir, name), value, { mode: 0o600 });
   }
@@ -48,6 +51,15 @@ function reject(dir, expected) {
     assert(!result.stderr.includes(value), 'Failure messages must not reveal credentials.');
   }
 }
+function resolvedConfig(dir, inherited = {}) {
+  const result = spawnSync('bash', ['-c',
+    'set -euo pipefail; source "$1"; runtime_load "$2"; runtime_compose config --format json',
+    'runtime-compose-test', join(runtime, 'runtime-common.sh'), join(dir, 'runtime.env')], {
+    cwd: root, env: { ...process.env, ...inherited }, encoding: 'utf8', timeout: 20_000,
+  });
+  assert.equal(result.status, 0, `Docker Compose >=2.30 config check required: ${result.stderr}`);
+  return JSON.parse(result.stdout);
+}
 
 test('validates external private configuration without executing Docker or paid calls', t => {
   const dir = fixture(t);
@@ -63,6 +75,51 @@ test('permits zero AI budget for recovery, not any unapproved increase', t => {
   for (const amount of ['6', '-1', '5.01', '500', '5e0', '']) {
     reject(fixture(t, { CANDIDATE_BUDGET_USD: amount }), /budgets|empty/);
   }
+});
+
+test('explicit catalog and staged reach only the app without changing secret files', t => {
+  for (const strategy of ['catalog', 'staged']) {
+    const dir = fixture(t, { CANDIDATE_ENGINE_STRATEGY: strategy });
+    assert.equal(check(dir).status, 0);
+    const config = resolvedConfig(dir, { CANDIDATE_ENGINE_STRATEGY: 'inherited-invalid', CANDIDATE_FAST_TIMEOUT_SECONDS: '99' });
+    assert.equal(config.services.app.environment.CANDIDATE_ENGINE_STRATEGY, strategy);
+    assert.equal(config.services.app.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, '30');
+    for (const service of [config.services.nginx, config.services.postgres]) {
+      assert.equal(service.environment.CANDIDATE_ENGINE_STRATEGY, undefined);
+      assert.equal(service.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, undefined);
+    }
+    for (const [name, contents] of Object.entries(secrets)) assert.equal(readFileSync(join(dir, name), 'utf8'), contents);
+  }
+});
+
+test('older runtime files retain staged and 30 without inheriting the invoking shell settings', t => {
+  const dir = fixture(t, { CANDIDATE_ENGINE_STRATEGY: undefined, CANDIDATE_FAST_TIMEOUT_SECONDS: undefined });
+  const config = resolvedConfig(dir, { CANDIDATE_ENGINE_STRATEGY: 'catalog', CANDIDATE_FAST_TIMEOUT_SECONDS: '60' });
+  assert.equal(config.services.app.environment.CANDIDATE_ENGINE_STRATEGY, 'staged');
+  assert.equal(config.services.app.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, '30');
+  const partial = resolvedConfig(fixture(t, { CANDIDATE_FAST_TIMEOUT_SECONDS: undefined }));
+  assert.equal(partial.services.app.environment.CANDIDATE_ENGINE_STRATEGY, 'catalog');
+  assert.equal(partial.services.app.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, '30');
+});
+
+test('rejects unsupported strategies and timeouts without evaluating environment expressions', t => {
+  for (const strategy of ['CATALOG', 'staged ', 'other', '$(printf catalog)', '${CANDIDATE_ENGINE_STRATEGY}', '']) {
+    reject(fixture(t, { CANDIDATE_ENGINE_STRATEGY: strategy }), /strategies|empty/);
+  }
+  for (const seconds of ['0', '1', '29', '31', '60', '-30', '030', '30.0', '3e1', '$(printf 30)', '']) {
+    reject(fixture(t, { CANDIDATE_FAST_TIMEOUT_SECONDS: seconds }), /timeout|empty/);
+  }
+});
+
+test('optional engine settings cannot hide duplicates, unknown keys or missing required configuration', t => {
+  const duplicate = fixture(t);
+  writeFileSync(join(duplicate, 'runtime.env'), `${readFileSync(join(duplicate, 'runtime.env'), 'utf8')}CANDIDATE_ENGINE_STRATEGY=staged\n`);
+  reject(duplicate, /Duplicate/);
+  reject(fixture(t, { CANDIDATE_STRATEGY: 'catalog' }), /Unexpected/);
+  reject(fixture(t, { CANDIDATE_BUDGET_USD: undefined }), /required/);
+  const misplaced = fixture(t);
+  writeFileSync(join(misplaced, 'app.env'), `${secrets['app.env']}CANDIDATE_ENGINE_STRATEGY=catalog\n`);
+  reject(misplaced, /Unexpected/);
 });
 
 test('rejects mutable/unofficial images, placeholders and a different region', t => {
@@ -127,18 +184,15 @@ test('keeps database, admin and proxy secrets distinct and app DB passwords alig
 
 test('Docker Compose resolves only synthetic credentials into their own containers', t => {
   const dir = fixture(t);
-  const result = spawnSync('docker', ['compose', '--project-name', 'worldcup', '--project-directory', runtime,
-    '--env-file', '/dev/null', '-f', join(runtime, 'compose.yaml'), 'config', '--format', 'json'], {
-    cwd: root, env: { ...process.env, ...metadata, SECRET_DIR: dir }, encoding: 'utf8', timeout: 20_000,
-  });
-  assert.equal(result.status, 0, `Docker Compose >=2.30 config check required: ${result.stderr}`);
-  const config = JSON.parse(result.stdout);
+  const config = resolvedConfig(dir);
   assert.deepEqual(Object.keys(config.services).sort(), ['app', 'nginx', 'postgres']);
   const { app, nginx, postgres } = config.services;
   assert.equal(app.environment.DATABASE_PASSWORD, 'b'.repeat(64));
   assert.equal(app.environment.SPRING_PROFILES_ACTIVE, 'prod,live,proxy');
   assert.equal(app.environment.TRUSTED_PROXY_ADDRESS, '172.30.52.2');
   assert.equal(app.environment.CANDIDATE_BUDGET_USD, '5');
+  assert.equal(app.environment.CANDIDATE_ENGINE_STRATEGY, 'catalog');
+  assert.equal(app.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, '30');
   assert.equal(app.environment.GENERATION_DAILY_LIMIT, '2');
   assert.match(app.environment.JAVA_TOOL_OPTIONS, /-Xmx384m/);
   for (const key of ['POSTGRES_PASSWORD', 'ORIGIN_VERIFY_TOKEN', 'WORLDCUP_PASSWORD']) assert.equal(app.environment[key], undefined);

@@ -41,8 +41,10 @@ class LiveEngineHttpTest extends PostgresSupport {
     }
     @Test void realProviderPassesThroughWorkerAndUnchangedHttpPreviewContract() throws Exception {
         int size = Integer.parseInt(System.getenv().getOrDefault("CANDIDATE_LIVE_SIZE", "8"));
-        var selected = LiveEvalCase.select(System.getenv().getOrDefault("CANDIDATE_LIVE_CASE", "hobby-calibration"), size,
-                json.read(Files.readString(Path.of("../evals/cases.json")), JsonNode.class));
+        String caseId = System.getenv().getOrDefault("CANDIDATE_LIVE_CASE", "hobby-calibration");
+        boolean catalogCase = caseId.startsWith("catalog-");
+        var selected = LiveEvalCase.select(caseId, size,
+                json.read(Files.readString(Path.of(catalogCase ? "../evals/catalog-cases.json" : "../evals/cases.json")), JsonNode.class));
         Path output = Path.of("../reports/local/live-engine", Instant.now().toString().replace(':', '-') + "-size" + size);
         Files.createDirectories(output);
         String prompt = selected.prompt();
@@ -62,13 +64,18 @@ class LiveEngineHttpTest extends PostgresSupport {
             var response = get(http, "/generation-jobs/" + queued.path("jobId").asString(), cookie);
             samples.add(Map.of("schema", "GenerationJob", "value", response));
             Files.writeString(output.resolve("job.json"), json.write(response));
-            assertThat(response.path("status").asString()).describedAs("Safe job result: %s", response).isEqualTo("READY");
+            int calls = EXCHANGES.size();
+            if (catalogCase) {
+                assertThat(System.getenv("CANDIDATE_ENGINE_STRATEGY")).isEqualTo("catalog");
+                assertThat(calls).isEqualTo("catalog-preset".equals(caseId) ? 0 : 1);
+                assertThat(jdbc.queryForObject("SELECT count(*) FROM candidate_reuse_set", Integer.class)).isZero();
+            }
+            if (assertExpectedTerminal(caseId, response)) return;
             var preview = get(http, "/drafts/" + response.path("draftId").asString(), cookie);
             samples.add(Map.of("schema", "Preview", "value", preview));
             assertThat(preview.path("candidates").size()).isEqualTo(size);
             assertThat(preview.toString()).doesNotContain("[개발용]", "assessments", "requirements", "sk-", prompt);
             Files.writeString(output.resolve("preview.json"), json.write(preview));
-            int calls = EXCHANGES.size();
             int ledgerRows = jdbc.queryForObject("SELECT count(*) FROM provider_call", Integer.class);
             var owner = new FlowBrowser(http, cookie, samples);
             var outsider = new FlowBrowser(http, null, samples);
@@ -83,10 +90,22 @@ class LiveEngineHttpTest extends PostgresSupport {
             Files.writeString(output.resolve("http-samples.json"), json.write(samples));
             Files.writeString(output.resolve("run.json"), json.write(Map.of("size", size, "prompt", prompt,
                     "caseId", selected.id(), "datasetVersion", selected.datasetVersion(),
-                    "latencyMs", (System.nanoTime() - start) / 1_000_000, "promptVersion", OpenAiResponsesClient.PROMPT_VERSION,
+                    "latencyMs", (System.nanoTime() - start) / 1_000_000, "promptVersion", catalogCase ? OpenAiResponsesClient.COMPACT_PROMPT_VERSION : OpenAiResponsesClient.PROMPT_VERSION,
                     "scope", "single synthetic end-to-end case; not a formal human quality evaluation")));
             System.out.println("Live eval artifacts: " + output.toAbsolutePath().normalize());
         }
+    }
+    /** True means an expected refusal: no preview, game, or fabricated success may follow. */
+    static boolean assertExpectedTerminal(String caseId, JsonNode response) {
+        if ("catalog-facts".equals(caseId)) {
+            assertThat(response.path("status").asString()).isEqualTo("FAILED");
+            assertThat(response.path("error").path("code").asString()).isEqualTo("CLARIFICATION_REQUIRED");
+            assertThat(response.has("draftId")).isTrue();
+            assertThat(response.path("draftId").isNull()).isTrue();
+            return true;
+        }
+        assertThat(response.path("status").asString()).describedAs("Safe job result: %s", response).isEqualTo("READY");
+        return false;
     }
     private String base() { return "http://localhost:" + port + "/api/v1"; }
     private final class FlowBrowser {

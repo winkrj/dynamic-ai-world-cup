@@ -1,5 +1,11 @@
 # B — 후보 품질과 서버
 
+TD-55 제출 준비(2026-09-20): catalog 운영 적용을 준비하며 compact prompt `ce003-v3-core-experience`를 사용한다. 새32강2관측/추가$0.032856 뒤 최신 실험 누적$5.4206158/$6, 잔여$0.5793842(미확인.50보존). 실제 연결은 통과했지만32강의 의미 유사 후보는 남았으며 품질PASS로 기록하지 않는다. 루트 TD-55와 docs/V1_SUBMISSION.md/CATALOG_ENGINE.md가 최신. 과거 TD-54의7회·v2수치는 당시기록이다.
+
+TD-54 로컬 구현·검증 완료: 실제 8개 실험/유료 7회, 추가 $0.09224, 누적 **$5.3877598/$6**(미확인 .50 포함), 잔여 $0.6122402. 최종 compact prompt `ce003-v2-visible-choice`; 식사 조건의 보이지 않는 변형 문제를 1회 수정/재비교했다. 전체 verify Java451 실행·유료2 제외·최종 독립 리뷰 Critical/High/actionable0. 운영 기본 staged/미배포. 상세 관측·한계는 docs/CATALOG_ENGINE.md.
+
+최신 TD-54는 루트 지침과 `docs/CATALOG_ENGINE.md`를 따른다. 사용자 승인한 `catalog` 전략은 DB 편집 후보 + 최대 1회 compact 선택/보충, 별도 best-effort acceptance이며 기존 독립 evidence를 합성하지 않는다. 정확한 preset 외 자연어 조건의 의미 판단은 모델의 한 번의 선택에 의존한다. 신규 V4 카탈로그만 사용하고 V1~V3/기존 FAILED/certificate/snapshot은 보존한다. 실제 장소·최신 사실은 이 경로에서 검증됐다고 주장하지 않는다. 기존 `staged`는 아래 규칙을 그대로 유지한다. 운영 기본 전략은 아직 staged이며 로컬 측정과 배포는 별도다. 새 전략의 실험도 기존 누적 $6·.50 예약·검색 없음·순차 실행·bounded loop를 따른다.
+
 최신 TD-51: v23은 GENERATE(plan→전체 cards) → 필요한 selective grounding → 독립 REVIEW → 필요 시 REPAIR 1회·전체 재검토다. 계획의 조건/단위/coverage는 Repair에서 고정, 미지정 후보는 동일하게 보존하며 새 coreActivity도 독립 검토한다. 해석 FAIL/UNKNOWN을 후보 Repair로 우회하지 않는다. 사전 allocation은 runtime port 밖으로 제거, 과거 진단 경로만 보존한다. certificate는 실제 최종 review만 저장하고 policy=v4-engine-v23로 구 데이터의 재사용을 거절한다. 공개 계약/모델/8·16·32/게임 규칙/토큰·시간·누적 예산·검색 승인은 불변이다.
 
 최신 TD-50: 사용자는 이후 목적이 명확한 실제 평가를 순차 1건씩 사전 승인했다. 매번 승인 질문은 생략하되 기존 누적 $6·검색 없음·자동 충전 OFF·모델/Repair/예약 한도와 동일 실패 수정–검증 최대 3회는 유지한다. 매 실험 전 전체 장부를 합산하고 자식 프로세스에만 live opt-in을 전달한다. v23/16 실제 1회는 READY·완주 저장·동일 공유/새 세션 PASS(127.012초/4회/$0.1380685/Repair 1회)다. 후속 v23/32는 185.026초/4회/$0.221852, Repair 1회 뒤 그림 중복 FAIL로 종료했다. preview 없음·재추첨 없음, 현재 누적 $5.2955198, 잔여 $0.7044802다. 선불 잔액 소진을 즉시 차단 보장으로 보지 않는다. 고정 TD-48 진단 재사용·무한 재추첨·운영 예산 승인은 아니다. 아래 추가 미승인 표시는 당시 기록으로 읽는다.

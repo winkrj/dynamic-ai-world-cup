@@ -15,8 +15,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/** Fail-closed gate over a fixed plan and independently supplied validation evidence. */
+/** Distinguishes structural acceptance from the legacy independently reviewed policy. */
 public final class CandidateQualityGate {
+    public enum AcceptancePolicy { INDEPENDENT_REVIEW, FAST_BEST_EFFORT }
     public enum Code {
         INVALID_SCHEMA, INVALID_PLAN, COUNT_MISMATCH, DUPLICATE_ID, DUPLICATE_NAME,
         UNIT_MISMATCH, COVERAGE_MISMATCH, HARD_CONSTRAINT_UNVERIFIED,
@@ -24,16 +25,22 @@ public final class CandidateQualityGate {
     }
     public record Issue(Code code, String candidateId, String detail) {}
 
-    /** Only this gate can construct the type accepted by the public preview mapper. */
+    /** Gate-issued acceptance, not a promise of independent review under every policy. */
     public static final class ValidatedSet {
         private final Plan plan;
         private final List<Candidate> candidates;
+        private final AcceptancePolicy policy;
         private ValidatedSet(Plan plan, List<Candidate> candidates) {
+            this(plan, candidates, AcceptancePolicy.INDEPENDENT_REVIEW);
+        }
+        private ValidatedSet(Plan plan, List<Candidate> candidates, AcceptancePolicy policy) {
             this.plan = plan;
             this.candidates = List.copyOf(candidates);
+            this.policy = policy;
         }
         public Plan plan() { return plan; }
         public List<Candidate> candidates() { return candidates; }
+        public AcceptancePolicy policy() { return policy; }
     }
     public record Result(List<Issue> issues, Optional<ValidatedSet> validated) {
         public Result { issues = List.copyOf(issues); }
@@ -49,12 +56,63 @@ public final class CandidateQualityGate {
     }
 
     public Result validate(Plan plan, List<Candidate> candidates, Evidence evidence, Instant now) {
-        List<Issue> issues = new ArrayList<>();
         if (plan == null || candidates == null || evidence == null || now == null) {
             return new Result(List.of(issue(Code.INVALID_SCHEMA, null, "Missing validation input")), Optional.empty());
         }
         // Freeze caller-owned containers before validation to prevent unchecked replacements.
         candidates = new ArrayList<>(candidates);
+        List<Issue> issues = structuralIssues(plan, candidates);
+        Map<String, VerificationMode> constraints = new HashMap<>();
+        plan.hardConstraints().forEach(c -> constraints.put(c.id(), c.mode()));
+        Set<String> ids = new HashSet<>();
+        candidates.stream().filter(java.util.Objects::nonNull).forEach(c -> ids.add(c.id()));
+
+        Map<String, Map<String, Verdict>> assessmentMap = new HashMap<>();
+        for (Assessment assessment : evidence.assessments()) {
+            if (!ids.contains(assessment.candidateId()) || !constraints.containsKey(assessment.constraintId()) || assessment.verdict() == null) {
+                issues.add(issue(Code.INVALID_EVIDENCE, assessment.candidateId(), "Unknown assessment target or verdict"));
+            }
+            Map<String, Verdict> byConstraint = assessmentMap.computeIfAbsent(assessment.candidateId(), ignored -> new HashMap<>());
+            if (byConstraint.containsKey(assessment.constraintId())) issues.add(issue(Code.INVALID_EVIDENCE, assessment.candidateId(), "Duplicate assessment"));
+            byConstraint.put(assessment.constraintId(), assessment.verdict());
+        }
+        for (GroundedFact fact : evidence.facts()) {
+            if (!ids.contains(fact.candidateId()) || !("availability".equals(fact.claimKey()) || constraints.containsKey(fact.claimKey()))) {
+                issues.add(issue(Code.INVALID_EVIDENCE, fact.candidateId(), "Unknown grounding target"));
+            }
+        }
+        for (String id : ids) {
+            for (Map.Entry<String, VerificationMode> constraint : constraints.entrySet()) {
+                Verdict verdict = assessmentMap.getOrDefault(id, Map.of()).get(constraint.getKey());
+                if (verdict != Verdict.PASS) issues.add(issue(Code.HARD_CONSTRAINT_UNVERIFIED, id, constraint.getKey()));
+                if (constraint.getValue() == VerificationMode.GROUNDED_FACT && !verifiedFact(evidence, id, constraint.getKey(), now)) {
+                    issues.add(issue(Code.GROUNDING_UNVERIFIED, id, constraint.getKey()));
+                }
+            }
+            if (plan.groundingRequired() && !verifiedFact(evidence, id, "availability", now)) issues.add(issue(Code.GROUNDING_UNVERIFIED, id, "availability"));
+        }
+        if (evidence.comparable() != Verdict.PASS || evidence.noSemanticDuplicates() != Verdict.PASS || blank(evidence.reviewerVersion())) {
+            issues.add(issue(Code.SEMANTIC_REVIEW_FAILED, null, "Independent comparability/semantic-duplicate review required"));
+        }
+        return new Result(issues, issues.isEmpty() ? Optional.of(new ValidatedSet(plan, candidates)) : Optional.empty());
+    }
+
+    /** TD-54: server checks structure; semantic suitability remains best-effort, never fabricated PASS evidence. */
+    public Result acceptBestEffort(Plan plan, List<Candidate> candidates) {
+        if (plan == null || candidates == null) {
+            return new Result(List.of(issue(Code.INVALID_SCHEMA, null, "Missing validation input")), Optional.empty());
+        }
+        candidates = new ArrayList<>(candidates);
+        var issues = structuralIssues(plan, candidates);
+        if (plan.groundingRequired() || plan.hardConstraints().stream().anyMatch(c -> c.mode() == VerificationMode.GROUNDED_FACT)) {
+            issues.add(issue(Code.GROUNDING_UNVERIFIED, null, "Fast policy cannot attest external facts"));
+        }
+        return new Result(issues, issues.isEmpty()
+                ? Optional.of(new ValidatedSet(plan, candidates, AcceptancePolicy.FAST_BEST_EFFORT)) : Optional.empty());
+    }
+
+    private List<Issue> structuralIssues(Plan plan, List<Candidate> candidates) {
+        List<Issue> issues = new ArrayList<>();
         if (!Set.of(8, 16, 32).contains(plan.size()) || blank(plan.unit()) || plan.unit().length() > 200) {
             issues.add(issue(Code.INVALID_PLAN, null, "Expected size 8/16/32 and one candidate unit"));
         }
@@ -101,34 +159,7 @@ public final class CandidateQualityGate {
             if (!count.equals(actualCoverage.getOrDefault(id, 0))) issues.add(issue(Code.COVERAGE_MISMATCH, null, "Quota not met: " + id));
         });
 
-        Map<String, Map<String, Verdict>> assessmentMap = new HashMap<>();
-        for (Assessment assessment : evidence.assessments()) {
-            if (!ids.contains(assessment.candidateId()) || !constraints.containsKey(assessment.constraintId()) || assessment.verdict() == null) {
-                issues.add(issue(Code.INVALID_EVIDENCE, assessment.candidateId(), "Unknown assessment target or verdict"));
-            }
-            Map<String, Verdict> byConstraint = assessmentMap.computeIfAbsent(assessment.candidateId(), ignored -> new HashMap<>());
-            if (byConstraint.containsKey(assessment.constraintId())) issues.add(issue(Code.INVALID_EVIDENCE, assessment.candidateId(), "Duplicate assessment"));
-            byConstraint.put(assessment.constraintId(), assessment.verdict());
-        }
-        for (GroundedFact fact : evidence.facts()) {
-            if (!ids.contains(fact.candidateId()) || !("availability".equals(fact.claimKey()) || constraints.containsKey(fact.claimKey()))) {
-                issues.add(issue(Code.INVALID_EVIDENCE, fact.candidateId(), "Unknown grounding target"));
-            }
-        }
-        for (String id : ids) {
-            for (Map.Entry<String, VerificationMode> constraint : constraints.entrySet()) {
-                Verdict verdict = assessmentMap.getOrDefault(id, Map.of()).get(constraint.getKey());
-                if (verdict != Verdict.PASS) issues.add(issue(Code.HARD_CONSTRAINT_UNVERIFIED, id, constraint.getKey()));
-                if (constraint.getValue() == VerificationMode.GROUNDED_FACT && !verifiedFact(evidence, id, constraint.getKey(), now)) {
-                    issues.add(issue(Code.GROUNDING_UNVERIFIED, id, constraint.getKey()));
-                }
-            }
-            if (plan.groundingRequired() && !verifiedFact(evidence, id, "availability", now)) issues.add(issue(Code.GROUNDING_UNVERIFIED, id, "availability"));
-        }
-        if (evidence.comparable() != Verdict.PASS || evidence.noSemanticDuplicates() != Verdict.PASS || blank(evidence.reviewerVersion())) {
-            issues.add(issue(Code.SEMANTIC_REVIEW_FAILED, null, "Independent comparability/semantic-duplicate review required"));
-        }
-        return new Result(issues, issues.isEmpty() ? Optional.of(new ValidatedSet(plan, candidates)) : Optional.empty());
+        return issues;
     }
 
     private boolean verifiedFact(Evidence evidence, String id, String claim, Instant now) {

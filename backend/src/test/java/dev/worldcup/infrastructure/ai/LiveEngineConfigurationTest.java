@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import dev.worldcup.generation.CandidateEngine;
 import dev.worldcup.generation.engine.StagedCandidateEngine;
+import dev.worldcup.generation.catalog.CandidateCatalog;
+import dev.worldcup.generation.catalog.FastCandidateEngine;
 import dev.worldcup.infrastructure.DevelopmentCandidateEngine;
 import dev.worldcup.infrastructure.UnavailableCandidateEngine;
 import java.time.Clock;
@@ -28,4 +30,20 @@ class LiveEngineConfigurationTest {
     @Test void mixedDevLiveProfileIsRejected() { runner.withPropertyValues("spring.profiles.active=dev,live").run(c -> assertThat(c).hasFailed()); }
     @Test void missingKeyIsRejected() { runner.withPropertyValues("worldcup.ai.api-key=").run(c -> assertThat(c).hasFailed()); }
     @Test void shorterLeaseThanOperationIsRejected() { runner.withPropertyValues("worldcup.worker.lease-seconds=60").run(c -> assertThat(c).hasFailed()); }
+    @Test void catalogStrategyIsExplicitAndHasNoStagedFallback() {
+        runner.withBean(CandidateCatalog.class, () -> mock(CandidateCatalog.class))
+                .withPropertyValues("worldcup.ai.strategy=catalog").run(c -> {
+                    assertThat(c).hasSingleBean(CandidateEngine.class);
+                    assertThat(c.getBean(CandidateEngine.class)).isInstanceOf(FastCandidateEngine.class);
+                });
+    }
+    @Test void catalogStrategyRequiresCatalogAndBoundedDeadline() {
+        runner.withPropertyValues("worldcup.ai.strategy=catalog").run(c -> assertThat(c).hasFailed());
+        runner.withBean(CandidateCatalog.class, () -> mock(CandidateCatalog.class))
+                .withPropertyValues("worldcup.ai.strategy=catalog", "worldcup.ai.fast-timeout-seconds=61")
+                .run(c -> assertThat(c).hasFailed());
+    }
+    @Test void unknownStrategyFailsConfiguration() {
+        runner.withPropertyValues("worldcup.ai.strategy=typo").run(c -> assertThat(c).hasFailed());
+    }
 }
