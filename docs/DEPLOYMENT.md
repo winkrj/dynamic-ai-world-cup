@@ -1,6 +1,20 @@
-# 배포 패키지와 운영 전 확인
+# AWS 배포와 운영 검증
 
-## 2026-09-19 실행 중 — TD-52
+## 2026-09-19 공개 배포 완료 — TD-52/53
+
+서비스: [Dynamic AI World Cup](https://dcti7vhb3wkpw.cloudfront.net). [실제 16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/6kx1tojTMZEfpyu51s_n3wpTxWn-94RdFw9M4w0DWLM)는 새 AI 호출 없이 같은 후보·대진으로 재생한다. 아래 준비 시점의 미완료 표시는 역사 기록이며 현재 실행 결과는 이 절과 [검증 기록](VERIFICATION.md)을 따른다.
+
+- 실제 AWS x86 호스트의 PostgreSQL·Spring·nginx 시작 및 HTTPS 웹/자산/health/ready/없는 경로 404 smoke PASS. 앱 재시작 후에도 같은 공개 snapshot hash를 확인했다.
+- 기본 16강을 실제 공개 화면에서 1회 생성했다. 78.396초, provider 4회·Repair 1회·검색 0, 비용 장부 **$0.146190/$5**다. 생성→전체 미리보기→freeze→15경기→Champion 저장→공유·새 익명 세션을 확인했다. 후속 유료 재생성은 실행하지 않았다.
+- 운영 한도는 **전체 누적 $5**, 익명 브라우저당 하루 2회, 자동 충전 OFF다. 처음에는 예산 0으로 시작해 백업/복원을 확인한 뒤 5를 적용했다. 재시작·복원 검증에서 운영 비용 장부를 초기화하지 않았다.
+- 키는 지정 Parameter Store SecureString과 호스트 root/0600 설정으로 분리했다. 정상 공유 재생의 Secure/HttpOnly/SameSite=Lax cookie, 다른 Origin 거절, origin token 없는 직접 요청 403, 앱/DB 미공개 포트를 확인했다.
+- 암호화·버전 관리 S3 백업을 **실제로 다시 다운로드**해 별도 DB로 복원했다. 완주 데이터의 snapshot hash, 15경기, 공유 1개, 세션 2개, provider 4건/$0.146190, Flyway 1~3과 불변 trigger가 보존됐다. 운영 DB를 덮지 않았다.
+- 매일 한국 03시 백업 timer active, 실제 service 실행 성공. RPO 24시간은 목표이며 실패 알림·자동 failover는 아직 없다. 초기/완주 복원 검증 DB와 private dump는 보존했다.
+- 최종 앱 소스·이미지와 인프라 후속 수정은 아래 digest/revision 기록을 따른다. 필요한 추가 독립 리뷰는 명시 승인 뒤 완료했고 Critical/High/actionable 0, AWS 정적 12개 PASS였다. 이번 후속 실행에서는 앱 코드를 바꾸지 않았다.
+
+남은 한계: 단일 서버 장애 지점, 크레딧/Free plan 종료 시 중단 가능성, 로컬 백업 용량 수동 관리, 일상 운영용 최소 권한 배포자 분리가 있다. 최신 실제 32강의 중복 FAIL과 일반 입력 성공률 미측정은 그대로다. 이번 16강의 서버 품질 gate 통과를 모든 후보의 사람 평가 완료로 일반화하지 않는다. 브라우저 검증 중 지연된 timeout 처리도 관측했으므로 백그라운드/기기 정지 상태의 정확한 벽시계 7초 화면 전환을 보장한다고 주장하지 않는다.
+
+## 배포 준비 당시 기록 — TD-52
 
 사용자가 실제 AWS 배포와 **운영 AI 누적 $5**를 별도로 승인했다. 월 예산/자동 갱신이 아니며 기존 실험 $6 장부와 분리한다. 자동 충전 OFF를 확인했고 서버의 진행 중·미확인 예약까지 합친 한도를 유지한다. AWS 계정의 Free plan ACTIVE와 t3.small의 무료 적용 적격성을 API로 확인했다. 무료 적용은 자원 소비가 없다는 뜻이 아니며 크레딧과 기간 종료 시 서비스가 중단될 수 있다. 계정 식별자·정확한 잔액은 공개 파일에 넣지 않는다.
 

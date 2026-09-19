@@ -1,5 +1,33 @@
 # 검증 기록
 
+## 2026-09-19 운영 실행 완료 — TD-52/53
+
+최종 앱은 source `a917a482534ae8c32461c463ac1971df4060e2a3`, image `sha256:a7cf6219da1d034298db3ecf8bea4a873a6f11519520dd13c5ce7300edf88382`다. 인프라 호환 수정 `13e55a1`은 앱 소스를 바꾸지 않는다. 실제 [공개 서비스](https://dcti7vhb3wkpw.cloudfront.net)에서 다음을 확인했다.
+
+| 대상 | 실제 결과 |
+| --- | --- |
+| 기동/DB | 3개 서비스 시작, app·PostgreSQL healthy, 앱 DB 역할 superuser=false, Flyway 1~3 성공, 첫 시작 provider 0건 |
+| 웹/HTTPS | 최초와 앱 재시작 후 `smoke-release.mjs` PASS: /·공유 deep link·JS/CSS 2개·health/ready·없는 API/asset 404 |
+| 보호 경계 | origin token 없는 호스트 요청 403; 정상 Origin의 없는 공유 재생 404와 잘못된 Origin 400 구분; 실제 공유 재생 cookie Secure/HttpOnly/SameSite=Lax; private-origin SG 제한은 TD-52 설정 증거 유지 |
+| 실제 AI | 기본 예시 hobby-solo/16, READY까지 78.396151초, GENERATE/REVIEW_INITIAL/REPAIR/REVIEW_REPAIRED 4건 COMPLETED·검색 0·합계 $0.14619000 |
+| 실제 화면/저장 | 후보 16개 preview·교체 남은 1회 표시·freeze·15경기·Champion 저장. USER_SELECTED 3건/TIMEOUT_RANDOM 12건, 공유 1개 |
+| 공유/재시작 | 새 익명 세션 생성·동일 key 재전송은 같은 세션; 원본과 새 세션 snapshot 완전 일치; 앱 재시작 뒤 공개 snapshot hash 동일. 공유 검증 뒤에도 provider 4건 |
+| 백업 | private S3 SSE AES256/versioned archive 33,340 bytes(초기), 45,037 bytes(완주 데이터); 실제 다운로드 후 별도 DB로 각각 복원 PASS |
+| 완주 복원 | Flyway 1~3, snapshot 1개와 payload MD5 `56f5271da82eceab4962bbd4f8649642`, selections 15, shares 1, sessions 2, provider 4/$0.146190/search 0, 활성 immutable trigger 1개 일치 |
+| 예약 백업 | worldcup-backup.service Result=success/ExecMainStatus=0, timer active, 매일 18:00 UTC(한국 03시) |
+
+완주 백업 SHA-256은 `a3c1e2a1f423eb2bf27cca49eb571dd31c3a8444f6fdd43493810fa869ffaf64`이며 다운로드/서버 staging checksum이 일치했다. 운영 DB를 덮지 않고 격리 복원 DB를 사용했으며 비용 장부는 초기화하지 않았다. 초기 메모리 단일 관측은 앱 201.8MiB/DB 45.31MiB/nginx 2.309MiB로 상한 이내였다. 부하 테스트나 최대 사용량 보장이 아니다.
+
+직접 선택 elapsed는 1,159~5,127ms, timeout은 7,018~959,595ms였다. 브라우저 조작·실행 지연을 포함한 관측이므로 모든 timeout 화면이 정확히 7초에 전환됐다는 증거는 아니다. timeout 저장은 7,000ms 이상이고 실제 경기/결승은 기존 규칙을 사용한다. 실행하지 않은 모바일 전체 회귀·운영 8/32강·전체 재생성·동시 부하 검증은 PASS로 세지 않는다. 이전 실제 32강 FAIL과 사람 품질 평가 한계도 보존한다.
+
+운영 예산은 누적 $5, 당시 장부 잔여 $4.853810, 자동 충전 OFF를 실행 전 새로고침해 확인했다. 키·cookie·원본 DB dump는 공개 Git/문서에 넣지 않았으며 private 실행 증거는 gitignored `reports/local/production/`에 둔다. 이번 후속 작업은 승인/실행 기록과 runtime 설정 적용뿐이라 같은 앱 소스의 전체 verify 결과를 재사용했다. 후속 호환 수정의 추가 독립 리뷰는 아래에 따로 기록한다.
+
+## 2026-09-19 TD-53 — 후속 승인과 독립 검토
+
+사용자가 기존 키의 지정 AWS SecureString 이전과 후속 호환 수정의 독립 검토 추가 1회를 승인했다. 해당 추가 리뷰는 `13e55a1` 및 후속 배포 기록을 대상으로 완료했으며 **Critical 0 / High 0 / actionable 0**이다. Reviewer가 AWS 정적 12개를 직접 실행해 모두 PASS했고, Main의 같은 12개 재실행도 PASS다. 리뷰는 AWS 상태 재조회나 앱·DB·백업/복원 검증을 대신하지 않는다.
+
+만료된 배포용 임시 인증은 사용자의 브라우저 재로그인 후 같은 계정임을 STS로 대조했다. Free plan을 다시 확인하고 기존 DB/origin 비밀을 바꾸지 않은 채 승인된 `app.env`를 SecureString version 1로 저장했다. 값은 출력하지 않았으며 0600 임시 요청 파일은 제거했다. AI 예산 0으로 첫 서비스 시작을 요청했으며 실제 시작·공개 smoke·복원 결과는 후속 증거가 필요하다. 아래 TD-52의 승인 대기는 당시 기록이다.
+
 ## 2026-09-19 TD-52 — 배포 패키지·보호 경계
 
 - opt-in proxy 실제 HTTP/config 33개 PASS. 기본 forwarding 무시는 유지하고 정확한 단일 peer, 실제 오른쪽 client IP, 위조 헤더·독립 quota·공유 URL을 검증했다. 독립 proxy 리뷰 Critical/High/actionable 0.
