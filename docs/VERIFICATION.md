@@ -1,5 +1,7 @@
 # 검증 기록
 
+최신 2026-09-20 TD-55: 제출본 `fcb6a5f`의 전체 verify·독립리뷰(Critical0/High0)·실제 합성 브라우저8/16/32완주와 공유는 PASS다. Java452실행/유료2제외·프론트61·배포정적32. 새 운영배포는 AWS 재로그인 대기 중이다. [최신 제출 현황](V1_SUBMISSION.md)과 이 문서 하단 TD-55 기록을 먼저 확인한다. 아래 TD-54의 v2/숫자는 당시 기록이다.
+
 ## 2026-09-19 TD-54 — DB 우선 단일 호출 (로컬 완료, 운영 미적용)
 
 신규 catalog 전략과 V4의 AI 편집 seed64개를 추가했다. 기존 strict gate는 유지하며 FAST_BEST_EFFORT acceptance에 독립 certificate를 합성하지 않는다. 세부 설계·전체 실험표·한계는 [DB 우선 엔진](CATALOG_ENGINE.md)에 있다.
@@ -272,7 +274,8 @@ smoke는 로컬 DB에 개발용 생성 작업 2개와 경기/공유 기록을 �
 독립 리뷰 1회차: Critical 0 / High 0 / Medium 1. 연결된 Fork 안내가 다른 브랜치를 push하고 main을 PR base로 고정하는 불일치를 확인했다. 현재 브랜치 `HEAD` push와 PR #1 병합 전후 base 절차로 통일했다. 2회차 리뷰는 clean, Critical 0 / High 0 / 남은 actionable finding 0이다. 수정 후 전체 verify 재실행과 문서 로컬 링크 46개·diff whitespace 검사를 통과했다. Java 작업은 다시 UP-TO-DATE였다.
 
 확인에 사용한 dev 서버와 이 프로젝트 전용 compose DB는 중지했고 데이터 volume은 유지했다. 다른 운영체제의 새 clone이나 실제 Fork UI 절차는 직접 실행하지 않았다. 이후 변경은 이 검증 기록뿐이다.
-# TD-55 제출 준비 — 2026-09-20
+
+## TD-55 제출 준비 — 2026-09-20
 
 최종 전체 verify PASS: Java454중452실행/유료2제외·실패/오류0, frontend61, handoff6, release13, runtime20+AWS12, fixture5/HTTP166개9schemas, TypeScript/Vite/bootJar/appJar. 최종 재실행은 변경 없는 Java test 결과를 Gradle up-to-date로 재사용했다. 독립 Reviewer1차 Critical0/High0/actionable0. 최종 UI/runtime/compact-v3를 포함하며 이전TD54 리뷰를 대신 인용하지 않았다.
 

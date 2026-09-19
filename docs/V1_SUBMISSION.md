@@ -21,13 +21,17 @@
 - 코드: [작업 브랜치](https://github.com/winkrj/dynamic-ai-world-cup/tree/feat/engine/context-feasibility). main과 배포 소스가 같다고 가정하지 않는다.
 - 설계/실측: [DB 우선 엔진](CATALOG_ENGINE.md), [화면 통합 Spec](INTEGRATION_SPEC.md), [공개 API](../contracts/openapi.json).
 
-온라인 데모는 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 → 다른 브라우저에서 같은 대진 순서로 진행한다. 이 문구의 첫 생성은 개인 이력이 없는 경우 DB preset이며, 문구에 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. 생성/전체 재생성/접수 후 실패는 하루2회 한도에 포함된다.
+**새 버전 배포 후** 온라인 데모는 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 → 다른 브라우저에서 같은 대진 순서로 진행한다. 새 버전에서 이 문구의 첫 생성은 개인 이력이 없는 경우 DB preset이며, 문구에 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. 생성/전체 재생성/접수 후 실패는 하루 2회 한도에 포함된다. 배포 전 기존 서비스에서는 이 문구도 느린 staged 경로로 처리되므로 새 속도 시연에 사용하지 않는다.
 
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
 
 **코드·로컬 통합 완료, AWS 재로그인 대기 때문에 새 운영 배포는 미완료. 기존 공개 서비스는 이전 staged 엔진이다.**
+
+릴리스 소스: `fcb6a5f8bea70fc90dd324bbceb30f22d3dc756d`, GitHub `feat/engine/context-feasibility`에 push 확인. 후속 문서 전용 커밋은 런타임 소스에 영향을 주지 않는다.
+
+배포 이미지도 로컬 준비 완료: `dynamic-ai-world-cup:submission-fcb6a5f`, `linux/amd64`, 로컬 digest `sha256:6bcf312d9520d3fb0000f73215afa2b3a768b6c30b82966307ff42f252408809`. 실제 Java21 실행 및 `prod,live`/`catalog`/예산0으로 시작해 웹·readiness·V4/카탈로그64개·provider 장부0건을 확인했다. 기본 개발 암호를 금지하는 운영 guard 때문에 별도 로컬 합성 계정/격리DB를 사용했다. 이 이미지는 **아직 ECR push/운영 교체 전**이며 원격 digest는 업로드 후 다시 대조한다.
 
 - 전체 `scripts/verify.sh` PASS: Java454중452실행/유료2제외, 프론트61, handoff6, release13, runtime20/AWS12, fixture5, 실제 HTTP166개/9schemas, TypeScript/Vite/bootJar/appJar. 마지막 실행의 변경 없는 Java 결과는 Gradle up-to-date로 재사용했다.
 - 독립 read-only 리뷰1차: Critical0 / High0 / actionable0. 운영의 실제 이미지/전략/DB적용은 별도 확인 대상으로 남겼다.
