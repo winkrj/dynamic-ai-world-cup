@@ -1,6 +1,17 @@
 # AWS 배포와 운영 검증
 
-최신 2026-09-20: 새 catalog 엔진·애니메이션 제출본 `fcb6a5f`는 코드 검증과 GitHub 반영을 완료했으나 **AWS 재로그인 대기로 미배포**다. 아래 9월19일 공개완료는 이전 staged 버전의 기록이다. 현재 상태·재개순서는 [1차 제출본](V1_SUBMISSION.md)을 따른다.
+최신 2026-09-20: **catalog 엔진·애니메이션 제출본 `fcb6a5f`의 AWS 배포 완료.** 실제 설정/V4/HTTPS·생성·저장·공유를 확인했다. 팀원 안내는 [1차 제출본](V1_SUBMISSION.md)을 따른다. 아래 9월19일 staged와 재로그인 대기는 당시 기록이다.
+
+## TD-55 운영 적용 완료 — 2026-09-20
+
+- 기존 배포 계정/서울 서버를 재확인한 뒤, 진행 중 생성0·운영장부10건/$0.68478·기존snapshot hash를 먼저 기록했다. DB dump를 기존 S3에 업로드하고46,077bytes/AES256/version 존재를 확인했다. DB·비밀 설정·다른 프로젝트 자원은 변경하지 않았다.
+- 소스 `fcb6a5f8bea70fc90dd324bbceb30f22d3dc756d`, `release-fcb6a5f-app`, digest `sha256:6bcf312d9520d3fb0000f73215afa2b3a768b6c30b82966307ff42f252408809`. 검증한 로컬linux/amd64/ECR/실행 호스트가 일치한다. 이전 runtime/metadata는 호스트에 보존했다.
+- 외부 runtime.env에서 `catalog`/`30`만 명시하고 기존 운영예산5를 유지했다. 실제 app의 `prod,live,proxy`와 해당 값을 확인했다. nginx/DB image와컨테이너는 그대로, 앱만 교체했다. Flyway4·카탈로그64·readiness/HTTPS/asset2/404 PASS.
+- 기존snapshot hash `56f5271da82eceab4962bbd4f8649642`와 공개 공유가 그대로다. 최종 운영장부11건/$0.697184·미결예약0, 백업timer active. 한 시점의 메모리는 app225.4MiB/768MiB, DB70.43MiB/384MiB, nginx2.316MiB/64MiB였다. 부하/장시간 안정성 증거는 아니다.
+- 실제 DB16강0.767초/AI0, 조건부AI16강preview5.357초/provider4.455초/1호출/$0.012404. 임시 HTTP 점검기의 공유본문 오류400은 보존하고, AI를 다시 생성하지 않은 DB 후속 점검 및 공개 브라우저15경기 timeout/Champion/공유로 연결을 확인했다. 자세한 구분은 [검증 기록](VERIFICATION.md)을 따른다.
+- 이번 배포는 새 인프라/결제/자동충전 변경 없이 기존 자원을 사용했다. 새 V4 백업의 격리 복원은 다시 수행하지 않았다. 이전 V3 복원 증거를 새 스키마 복원 성공으로 표시하지 않는다. rollout 중 macOS provenance 확장 속성을 tar가 무시한 경고는 있었으나 archive checksum·실행·서비스 정상 확인에는 영향 없었다.
+
+향후 rollback은 같은 새 이미지에서 staged 전략으로 되돌리며, V4 이후 옛 이미지를 무조건 적용하지 않는다. 비용 긴급 차단은 기존 예산0, DB/장부 초기화가 아니다.
 
 ## 2026-09-19 공개 배포 완료 — TD-52/53
 

@@ -21,26 +21,37 @@
 - 코드: [작업 브랜치](https://github.com/winkrj/dynamic-ai-world-cup/tree/feat/engine/context-feasibility). main과 배포 소스가 같다고 가정하지 않는다.
 - 설계/실측: [DB 우선 엔진](CATALOG_ENGINE.md), [화면 통합 Spec](INTEGRATION_SPEC.md), [공개 API](../contracts/openapi.json).
 
-**새 버전 배포 후** 온라인 데모는 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 → 다른 브라우저에서 같은 대진 순서로 진행한다. 새 버전에서 이 문구의 첫 생성은 개인 이력이 없는 경우 DB preset이며, 문구에 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. 생성/전체 재생성/접수 후 실패는 하루 2회 한도에 포함된다. 배포 전 기존 서비스에서는 이 문구도 느린 staged 경로로 처리되므로 새 속도 시연에 사용하지 않는다.
+온라인 데모는 공개 서비스에서 새로고침한 뒤 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 순서로 진행한다. 이 문구의 첫 생성은 개인 선택 이력이 없는 경우 DB preset이며, 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. 생성/전체 재생성/접수 후 실패는 하루 2회 한도에 포함된다. 생성 없이 바로 시연하려면 [새 버전 16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/EvDA3r6utnyXgg4YJWpk-9CKTXhmqaIM_BDV8tIoOo4)를 사용한다. 로컬18089는 개발 합성 서버이며 제출용 운영 주소가 아니다.
 
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
 
-**코드·로컬 통합 완료, AWS 재로그인 대기 때문에 새 운영 배포는 미완료. 기존 공개 서비스는 이전 staged 엔진이다.**
+**2026-09-20 1차 제출본 개발·검증·AWS 배포 완료. 공개 서비스는 catalog 엔진과 새 애니메이션을 사용한다.**
 
 릴리스 소스: `fcb6a5f8bea70fc90dd324bbceb30f22d3dc756d`, GitHub `feat/engine/context-feasibility`에 push 확인. 후속 문서 전용 커밋은 런타임 소스에 영향을 주지 않는다.
 
-배포 이미지도 로컬 준비 완료: `dynamic-ai-world-cup:submission-fcb6a5f`, `linux/amd64`, 로컬 digest `sha256:6bcf312d9520d3fb0000f73215afa2b3a768b6c30b82966307ff42f252408809`. 실제 Java21 실행 및 `prod,live`/`catalog`/예산0으로 시작해 웹·readiness·V4/카탈로그64개·provider 장부0건을 확인했다. 기본 개발 암호를 금지하는 운영 guard 때문에 별도 로컬 합성 계정/격리DB를 사용했다. 이 이미지는 **아직 ECR push/운영 교체 전**이며 원격 digest는 업로드 후 다시 대조한다.
+배포 이미지: `release-fcb6a5f-app`, `linux/amd64`, digest `sha256:6bcf312d9520d3fb0000f73215afa2b3a768b6c30b82966307ff42f252408809`. 로컬 검증 이미지와 ECR 업로드/실제 호스트 실행 digest·소스 label이 같다. 운영 `prod,live,proxy`, `catalog`, 호출 제한30초, 누적예산5를 확인했다. 기존 app.env·nginx·PostgreSQL 이미지·인프라는 바꾸지 않았다.
 
 - 전체 `scripts/verify.sh` PASS: Java454중452실행/유료2제외, 프론트61, handoff6, release13, runtime20/AWS12, fixture5, 실제 HTTP166개/9schemas, TypeScript/Vite/bootJar/appJar. 마지막 실행의 변경 없는 Java 결과는 Gradle up-to-date로 재사용했다.
 - 독립 read-only 리뷰1차: Critical0 / High0 / actionable0. 운영의 실제 이미지/전략/DB적용은 별도 확인 대상으로 남겼다.
 - 최종 통합 JAR + 전용 로컬 DB: 브라우저360px에서8/16/32강7/15/31경기, 전체 재생성, deadline 새로고침복원, 숨김/복귀 timeout, 중복탭잠금, 완료저장, 동일 공유/새세션 PASS. 생성POST는 의도한4건, 공유재생성0, 브라우저오류0. 개발 합성 후보이며 실제AI 품질 증거는 아니다.
 - 별도 합성 브라우저: 360/1280px × 일반/줄인 움직임, 양쪽 승패연출·결승·실제7초·280ms피드백·고정클릭영역·키보드·이미지2초fallback·긴이름·로딩·Champion·32강안내 PASS. 실제카드간격에 VS를 배치해 focus에서 가리는 문제를 수정했다.
 - 통합JAR 읽기전용 smoke: 웹/공유진입/정적자산2개/health/ready/없는API·asset404 PASS.
-- 실제 모델 관측/비용: [32강 후속 관측](CATALOG_ENGINE.md#제출-전-32강-관측--td-55). 최종v3 32강은1호출2.827초/$0.0167525지만 유사후보는 남음. 이전v2 16강의2~6초 측정과 구별한다. 실험누적$5.4206158/$6. 운영 장부는 로그인 후 다시 조회하며 과거 수치를 현재 잔액으로 표시하지 않는다.
+- 실제 모델 관측/비용: [32강 후속 관측](CATALOG_ENGINE.md#제출-전-32강-관측--td-55). 최종v3 32강은1호출2.827초/$0.0167525지만 유사후보는 남음. 실험누적$5.4206158/$6과 운영 장부는 분리한다.
 
-배포 재개 순서: 기존 계정/대상 확인 → 현재 DB와 장부를 보존한 백업 → 검증된 linux/amd64 이미지/새 runtime 배포 → 외부 runtime.env에 `CANDIDATE_ENGINE_STRATEGY=catalog`, `CANDIDATE_FAST_TIMEOUT_SECONDS=30` 명시 → V4·실제환경·readiness·HTTPS·기존공유 보존 점검 → 운영 예산 안의 새16강1회 생성/완주/공유. 비밀app.env·기존예산·다른서비스는 변경하지 않는다.
+### 실제 운영 확인
+
+| 확인 | 결과 |
+| --- | --- |
+| 기본 취미16강 | 접수→preview 0.767초, AI0 / 후속 DB 전용 확인0.613초 |
+| 혼자·비운동·월10만원 취미16강 | 접수→preview5.357초, provider4.455초, COMPOSE1회/검색0/Repair0, $0.012404 |
+| 저장/공유 | AI 후보15경기 API 저장 완료. DB 후보16강은 freeze→15경기→공유→새 익명 세션의 동일 snapshot 대조 PASS |
+| 실제 브라우저 | 새 공유16강의 timeout15경기→Champion 저장→다시 공유 PASS, console warn/error0. 직접 클릭15회 증거로 세지 않음 |
+| 데이터/백업 | 적용 전 DB dump 암호화·버전관리 S3 업로드 확인, V4·seed64, 기존 snapshot hash/공유·비용장부 보존, 한국03시 backup timer active |
+| 비용 | 운영 누적$0.697184/$5, 미결 예약0, 잔여$4.302816(확인 시점). 실험 추가 비용0, 예산/자동충전 설정 변경0 |
+
+초기 임시 HTTP 점검기가 본문이 없어야 하는 공유 요청에 `{}`를 보내400을 받았다. 제품은 계약대로 거절했고 기존 프론트는 빈 본문을 올바르게 보낸다. 그 실패를 지우지 않으며, 유료 AI 생성을 다시 하지 않고 DB preset으로 도구의 본문 처리만 고쳐 공유를 확인했다. 운영 앱 코드는 수정하지 않았다. 세 번의 생성 접수 중 실제 AI는 한 번뿐이며, 이후 공유/브라우저 플레이에서도 provider 총11건은 늘지 않았다. 5.357초는 한 사례의 실측으로 전체 입력의 평균/p95나 품질 보장이 아니다. 이번 새 V4 백업의 격리 복원은 재실행하지 않았으며, 이전V3의 실제 복원 증거와 구별한다.
 
 ## 출시 후 남길 과제
 
