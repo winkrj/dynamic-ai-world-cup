@@ -106,6 +106,39 @@ class OpenAiCatalogComposerTest {
         assertThat(schema.path("properties").path("additions").path("maxItems").asInt()).isEqualTo(16);
     }
 
+    @Test void promptSupportsStableChoicesOutsideTheCatalogWithoutCollapsingWorksIntoActivities() {
+        compose();
+        assertThat(request.path("instructions").asString()).contains(
+                "모든 요청을 취미나 활동으로 바꾸지", "노래·영화·책·게임", "음식·선물 종류", "여행지", "창작 아이디어",
+                "catalog는 재사용 재료이지 지원 주제 목록이 아니다", "additions로 전부 구성",
+                "선택적 선호가 없다는 이유만으로 추가 질문하지",
+                "category는 장르·종류 묶음이며 여러 후보가 같아도 된다",
+                "같은 가수의 서로 다른 곡", "같은 작가의 서로 다른 책", "그 작품의 고유 식별 묶음",
+                "동일 작품의 별칭·번역명·재발매·리마스터", "곡명 — 가수", "제목 — 저자",
+                "확실히 아는 후보로도 요청 수를 채울 수 없으면 UNSUPPORTED_REQUEST");
+        assertThat(calls).hasValue(1);
+        assertThat(OpenAiResponsesClient.COMPACT_PROMPT_VERSION).isEqualTo("ce003-v6-clear-subject");
+    }
+
+    @Test void namedWorksDoNotAuthorizeInventedWorksOrCurrentAvailabilityClaims() {
+        compose();
+        assertThat(request.path("instructions").asString()).contains(
+                "실재하는 이름이라는 이유만으로 거절하지", "불확실한 작품을 만들어내지",
+                "실제 작품 요청을 창작물이나 감상 활동으로 몰래 바꾸지",
+                "지금 음원 차트 상위 곡", "오늘 넷플릭스에서 볼 수 있는 영화",
+                "조건을 빼고 일반 작품을 내지", "최신 가격·영업·예약·재고·이용 가능성",
+                "GROUNDING_REQUIRED");
+        assertThat(request.path("tools").size()).isZero();
+    }
+
+    @Test void missingOptionalPreferencesCannotTurnAClearSubjectIntoClarification() {
+        compose();
+        assertThat(request.path("instructions").asString()).contains(
+                "무엇을 고를지조차 정할 수 없는 요청에만", "대상이 명확하므로 READY",
+                "취향·시대·장르·예산 미기재는 추가 질문의 이유가 아니다", "GROUNDING_REQUIRED가 우선");
+        assertThat(request.path("instructions").asString()).doesNotContain("핵심 비교 대상·조건이 불명확하면");
+    }
+
     @ParameterizedTest @ValueSource(strings = {"null", "{}", "{\"decision\":\"READY\",\"unit\":\"취미\",\"constraintSources\":[],\"selectedIds\":[],\"additions\":[],\"score\":5}"})
     void malformedCompactResponseIsPaidOnceWithoutRepair(String invalid) {
         output = invalid;

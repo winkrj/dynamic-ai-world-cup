@@ -97,7 +97,7 @@ class LiveEngineHttpTest extends PostgresSupport {
     }
     /** True means an expected refusal: no preview, game, or fabricated success may follow. */
     static boolean assertExpectedTerminal(String caseId, JsonNode response) {
-        if ("catalog-facts".equals(caseId)) {
+        if (Set.of("catalog-facts", "catalog-music-facts").contains(caseId)) {
             assertThat(response.path("status").asString()).isEqualTo("FAILED");
             assertThat(response.path("error").path("code").asString()).isEqualTo("GROUNDING_REQUIRED");
             assertThat(response.has("draftId")).isTrue();

@@ -1,5 +1,7 @@
 # B — 후보 품질과 서버
 
+TD-59: compact v6-clear-subject는 활동 외 작품·일반 선택을 지원한다. family는 비교 단위에 따른 동일 선택의 키이며, 작품에서는 장르/가수가 아닌 작품 식별이다. v5의 실제 추가 질문 실패는 보존하고 선택적 취향 미기재만으로 명확한 주제를 거절하지 않는다. 중복 검사를 없애거나 실제 검색을 추가하지 않는다. 제목/창작자 정확도는 모델 추정이고 최신 차트·현재 이용 가능성은 GROUNDING_REQUIRED다. docs/CATALOG_ENGINE.md의 최신 검증/미배포 상태를 따른다.
+
 TD-58 현재 제출 수정: 운영 catalog의 compact v4-activity-context는 지역·요일 활동 아이디어와 실제 장소/최신 사실을 구별한다. 후자는 별도 GROUNDING_REQUIRED이며 DB·HTTP에 그대로 보존한다. 공개 오류 enum 추가 외 요청/DB/모델/호출/예산은 불변이다. 최신 관측과 배포 상태는 docs/V1_SUBMISSION.md를 따르며 아래 staged 미배포 표시는 당시 기록이다.
 
 TD-55 제출 준비(2026-09-20): catalog 운영 적용을 준비하며 compact prompt `ce003-v3-core-experience`를 사용한다. 새32강2관측/추가$0.032856 뒤 최신 실험 누적$5.4206158/$6, 잔여$0.5793842(미확인.50보존). 실제 연결은 통과했지만32강의 의미 유사 후보는 남았으며 품질PASS로 기록하지 않는다. 루트 TD-55와 docs/V1_SUBMISSION.md/CATALOG_ENGINE.md가 최신. 과거 TD-54의7회·v2수치는 당시기록이다.

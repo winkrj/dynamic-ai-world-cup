@@ -320,12 +320,13 @@ test('grounding failure is terminal rather than clarification and retains the su
   assert.equal(first.getSnapshot().screen, 'generating');
   assert.equal(first.getSnapshot().canRetry, false);
   assert.equal(first.getSnapshot().canEdit, true);
-  assert.match(first.getSnapshot().error!.detail, /현재 가격, 영업 여부나 예약 가능 여부는 확인하지 못해요/);
+  assert.match(first.getSnapshot().error!.detail, /최신 순위, 현재 가격·영업·예약·시청 가능 여부는 확인하지 못해요/);
+  assert.match(first.getSnapshot().error!.detail, /일반적인 노래·영화·책 추천은 가능해요/);
   first.dispose();
   const restored = harness(t, { storage, api }).controller;
   await restored.resume(); await restored.retry();
   assert.equal(posts, 1);
-  assert.match(restored.getSnapshot().error!.title, /최신 장소 정보는 확인할 수 없어요/);
+  assert.match(restored.getSnapshot().error!.title, /실시간 정보는 확인할 수 없어요/);
   assert.doesNotMatch(storage.getItem(storageKey)!, /Private detail/);
   restored.editInput(); assert.equal(restored.getSnapshot().prompt, input.prompt);
 });
@@ -341,7 +342,7 @@ test('grounding failure during regeneration keeps the complete prior preview and
   assert.deepEqual(h.controller.getSnapshot().preview, original);
   assert.equal(h.controller.getSnapshot().previewLocked, false);
   assert.equal(h.controller.getSnapshot().preview!.regenerationsRemaining, 1);
-  assert.match(h.controller.getSnapshot().error!.title, /최신 장소 정보/);
+  assert.match(h.controller.getSnapshot().error!.title, /실시간 정보/);
 });
 
 test('failed regeneration preserves original full preview and remaining successful regeneration', async t => {

@@ -1,5 +1,5 @@
 {
-  "datasetVersion": "catalog-speed-v2-context",
+  "datasetVersion": "catalog-speed-v3-choice-unit",
   "provenance": "Fixed synthetic cases for the TD-54 DB-first latency/quality tradeoff; not human approval or a representative traffic sample.",
   "cases": [
     {"id":"catalog-preset", "prompt":"취미 추천해줘", "purpose":"Exact curated preset, zero AI calls"},
@@ -8,6 +8,10 @@
     {"id":"catalog-date-context", "prompt":"서울 평일 데이트", "purpose":"Short activity context without instructing the model to ignore venue facts; expected general activities, not named places"},
     {"id":"catalog-dinner", "prompt":"고기 없이 먹을 저녁 메뉴를 추천해줘. 매운 음식은 싫어.", "purpose":"Partial suitable catalog; exclusions and compact supplementation"},
     {"id":"catalog-empty", "prompt":"새 판타지 소설 주인공의 마법 능력을 고르고 싶어. 공격보다 일상에 도움 되는 능력으로 추천해줘.", "purpose":"Out-of-catalog fictional ideas; one-shot full generation without real-world factual claims"},
-    {"id":"catalog-facts", "prompt":"이번 토요일 서울에서 실제 영업하는 식당 이름과 현재 가격을 알려줘.", "purpose":"No invented live facts; explicit fast-path refusal"}
+    {"id":"catalog-facts", "prompt":"이번 토요일 서울에서 실제 영업하는 식당 이름과 현재 가격을 알려줘.", "purpose":"No invented live facts; explicit fast-path refusal"},
+    {"id":"catalog-music", "prompt":"케이팝 곡을 골라줘.", "purpose":"Stable named works outside the activity catalog; individual songs, not artists or listening activities"},
+    {"id":"catalog-movie", "prompt":"주말에 볼 SF 영화를 추천해줘.", "purpose":"Distinct films in one genre; no current streaming availability implied"},
+    {"id":"catalog-book", "prompt":"읽어볼 추리소설을 골라줘.", "purpose":"Books with identifiable titles and authors; no current stock or price claims"},
+    {"id":"catalog-music-facts", "prompt":"지금 국내 음원 차트에서 가장 높은 순위의 곡들로 골라줘.", "purpose":"Current rankings still require grounding; do not silently substitute a general music list"}
   ]
 }

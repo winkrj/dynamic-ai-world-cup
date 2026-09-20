@@ -28,9 +28,20 @@ class LiveEvalCaseTest {
         var json = new JsonMapper();
         var refused = json.readTree("{\"status\":\"FAILED\",\"draftId\":null,\"error\":{\"code\":\"GROUNDING_REQUIRED\"}}");
         var ready = json.readTree("{\"status\":\"READY\",\"draftId\":\"invented\",\"error\":null}");
-        assertThat(LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", refused)).isTrue();
-        assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", ready)).isInstanceOf(AssertionError.class);
+        for (var caseId : new String[]{"catalog-facts", "catalog-music-facts"}) {
+            assertThat(LiveEngineHttpTest.assertExpectedTerminal(caseId, refused)).isTrue();
+            assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal(caseId, ready)).isInstanceOf(AssertionError.class);
+        }
         assertThat(LiveEngineHttpTest.assertExpectedTerminal("catalog-hobby", ready)).isFalse();
         assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal("catalog-hobby", refused)).isInstanceOf(AssertionError.class);
+    }
+
+    @Test void choiceUnitCasesRemainSeparateFromLiveFactCases() throws Exception {
+        var dataset = new JsonMapper().readTree(Files.readString(Path.of("../evals/catalog-cases.json")));
+        var ready = new JsonMapper().readTree("{\"status\":\"READY\",\"draftId\":\"synthetic\",\"error\":null}");
+        for (var id : new String[]{"catalog-music", "catalog-movie", "catalog-book"}) {
+            assertThat(LiveEvalCase.select(id, 16, dataset).datasetVersion()).isEqualTo("catalog-speed-v3-choice-unit");
+            assertThat(LiveEngineHttpTest.assertExpectedTerminal(id, ready)).isFalse();
+        }
     }
 }

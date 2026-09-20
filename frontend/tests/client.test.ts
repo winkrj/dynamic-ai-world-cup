@@ -113,7 +113,7 @@ test('GROUNDING_REQUIRED job error is recognized with safe local copy, not treat
   const client = createApiClient((async () => json({ jobId: 'job', status: 'FAILED', draftId: null, error })) as typeof fetch);
   const result = await client.getJob('job');
   assert.equal(result.status, 'FAILED');
-  assert.match(errorFromJob(result.error!).message, /최신 정보는 확인할 수 없어요/);
+  assert.match(errorFromJob(result.error!).message, /최신 순위·가격·영업·시청 가능 여부는 확인할 수 없어요/);
   assert.doesNotMatch(errorFromJob(result.error!).message, /Private/);
 });
 

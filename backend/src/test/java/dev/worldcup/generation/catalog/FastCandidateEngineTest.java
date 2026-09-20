@@ -122,6 +122,31 @@ class FastCandidateEngineTest {
         assertThat(result.candidates().plan().coverage()).hasSize(2);
     }
 
+    @ParameterizedTest @ValueSource(ints = {8, 16, 32})
+    void distinctWorksOfOneGenreAndArtistCanUseAdditionsWithoutActivityCatalogRows(int size) {
+        catalog.rows = entries(16); // Available hobby rows must not force the comparison unit.
+        var works = IntStream.rangeClosed(1, size).mapToObj(i ->
+                new Addition("합성 곡 " + i + " — 합성 가수", List.of("댄스"), "synthetic-song-" + i, "댄스")).toList();
+        composer.result = new Selection(Decision.READY, "노래", List.of(), List.of(), works);
+        var result = engine.generate(new GenerationInput("밝은 곡을 골라줘", size, "ko-KR", "Asia/Seoul"), context());
+        assertThat(result.candidates().candidates()).hasSize(size).allSatisfy(candidate -> {
+            assertThat(candidate.unit()).isEqualTo("노래");
+            assertThat(candidate.name()).endsWith("— 합성 가수");
+        });
+        assertThat(result.candidates().plan().coverage()).hasSize(1);
+        assertThat(composer.calls).isEqualTo(1);
+        assertThat(result.certificate()).isNull();
+    }
+
+    @Test void alternativeNamesOfTheSameWorkStillFailWithoutAnotherCall() {
+        var works = new ArrayList<>(selection(0, 8).additions());
+        works.set(0, new Addition("합성 곡 — 합성 가수", List.of(), "same-work", "댄스"));
+        works.set(1, new Addition("합성 곡 리마스터 — 합성 가수", List.of(), " SAME-WORK ", "댄스"));
+        composer.result = new Selection(Decision.READY, "노래", List.of(), List.of(), works);
+        fails(Failure.Code.QUALITY_GATE_FAILED, () -> engine.generate(input(8), context()));
+        assertThat(composer.calls).isEqualTo(1);
+    }
+
     @Test void fullButNonExactPoolStillRequiresOneRequestInterpretationCall() {
         catalog.rows = entries(16);
         composer.result = selection(8, 0);

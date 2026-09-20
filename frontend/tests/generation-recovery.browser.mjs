@@ -63,13 +63,13 @@ try {
     await page.waitForFunction(() => !document.querySelector('.message-actions .button')?.disabled);
     assert.equal(posts.length, 1, 'Expiry alone never POSTs.');
     await retryButton(page).focus(); await page.keyboard.press('Enter');
-    await page.getByText('최신 장소 정보는 확인할 수 없어요', { exact: true }).waitFor();
+    await page.getByText('실시간 정보는 확인할 수 없어요', { exact: true }).waitFor();
     assert.deepEqual(posts, [posts[0], posts[0]], 'Explicit retry keeps its exact body/key.');
     assert.equal(await page.getByTestId('screen-clarification').count(), 0);
     assert.equal(await retryButton(page).count(), 0);
     assert.doesNotMatch(await page.locator('body').textContent(), /Private model detail/);
     await page.reload();
-    await page.getByText('최신 장소 정보는 확인할 수 없어요', { exact: true }).waitFor();
+    await page.getByText('실시간 정보는 확인할 수 없어요', { exact: true }).waitFor();
     assert.equal(posts.length, 2, 'A failed job stays terminal after reload.');
     await fits(page);
     await page.screenshot({ path: `${directory}/generation-recovery-grounding-${width}.png`, fullPage: true });
