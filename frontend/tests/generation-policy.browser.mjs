@@ -10,11 +10,12 @@ const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL 
 const directory = 'reports/local/browser';
 await mkdir(directory, { recursive: true });
 const failures = [];
-const policyText = '전체 다시 만들기와 접수 후 실패도 포함돼요.';
+const policyText = '짧은 시간에 여러 번 만들면 잠시 기다려야 할 수 있어요.';
 async function openSize(page) {
   page.on('pageerror', error => failures.push(error.message));
   await page.goto(base.href);
-  assert.match(await page.locator('.input-reassurance').textContent(), /이 브라우저에서 하루 2회 · 한국 시간 자정 초기화/);
+  assert.match(await page.locator('.input-reassurance').textContent(), /반복 요청은 일시적으로 제한될 수 있어요/);
+  assert.doesNotMatch(await page.locator('.input-reassurance').textContent(), /하루 2회|자정/);
   await page.getByRole('textbox').fill('합성 생성 정책 검증');
   await page.getByRole('button', { name: /월드컵 만들기/ }).click();
   assert.equal(await page.locator('input[value="16"]').isChecked(), true, '16 remains the default.');
@@ -23,7 +24,8 @@ async function openSize(page) {
   assert.match(await page.locator('.size-quality-note').textContent(), /비슷한 후보가 섞일 수 있어요/);
   await page.locator('input[value="8"]').check();
   assert.equal(await page.locator('.size-quality-note').count(), 0, 'The 32-candidate guidance is scoped to that choice.');
-  assert.match(await page.locator('.generation-policy').textContent(), /같은 요청 재전송·공유 플레이는 차감하지 않아요/);
+  assert.match(await page.locator('.generation-policy').textContent(), /같은 요청 재전송·공유 플레이는 AI를 새로 호출하지 않아요/);
+  assert.doesNotMatch(await page.locator('.generation-policy').textContent(), /하루 2회|자정/);
 }
 async function assertFits(page) {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

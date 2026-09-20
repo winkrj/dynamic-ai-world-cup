@@ -1,0 +1,88 @@
+name: release AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact current main commit SHA (40 lowercase hex characters)
+        required: true
+        type: string
+      quota:
+        description: Daily generation quota; keep preserves the host setting (AI budget stays unchanged)
+        required: true
+        default: keep
+        type: choice
+        options: [keep, '0', '2']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worldcup-production-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'winkrj/dynamic-ai-world-cup' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: production
+      url: https://${{ vars.AWS_RELEASE_HOST }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CANDIDATE_LIVE_TEST: 'false'
+      CANDIDATE_INTERPRETATION_DIAGNOSTIC: 'false'
+      AWS_RELEASE_CONFIG: ${{ runner.temp }}/worldcup-release.json
+    steps:
+      # Never execute an arbitrary input ref with deployment credentials. The entrypoint
+      # requires this trusted main checkout and the remote main tip to equal revision.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - name: Write non-secret environment target
+        env:
+          TARGET_ACCOUNT: ${{ vars.AWS_RELEASE_ACCOUNT_ID }}
+          TARGET_INSTANCE: ${{ vars.AWS_RELEASE_INSTANCE_ID }}
+          TARGET_REPOSITORY: ${{ vars.AWS_RELEASE_ECR_REPOSITORY }}
+          TARGET_HOST: ${{ vars.AWS_RELEASE_HOST }}
+          TARGET_BUCKET: ${{ vars.AWS_RELEASE_BACKUP_BUCKET }}
+        run: |
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            import { validateTarget } from "./scripts/release-aws.mjs";
+            const e = process.env;
+            const target = validateTarget({ account: e.TARGET_ACCOUNT, region: "ap-northeast-2",
+              instance: e.TARGET_INSTANCE, repository: e.TARGET_REPOSITORY,
+              host: e.TARGET_HOST, bucket: e.TARGET_BUCKET });
+            writeFileSync(e.AWS_RELEASE_CONFIG, JSON.stringify(target), { mode: 0o600 });
+          '
+      # The role must trust this repository's actual OIDC subject + production environment,
+      # with GitHub production restricted to main. SSM means root on the one target host:
+      # do not grant the role to PRs, forks, arbitrary branches, or untrusted workflows.
+      # API/DB secrets remain on EC2; no secret export, long-lived AWS key, IAM creation,
+      # budget reset, DB restore, or automatic redeployment is part of this workflow.
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: worldcup-release-${{ github.run_id }}
+          aws-region: ap-northeast-2
+          allowed-account-ids: ${{ vars.AWS_RELEASE_ACCOUNT_ID }}
+          role-duration-seconds: 3600
+      - name: Verify, build, back up, deploy and smoke-test
+        env:
+          RELEASE_REVISION: ${{ inputs.revision }}
+          RELEASE_QUOTA: ${{ inputs.quota }}
+        run: node scripts/release-aws.mjs --revision "$RELEASE_REVISION" --quota "$RELEASE_QUOTA"

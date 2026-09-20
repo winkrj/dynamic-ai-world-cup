@@ -8,7 +8,7 @@ Amazon Linux 2023 / `linux/amd64` / 초기 2 GiB 호스트용이다. CloudFront 
 | --- | --- |
 | `/opt/worldcup/runtime` | 이 폴더의 배포 파일. root 소유, 다른 사용자 쓰기 금지. `init-worldcup.sh` 실행 비트 보존 |
 | `/etc/worldcup` | root 소유·0700. 아래 네 파일은 root 소유·0600, symlink 금지 |
-| `runtime.env` | 필수: `APP_IMAGE`, `NGINX_IMAGE`, `POSTGRES_IMAGE`, `PUBLIC_HOST`, `BACKUP_BUCKET`, `AWS_REGION`, `CANDIDATE_BUDGET_USD`. 선택: `CANDIDATE_ENGINE_STRATEGY`, `CANDIDATE_FAST_TIMEOUT_SECONDS` |
+| `runtime.env` | 필수: `APP_IMAGE`, `NGINX_IMAGE`, `POSTGRES_IMAGE`, `PUBLIC_HOST`, `BACKUP_BUCKET`, `AWS_REGION`, `CANDIDATE_BUDGET_USD`. 선택: `CANDIDATE_ENGINE_STRATEGY`, `CANDIDATE_FAST_TIMEOUT_SECONDS`, `GENERATION_DAILY_LIMIT` |
 | `app.env` | `DATABASE_PASSWORD`, `OPENAI_API_KEY`만 |
 | `postgres.env` | `POSTGRES_PASSWORD`(관리자), `WORLDCUP_PASSWORD`(앱 암호와 동일)만 |
 | `proxy.env` | CloudFront origin의 `X-Origin-Verify`와 동일한 `ORIGIN_VERIFY_TOKEN`만 |
@@ -32,7 +32,9 @@ bash /opt/worldcup/runtime/run.sh status
 
 `start`는 매번 호스트 역할로 ECR 인증 갱신 → 고정 digest pull → PostgreSQL TCP 준비 → 앱 `/api/v1/ready` 200 → nginx 순서로 기다린다. AWS CLI 토큰은 `docker login --password-stdin`에 파이프로만 전달한다. 0700 임시 `DOCKER_CONFIG`와 0600 token 설정을 사용하고 성공/실패 종료 시 해당 파일을 삭제한다. 원래 사용자 Docker 인증 설정은 덮어쓰거나 지우지 않는다. 이전 로그인 만료 후 재배포도 새 인증으로 시작한다. 실패하면 배포를 성공으로 표시하지 않고 상태와 비밀 없는 오류를 확인한다. 자동 DB 삭제·major 업그레이드·복원·무한 재시도는 없다. `stop`은 이 프로젝트의 컨테이너만 정지하며 volume을 삭제하지 않는다.
 
-앱은 `prod,live,proxy`, 같은 기존 Terra 모델, 하루 2회, **DB 전체 운영 누적 $5**다. 일/월 자동 재설정이 아니며 API 잔액 소진만을 안전장치로 삼지 않는다. 복구/비용 대조 동안은 `CANDIDATE_BUDGET_USD=0`으로 시작한다. 런타임 validator는 `0` 또는 승인한 `5`만 허용한다. 예산을 바꾸면 컨테이너를 다시 생성해야 하며 파일 변경만으로 실행 중 프로세스가 바뀌지 않는다. 초기 메모리 상한은 앱 768 MiB(`-Xmx384m`), DB 384 MiB, nginx 64 MiB다. 이는 검증할 시작 설정이며 처리량/무장애를 보장하지 않는다.
+앱은 `prod,live,proxy`, 같은 기존 Terra 모델, **DB 전체 운영 누적 $5**다. 일/월 자동 재설정이 아니며 API 잔액 소진만을 안전장치로 삼지 않는다. 복구/비용 대조 동안은 `CANDIDATE_BUDGET_USD=0`으로 시작한다. 런타임 validator는 예산에 `0` 또는 승인한 `5`만 허용한다. 예산을 바꾸면 컨테이너를 다시 생성해야 하며 파일 변경만으로 실행 중 프로세스가 바뀌지 않는다. 초기 메모리 상한은 앱768MiB(`-Xmx384m`), DB384MiB, nginx64MiB다. 이는 검증할 시작 설정이며 처리량/무장애를 보장하지 않는다.
+
+TD-57 심사 모드: `GENERATION_DAILY_LIMIT=0`은 일일 횟수만 해제하며 `2`는 일반 모드다. 운영 validator는0/2만 허용하고 누락 시2를 유지한다. 호출 shell의 동명 환경을 상속하지 않는다. cap0에서도 actor/IP5회/10분·기록·전체 재생성1회·누적 AI예산은 그대로다. 음수/매우 큰 수로 ‘무제한’을 흉내 내지 않는다. 호환 앱 이미지와 이 runtime을 함께 배포한 뒤 적용하고, 종료 시2로 재배포한다. 기존 일일 기록/비용 장부를 지우지 않으므로 같은 날 다시2로 바꾸면 이전 접수가 계속 집계된다.
 
 후보 엔진은 `runtime.env`에 `CANDIDATE_ENGINE_STRATEGY=catalog`, `CANDIDATE_FAST_TIMEOUT_SECONDS=30`을 명시해 DB 우선·최대 1회 AI 경로로 전환한다. 해당 코드와 V4 migration을 포함한 이미지가 선행해야 한다. 전략은 `catalog` 또는 `staged`만, 운영 fast timeout은 `30`만 허용한다. 기존 설정 파일에 두 키가 없으면 `staged`/`30`을 유지하며 호출한 shell의 동명 변수는 덮어쓴다. `app.env`에 추가하지 않는다. 30초는 fast engine 실행 상한이지 대기열·네트워크를 포함한 응답 SLA가 아니다.
 

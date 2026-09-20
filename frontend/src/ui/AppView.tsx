@@ -31,7 +31,7 @@ function Tags({ candidate }: { candidate: Candidate }) {
 }
 
 function GenerationPolicy() {
-  return <p className="fine-print generation-policy">이 브라우저에서 하루 2회까지 만들 수 있어요. 전체 다시 만들기와 접수 후 실패도 포함돼요.<br />한국 시간 자정에 초기화돼요. 같은 요청 재전송·공유 플레이는 차감하지 않아요.</p>;
+  return <p className="fine-print generation-policy">짧은 시간에 여러 번 만들면 잠시 기다려야 할 수 있어요.<br />같은 요청 재전송·공유 플레이는 AI를 새로 호출하지 않아요.</p>;
 }
 
 /** A missing, failed, or slow image settles to the same-size artwork. */
@@ -95,7 +95,7 @@ function InputScreen({ state, actions }: ViewProps) {
         placeholder="취향, 예산, 함께할 사람… 원하는 조건을 편하게 적어 주세요." rows={5} required />
       <div className="field-help"><span id="question-help">{promptLength(state.prompt) > 500 ? '입력은 그대로 보관했어요. 500자 이내로 줄여 주세요.' : '조건이 구체적일수록, 더 나다운 후보.'}</span><span id="question-count">{promptLength(state.prompt)} / 500</span></div>
       <button className="button button--primary" type="submit" disabled={!state.prompt.trim() || promptLength(state.prompt) > 500 || state.busy || state.locked || state.storageBlocked}>월드컵 만들기 <Arrow /></button>
-      <p className="input-reassurance">로그인 없이 시작해요. 후보는 먼저 확인할 수 있어요.<br />이 브라우저에서 하루 2회 · 한국 시간 자정 초기화</p>
+      <p className="input-reassurance">로그인 없이 시작해요. 후보는 먼저 확인할 수 있어요.<br />짧은 시간의 반복 요청은 일시적으로 제한될 수 있어요.</p>
       <div className="example-section"><p className="tiny-label">이렇게 시작해 봐도 좋아요</p>
         {examples.map((example, index) => <button className="example" type="button" key={example} disabled={state.busy || state.locked} onClick={() => actions.editPrompt(example)}>
           <span className="example-number">{twoDigits(index + 1)}</span><span>{example}</span><span aria-hidden="true">↗</span>
@@ -160,7 +160,7 @@ function ClarificationScreen({ state, actions }: ViewProps) {
         aria-describedby="clarification-help clarification-count clarification-cost"
         aria-invalid={!!answer.trim() && !!validation} placeholder="예: 새로 시작할 취미 중 하나를 고르고 싶어요." />
       <div className="field-help"><span id="clarification-help">{validation ?? '처음 고민과 답변을 합쳐 새 요청으로 보냅니다.'}</span><span id="clarification-count">합계 {count} / 500</span></div>
-      <p id="clarification-cost" className="fine-print clarification-cost">앞선 요청은 실패로 끝났어요. 답변을 보내면 새로 만들며, 접수되면 하루 횟수를 1회 더 사용해요.</p>
+      <p id="clarification-cost" className="fine-print clarification-cost">앞선 요청은 실패로 끝났어요. 답변을 보내면 새 후보 생성을 요청하며, 반복 요청은 일시적으로 제한될 수 있어요.</p>
       <button className="button button--primary" type="submit" disabled={!!validation || state.busy || state.locked || state.storageBlocked}>답변을 더해 후보 {state.size}개 만들기 <Arrow /></button>
       <button className="text-button" type="button" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.editInput}><Arrow direction="left" /> 처음 고민 수정하기</button>
     </form>
@@ -309,7 +309,7 @@ function ShareScreen({ state, actions }: ViewProps) {
     {champion && <div className="original-champion"><span className="tiny-label">만든 사람의 CHAMPION</span><strong>{champion.name}</strong><Tags candidate={champion} /><span className="original-mark" aria-hidden="true">✳</span></div>}
     <div className="roster-heading"><h2>함께 고를 후보 <span>{shared.snapshot.size}강</span></h2><span className="tiny-label">SAME BRACKET</span></div>
     <CandidateList candidates={shared.snapshot.candidates} />
-    <p className="fine-print frozen-note">{Number.isNaN(frozenAt.getTime()) ? '저장된' : frozenAt.toLocaleString('ko-KR')} 대진 그대로 진행해요.<br />후보를 새로 만들지 않으며, 내 결과는 별도로 저장돼요.<br />공유 플레이는 하루 만들기 횟수를 쓰지 않아요.</p>
+    <p className="fine-print frozen-note">{Number.isNaN(frozenAt.getTime()) ? '저장된' : frozenAt.toLocaleString('ko-KR')} 대진 그대로 진행해요.<br />후보를 새로 만들지 않으며, 내 결과는 별도로 저장돼요.<br />공유 플레이는 AI를 새로 호출하지 않아요.</p>
     <div className="action-stack"><button className="button button--primary" disabled={state.busy || state.locked || state.storageBlocked} onClick={actions.replay}>이 월드컵 해보기 <Arrow /></button><button className="text-button" disabled={state.busy || state.locked} onClick={actions.newCup}>내 월드컵으로 돌아가기 <Arrow /></button><p className="fine-print">진행 중인 월드컵이 있다면 이어서 열려요.</p></div>
   </section>;
 }

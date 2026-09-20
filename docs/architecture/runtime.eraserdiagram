@@ -1,0 +1,23 @@
+cloud-architecture-diagram
+direction right
+colorMode pastel
+styleMode shadow
+typeface clean
+
+"CLIENT & EDGE · CURRENT" [color: blue] {
+  Client [icon: browser, label: "Browser\nReact / same-origin API"]
+  Edge [icon: aws-cloudfront, label: "CloudFront\nHTTPS / VPC origin"]
+}
+"AWS EC2 · 1 INSTANCE · t3.small" [color: green] {
+  Proxy [icon: nginx, label: "nginx\norigin check / host :80"]
+  Application [icon: spring, label: "Spring Boot\nweb + API :8080"]
+  Database [icon: postgresql, label: "PostgreSQL 17\nprivate :5432 / encrypted EBS"]
+}
+"EXTERNAL SERVICES" [color: yellow] {
+  Provider [icon: api, label: "OpenAI API\n0–1 call / budget guard"]
+  Backup [icon: aws-s3, label: "Private S3\nencrypted / daily 03:00 KST"]
+}
+Client > Edge > Proxy > Application
+Application > Database
+Application > Provider: HTTPS
+Database > Backup: pg_dump

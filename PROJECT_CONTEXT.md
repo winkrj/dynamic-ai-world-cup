@@ -2,6 +2,8 @@
 
 갱신일: 2026-09-20.
 
+최신 TD-57: 심사용 일일 제한0(일반 기본2)과 반복 배포 진입점을 구현·검증했다. 단기 actor/IP5회/10분·운영 누적$5·실험$6·장부/공유/게임은 유지한다. 최종 독립 리뷰2/2 Critical/High/actionable0, 실제 archive 추출 권한 회귀 포함. 기존 AWS 로그인으로 운영 적용 예정이며 아직 완료로 표시하지 않는다. GitHub OIDC 역할·production 환경·main 통합은 별도 승인 대기다. 구성과 실제 적용 상태는 [배포 파이프라인](docs/DEPLOYMENT_PIPELINE.md)을 따른다.
+
 최신 TD-56: HTML A 연출 재대조 후 내부 압박/VS/승패·마지막3초와 라운드 첫500ms 안내·상시 강수 경로를 구현해 소스 `521fbfe`를 기존 AWS에 배포했다. 7초/280ms·API·엔진·예산은 유지한다. 최종 verify·8강28경기 및16/32강184경기 합성 브라우저·독립 리뷰 Critical/High/actionable0. active 복원 포커스도 보완했다. 공개 파일의 검증본 바이트 일치·실제16강 직접7/timeout8·Champion저장·오류0, DB/snapshot/장부 보존·추가AI0 확인. 운영누적14건/$0.73137410이며 실험은 변화없다. [검증 기록](docs/VERIFICATION.md)이 증거다. [사진 설계](docs/CANDIDATE_VISUALS.md)는 검토 사진+SVG 대체를 제안할 뿐 수집/생성/구현은 하지 않았다.
 
 최신 TD-55: **2026-09-20 1차 제출본 AWS 배포 완료.** 엔진·애니메이션 소스 `fcb6a5f`, catalog/30초·V4/seed64·HTTPS 확인. 전체 verify(Java452/프론트61)·독립 리뷰(Critical/High0)·합성 브라우저8/16/32를 통과한 동일 이미지다. 실제 DB preset0.767초/AI0, 조건부16강 preview5.357초/provider1회/$0.012404를 관측했다. 저장/공유/새세션·공개 브라우저15경기 timeout/Champion/공유·기존snapshot hash 보존·백업 완료. 임시 HTTP 점검기의 공유 본문 오류400은 남기고 DB preset으로 비용 없이 후속 확인했다. 운영 누적$0.697184/$5, 실험$5.4206158/$6·하루2회 유지. 32강 의미유사성과 일반 품질/SLA 미보장은 남는다. [1차 제출본](docs/V1_SUBMISSION.md)이 최신이며 아래 미완료/이전전략/숫자는 각 날짜의 역사 기록이다.

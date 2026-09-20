@@ -1,5 +1,17 @@
 # 검증 기록
 
+## TD-57 심사 모드·배포 진입점 — 2026-09-20
+
+- 일일2회/해제0의 실제 PostgreSQL 테스트18개 PASS. 기본2·actor/IP burst·동시 요청·idempotency·접수 실패/rollback·0→2 복귀 시 기존 기록 보존을 확인했다. Java 전체458개 실행, 유료2개 제외·실패/오류0.
+- 최종 권한 수정 전 전체 verify PASS: frontend61, handoff6, release13, deployment34, pipeline16+IAM2, fixture5/HTTP166·9schemas, TypeScript/Vite/두JAR. 두 번째 verify의 Java는 UP-TO-DATE이며 새458회 실행으로 세지 않는다.
+- 일일 한도 하드코딩 제거 후 generation-policy/clarification 브라우저 검사를360/1280px·reduced-motion·키보드·새로고침/수동 재시도·자동POST없음으로 통과했다. console/page 오류0, 모바일 화면 가로 넘침없음. 게임 시간/애니메이션 코드는 변경하지 않았다.
+- 독립 리뷰1차 High1: strict umask077로 새 runtime 압축을 해제하면 앱/nginx의 비루트 사용자가 코드 파일을 읽지 못했다. 실제 전송 archive 추출 회귀로 실패 재현 후 공개 allowlist만0755/0644로 정규화했다. private stage0700/archive0600·외부secret0600 유지. 수정 후 pipeline17+IAM2+runtime22=41 PASS, syntax/diff PASS. 최종 리뷰2/2 Critical0/High0/actionable0.
+- runtime/delivery SVG는 외부 참조 없는 공식 아이콘과 편집 가능한 원본으로 작성하고 XML검사·PNG 렌더·시각 확인을 했다. 단일 호스트와 아직 활성화하지 않은 GitHub 경로를 구별한다.
+- AWS 역할 템플릿 validate-template PASS(자원 생성 없음). 실제 GitHub OIDC subject는 immutable IDs 형식임을 읽기 전용으로 확인했다. 역할/Environment/main 통합/원격 배포 실행은 승인 대기다.
+- 배포 직전 운영 관측: 기존521fbfe, 일일2·누적예산5, active0/provider15/$0.74506260/reserved0, snapshot5·집계MD5 `505c0ea279c67af33e2f6196ab091e9c`, 백업timer active. TD-56 이후 운영 증가분은 이번 테스트 비용이 아니다. 이번 작업의 유료 AI 호출0, 실험장부$5.4206158/$6 불변.
+
+최종 권한 수정·재리뷰 이후 전체 `scripts/verify.sh`도 PASS: runtime22+AWS12+pipeline17+IAM2, frontend61·handoff6·release13·fixture5/HTTP166·9schemas·웹/두JAR. Java는 앞서 실행한458개의 UP-TO-DATE 결과다. 운영 적용과 전체 파이프라인 실제 실행 결과는 완료 후 별도 기록한다. 코드 테스트·역할 템플릿 존재를 운영 배포/OIDC 성공으로 일반화하지 않는다.
+
 ## TD-56 라운드 구분·긴박감 — 2026-09-20
 
 원본 HTML A와 대조해 고정 버튼 내부의 900ms 압박·VS, 250ms 승패 연출, 마지막 3→2→1 강조를 보강했다. 각 라운드 첫 준비에만 500ms 안내하며 상시 16→8→4→결승 경로를 표시한다. 실제 선택 7초와 피드백 280ms, 이미지 2초 fallback, 기존 active deadline은 유지한다. 사진은 [별도 설계](CANDIDATE_VISUALS.md)뿐이며 외부 이미지/AI 호출은 없다.

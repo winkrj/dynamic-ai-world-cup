@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-/** Accepted jobs consume one daily actor slot and actor/IP burst slots in the mutation transaction. */
+/** Accepted jobs consume actor/IP burst slots and, when enabled, daily actor slots in the mutation transaction. */
 @Component
 public class GenerationRateLimit {
     private static final ZoneId DAILY_ZONE = ZoneId.of("Asia/Seoul");
@@ -23,7 +23,7 @@ public class GenerationRateLimit {
     private final int dailyLimit;
     public GenerationRateLimit(JdbcTemplate jdbc, Clock clock,
             @Value("${worldcup.generation.daily-limit:2}") int dailyLimit) {
-        if (dailyLimit < 1) throw new IllegalArgumentException("Daily generation limit must be positive");
+        if (dailyLimit < 0) throw new IllegalArgumentException("Daily generation limit must be nonnegative; zero disables the daily cap");
         this.jdbc = jdbc; this.clock = clock; this.dailyLimit = dailyLimit;
     }
     public void reserve(String actor, String remoteAddress) {
@@ -35,14 +35,17 @@ public class GenerationRateLimit {
         }
         // A lock wait may cross midnight. Decide the accounting day only after acquiring both locks.
         Instant now = clock.instant();
-        var day = now.atZone(DAILY_ZONE).toLocalDate();
-        Instant dayStart = day.atStartOfDay(DAILY_ZONE).toInstant();
-        Instant nextDay = day.plusDays(1).atStartOfDay(DAILY_ZONE).toInstant();
-        int dailyCount = jdbc.queryForObject("""
-                SELECT count(*) FROM generation_rate_event
-                WHERE scope = ? AND created_at >= ? AND created_at < ?
-                """, Integer.class, actorScope, Timestamp.from(dayStart), Timestamp.from(nextDay));
-        Instant retryAt = dailyCount >= dailyLimit ? nextDay : now;
+        Instant retryAt = now;
+        if (dailyLimit > 0) {
+            var day = now.atZone(DAILY_ZONE).toLocalDate();
+            Instant dayStart = day.atStartOfDay(DAILY_ZONE).toInstant();
+            Instant nextDay = day.plusDays(1).atStartOfDay(DAILY_ZONE).toInstant();
+            int dailyCount = jdbc.queryForObject("""
+                    SELECT count(*) FROM generation_rate_event
+                    WHERE scope = ? AND created_at >= ? AND created_at < ?
+                    """, Integer.class, actorScope, Timestamp.from(dayStart), Timestamp.from(nextDay));
+            if (dailyCount >= dailyLimit) retryAt = nextDay;
+        }
         for (String scope : scopes) {
             // The fifth newest event must expire, even if a previous configuration admitted more.
             var recent = jdbc.query("""

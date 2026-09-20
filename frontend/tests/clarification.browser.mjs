@@ -44,7 +44,8 @@ try {
     await page.getByRole('button', { name: /후보 32개 만들기/ }).click();
     await page.getByTestId('screen-clarification').waitFor();
     assert.equal(await page.locator('.clarification-original').textContent(), original);
-    assert.match(await page.locator('#clarification-cost').textContent(), /접수되면 하루 횟수를 1회 더/);
+    assert.match(await page.locator('#clarification-cost').textContent(), /새 후보 생성을 요청하며, 반복 요청은 일시적으로 제한/);
+    assert.doesNotMatch(await page.locator('#clarification-cost').textContent(), /하루 횟수/);
     assert.equal(posts.length, 1);
     const textbox = page.getByRole('textbox', { name: question });
     await textbox.fill('😀'.repeat(500));

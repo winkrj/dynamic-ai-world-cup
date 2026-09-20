@@ -335,6 +335,6 @@ class DailyGenerationLimitTest extends PostgresSupport {
         assertThat(unknown.getHeaders().getFirst("Retry-After")).isNull();
         assertThat(errors.business(Failure.rateLimited(37), request).getHeaders().getFirst("Retry-After")).isEqualTo("37");
         assertThatThrownBy(() -> Failure.rateLimited(0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new GenerationRateLimit(jdbc, clock, 0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new GenerationRateLimit(jdbc, clock, -1)).isInstanceOf(IllegalArgumentException.class);
     }
 }

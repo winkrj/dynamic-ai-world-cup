@@ -1,0 +1,89 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Optional explicitly approved GitHub OIDC deployment role. No application secrets or new runtime resources.",
+  "Parameters": {
+    "OidcProviderArn": {
+      "Type": "String",
+      "AllowedPattern": "arn:aws:iam::[0-9]{12}:oidc-provider/token[.]actions[.]githubusercontent[.]com",
+      "Description": "Existing GitHub OIDC provider in this AWS account; do not duplicate or change another project's provider."
+    },
+    "GitHubSubject": {
+      "Type": "String",
+      "AllowedPattern": "repo:winkrj(@[0-9]+)?/dynamic-ai-world-cup(@[0-9]+)?:environment:production",
+      "Description": "Exact subject prefix from repository OIDC customization API plus :environment:production. Preserve immutable IDs when enabled."
+    },
+    "RepositoryName": {
+      "Type": "String",
+      "AllowedPattern": "worldcup-production-imagerepository-[a-z0-9]+"
+    },
+    "InstanceId": { "Type": "String", "AllowedPattern": "i-[a-f0-9]{17}" }
+  },
+  "Resources": {
+    "DeployRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": "worldcup-production-github-deploy",
+        "Description": "Trusted main/production GitHub releases only; SSM allows root execution on one existing Worldcup host.",
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": { "Federated": { "Ref": "OidcProviderArn" } },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": { "StringEquals": {
+              "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+              "token.actions.githubusercontent.com:sub": { "Ref": "GitHubSubject" }
+            } }
+          }]
+        },
+        "Policies": [{
+          "PolicyName": "existing-worldcup-release",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "RegistryLogin",
+                "Effect": "Allow",
+                "Action": "ecr:GetAuthorizationToken",
+                "Resource": "*",
+                "Condition": { "StringEquals": { "aws:RequestedRegion": "ap-northeast-2" } }
+              },
+              {
+                "Sid": "OneImageRepository",
+                "Effect": "Allow",
+                "Action": ["ecr:BatchCheckLayerAvailability", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:DescribeImages", "ecr:DescribeRepositories"],
+                "Resource": { "Fn::Sub": "arn:aws:ecr:ap-northeast-2:${AWS::AccountId}:repository/${RepositoryName}" }
+              },
+              {
+                "Sid": "OneDeploymentHost",
+                "Effect": "Allow",
+                "Action": "ssm:SendCommand",
+                "Resource": [
+                  "arn:aws:ssm:ap-northeast-2::document/AWS-RunShellScript",
+                  { "Fn::Sub": "arn:aws:ec2:ap-northeast-2:${AWS::AccountId}:instance/${InstanceId}" }
+                ]
+              },
+              {
+                "Sid": "DeploymentTargetMetadata",
+                "Effect": "Allow",
+                "Action": "ec2:DescribeInstances",
+                "Resource": "*",
+                "Condition": { "StringEquals": { "aws:RequestedRegion": "ap-northeast-2" } }
+              },
+              {
+                "Sid": "DeploymentStatus",
+                "Effect": "Allow",
+                "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"],
+                "Resource": "*",
+                "Condition": { "StringEquals": { "aws:RequestedRegion": "ap-northeast-2" } }
+              }
+            ]
+          }
+        }],
+        "Tags": [{ "Key": "Project", "Value": "dynamic-ai-world-cup" }, { "Key": "Purpose", "Value": "production-release" }]
+      }
+    }
+  },
+  "Outputs": { "DeployRoleArn": { "Value": { "Fn::GetAtt": ["DeployRole", "Arn"] } } }
+}

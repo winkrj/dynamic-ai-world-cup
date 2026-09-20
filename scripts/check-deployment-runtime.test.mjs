@@ -21,6 +21,7 @@ const metadata = {
   CANDIDATE_BUDGET_USD: '5',
   CANDIDATE_ENGINE_STRATEGY: 'catalog',
   CANDIDATE_FAST_TIMEOUT_SECONDS: '30',
+  GENERATION_DAILY_LIMIT: '2',
 };
 const secrets = {
   'app.env': `DATABASE_PASSWORD=${'b'.repeat(64)}\nOPENAI_API_KEY=sk-unit-test-not-a-real-api-key-123456789\n`,
@@ -100,6 +101,33 @@ test('older runtime files retain staged and 30 without inheriting the invoking s
   const partial = resolvedConfig(fixture(t, { CANDIDATE_FAST_TIMEOUT_SECONDS: undefined }));
   assert.equal(partial.services.app.environment.CANDIDATE_ENGINE_STRATEGY, 'catalog');
   assert.equal(partial.services.app.environment.CANDIDATE_FAST_TIMEOUT_SECONDS, '30');
+});
+
+test('daily quota disables only by explicit zero and reaches only the app', t => {
+  for (const limit of ['0', '2']) {
+    const dir = fixture(t, { GENERATION_DAILY_LIMIT: limit });
+    assert.equal(check(dir).status, 0);
+    const config = resolvedConfig(dir, { GENERATION_DAILY_LIMIT: '999' });
+    assert.equal(config.services.app.environment.GENERATION_DAILY_LIMIT, limit);
+    assert.equal(config.services.app.environment.CANDIDATE_BUDGET_USD, '5');
+    assert.equal(config.services.nginx.environment.GENERATION_DAILY_LIMIT, undefined);
+    assert.equal(config.services.postgres.environment.GENERATION_DAILY_LIMIT, undefined);
+    for (const [name, contents] of Object.entries(secrets)) assert.equal(readFileSync(join(dir, name), 'utf8'), contents);
+  }
+  const old = fixture(t, { GENERATION_DAILY_LIMIT: undefined });
+  assert.equal(resolvedConfig(old, { GENERATION_DAILY_LIMIT: '0' }).services.app.environment.GENERATION_DAILY_LIMIT, '2');
+});
+
+test('daily quota rejects malformed values, unsupported caps and duplicate keys', t => {
+  for (const limit of ['-1', '1', '100', '00', '2.0', 'false', 'unlimited', '$(printf 0)', '']) {
+    reject(fixture(t, { GENERATION_DAILY_LIMIT: limit }), /Daily generation limit|empty/);
+  }
+  const duplicate = fixture(t);
+  writeFileSync(join(duplicate, 'runtime.env'), `${readFileSync(join(duplicate, 'runtime.env'), 'utf8')}GENERATION_DAILY_LIMIT=0\n`);
+  reject(duplicate, /Duplicate/);
+  const misplaced = fixture(t);
+  writeFileSync(join(misplaced, 'app.env'), `${secrets['app.env']}GENERATION_DAILY_LIMIT=0\n`);
+  reject(misplaced, /Unexpected/);
 });
 
 test('rejects unsupported strategies and timeouts without evaluating environment expressions', t => {

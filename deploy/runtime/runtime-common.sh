@@ -39,8 +39,11 @@ runtime_load() {
     # in. Never inherit these choices from the invoking shell.
     wc_cfg_CANDIDATE_ENGINE_STRATEGY=staged
     wc_cfg_CANDIDATE_FAST_TIMEOUT_SECONDS=30
+    # Missing configuration preserves the original daily cap; only an explicit
+    # zero disables that cap for judging. Do not inherit a caller's environment.
+    wc_cfg_GENERATION_DAILY_LIMIT=2
     local wc_required_config='APP_IMAGE|NGINX_IMAGE|POSTGRES_IMAGE|PUBLIC_HOST|BACKUP_BUCKET|AWS_REGION|CANDIDATE_BUDGET_USD'
-    runtime_read_env "$wc_config" wc_cfg_ "$wc_required_config|CANDIDATE_ENGINE_STRATEGY|CANDIDATE_FAST_TIMEOUT_SECONDS" "$wc_required_config"
+    runtime_read_env "$wc_config" wc_cfg_ "$wc_required_config|CANDIDATE_ENGINE_STRATEGY|CANDIDATE_FAST_TIMEOUT_SECONDS|GENERATION_DAILY_LIMIT" "$wc_required_config"
     [[ "$wc_cfg_APP_IMAGE" =~ ^[0-9]{12}\.dkr\.ecr\.ap-northeast-2\.amazonaws\.com/[a-z0-9][a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'APP_IMAGE must be a Seoul private ECR release image digest.'
     [[ "$wc_cfg_NGINX_IMAGE" =~ ^nginx:stable-alpine@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'NGINX_IMAGE must pin the official stable-alpine digest.'
     [[ "$wc_cfg_POSTGRES_IMAGE" =~ ^postgres:17-alpine@sha256:[a-f0-9]{64}$ ]] || runtime_fail 'POSTGRES_IMAGE must pin the official PostgreSQL 17 alpine digest.'
@@ -50,8 +53,9 @@ runtime_load() {
     [[ "$wc_cfg_CANDIDATE_BUDGET_USD" == 0 || "$wc_cfg_CANDIDATE_BUDGET_USD" == 5 ]] || runtime_fail 'Only cumulative AI budgets 0 or approved 5 are allowed.'
     [[ "$wc_cfg_CANDIDATE_ENGINE_STRATEGY" == catalog || "$wc_cfg_CANDIDATE_ENGINE_STRATEGY" == staged ]] || runtime_fail 'Only catalog or staged candidate strategies are allowed.'
     [[ "$wc_cfg_CANDIDATE_FAST_TIMEOUT_SECONDS" == 30 ]] || runtime_fail 'The production fast candidate timeout must be 30 seconds.'
+    [[ "$wc_cfg_GENERATION_DAILY_LIMIT" == 0 || "$wc_cfg_GENERATION_DAILY_LIMIT" == 2 ]] || runtime_fail 'Daily generation limit must be 0 (judging) or 2 (normal).'
     local wc_name wc_val
-    for wc_name in APP_IMAGE NGINX_IMAGE POSTGRES_IMAGE PUBLIC_HOST BACKUP_BUCKET AWS_REGION CANDIDATE_BUDGET_USD CANDIDATE_ENGINE_STRATEGY CANDIDATE_FAST_TIMEOUT_SECONDS; do
+    for wc_name in APP_IMAGE NGINX_IMAGE POSTGRES_IMAGE PUBLIC_HOST BACKUP_BUCKET AWS_REGION CANDIDATE_BUDGET_USD CANDIDATE_ENGINE_STRATEGY CANDIDATE_FAST_TIMEOUT_SECONDS GENERATION_DAILY_LIMIT; do
         wc_val="wc_cfg_$wc_name"; wc_val=${!wc_val}
         case "$wc_val" in *REPLACE*|*replace*|*placeholder*|*example*|*@sha256:0000000000000000000000000000000000000000000000000000000000000000)
             runtime_fail 'A deployment placeholder is not a usable configuration.' ;;
