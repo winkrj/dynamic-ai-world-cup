@@ -2,7 +2,7 @@
 
 갱신일: 2026-09-20.
 
-최신 TD-57: 심사용 일일 제한0(일반 기본2)과 반복 배포 진입점을 구현·검증했다. 단기 actor/IP5회/10분·운영 누적$5·실험$6·장부/공유/게임은 유지한다. 최종 독립 리뷰2/2 Critical/High/actionable0, 실제 archive 추출 권한 회귀 포함. 기존 AWS 로그인으로 운영 적용 예정이며 아직 완료로 표시하지 않는다. GitHub OIDC 역할·production 환경·main 통합은 별도 승인 대기다. 구성과 실제 적용 상태는 [배포 파이프라인](docs/DEPLOYMENT_PIPELINE.md)을 따른다.
+최신 TD-57: 심사용 일일 제한0(일반 기본2)과 반복 배포 진입점을 구현·검증하고 공통 로컬 명령으로 `a08d5a3`를 기존 AWS에 배포했다. 동일actor DB16강3회 READY/AI0·HTTPS/asset바이트일치·snapshot5/hash보존·백업71,555bytes 확인. 단기 actor/IP5회/10분·운영 누적$5(현재15건/$0.74506260)·실험$6·장부/공유/게임은 유지한다. 최종 독립 리뷰2/2 Critical/High/actionable0. GitHub OIDC 역할·production 환경·main 통합은 별도 승인 대기다. 이전429 대기값이 저장된 기존 탭은 보존하며 즉시 시연은 새 시크릿 세션을 사용한다. 구성과 실제 적용 상태는 [배포 파이프라인](docs/DEPLOYMENT_PIPELINE.md)을 따른다.
 
 최신 TD-56: HTML A 연출 재대조 후 내부 압박/VS/승패·마지막3초와 라운드 첫500ms 안내·상시 강수 경로를 구현해 소스 `521fbfe`를 기존 AWS에 배포했다. 7초/280ms·API·엔진·예산은 유지한다. 최종 verify·8강28경기 및16/32강184경기 합성 브라우저·독립 리뷰 Critical/High/actionable0. active 복원 포커스도 보완했다. 공개 파일의 검증본 바이트 일치·실제16강 직접7/timeout8·Champion저장·오류0, DB/snapshot/장부 보존·추가AI0 확인. 운영누적14건/$0.73137410이며 실험은 변화없다. [검증 기록](docs/VERIFICATION.md)이 증거다. [사진 설계](docs/CANDIDATE_VISUALS.md)는 검토 사진+SVG 대체를 제안할 뿐 수집/생성/구현은 하지 않았다.
 

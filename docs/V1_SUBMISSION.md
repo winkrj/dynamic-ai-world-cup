@@ -9,7 +9,7 @@
 | 모델 | 기존 Terra, DB 후보 선택 + 부족분 한 번 보충 | 별도 모델 학습/파인튜닝 아님 |
 | 속도 | 정확 preset은 AI 0회, 그 외 최대 1회. DB ≤2초/일반 16강 약10초 목표, AI 호출 제한30초 | 목표는 SLA/p95가 아님. 네트워크·대기열에 따라 지연 가능 |
 | 품질 | 조건 우선·서버 구조/중복 검사·전체 미리보기. 평범함/호불호는 허용 | 의미 조건/유사성은 best-effort. 모든 입력의 완벽한 후보 보장 안 함 |
-| 비용 | 일반 생성 건당 $0.05 이하 관측 목표. 운영 누적$5, 실험 누적$6, 자동충전 OFF, 익명 하루2회 | 목표와 비용 예약은 최종 청구 hard cap이 아님. 쿠키 제한은 정확한 사람당 식별이 아님 |
+| 비용 | 일반 생성 건당 $0.05 이하 관측 목표. 운영 누적$5, 실험 누적$6, 자동충전 OFF. 심사 중 일일 횟수 해제, actor/IP5회/10분 유지 | 목표와 비용 예약은 최종 청구 hard cap이 아님. 쿠키 제한은 정확한 사람당 식별이 아님 |
 | 화면 | A 상하 카드, 진입·승패·진출·우승·로딩, 마지막3초·라운드 첫500ms 안내·상시 강수 경로 | B 좌우 카드/실시간 그룹방은 미포함. 사진은 별도 설계만 |
 | 게임 | 8/16/32, 16기본, 준비 후7초, timeout 균등랜덤, Undo없음, 동일 snapshot 공유 | 공유는 동일 대진의 새 세션이며 공동 투표가 아님 |
 
@@ -21,11 +21,17 @@
 - 코드: [작업 브랜치](https://github.com/winkrj/dynamic-ai-world-cup/tree/feat/engine/context-feasibility). main과 배포 소스가 같다고 가정하지 않는다.
 - 설계/실측: [DB 우선 엔진](CATALOG_ENGINE.md), [화면 통합 Spec](INTEGRATION_SPEC.md), [공개 API](../contracts/openapi.json).
 
-온라인 데모는 공개 서비스에서 새로고침한 뒤 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 순서로 진행한다. 이 문구의 첫 생성은 개인 선택 이력이 없는 경우 DB preset이며, 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. 생성/전체 재생성/접수 후 실패는 하루 2회 한도에 포함된다. 생성 없이 바로 시연하려면 [새 버전 16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/EvDA3r6utnyXgg4YJWpk-9CKTXhmqaIM_BDV8tIoOo4)를 사용한다. 로컬18089는 개발 합성 서버이며 제출용 운영 주소가 아니다.
+온라인 데모는 공개 서비스에서 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 순서로 진행한다. 이 문구의 첫 생성은 개인 선택 이력이 없는 경우 DB preset이며, 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. **심사 중 일일 횟수 제한은 해제했으며 단기 actor/IP5회/10분과 누적 예산은 유지한다.** 이전429 대기화면이 저장된 브라우저는 새로고침만으로 초기화되지 않을 수 있으므로 즉시 시연은 새 시크릿 창을 사용한다. 생성 없이 바로 시연하려면 [새 버전 16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/EvDA3r6utnyXgg4YJWpk-9CKTXhmqaIM_BDV8tIoOo4)를 사용한다. 로컬18089는 개발 합성 서버이며 제출용 운영 주소가 아니다.
 
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
+
+### 최신 TD-57 — 심사 모드·배포 자동화
+
+2026-09-20 `a08d5a3`를 공통 로컬 배포 명령으로 운영 적용했다. 같은익명actor의 DB16강3회 READY/추가AI0, 실행quota0·예산5·HTTPS/공개파일일치·기존snapshot/장부 보존을 확인했다. 현재 운영15건/$0.74506260이며 실험장부는 변화없다. S3백업71,555bytes/AES256/version 확인. 전체검증과 최종 독립리뷰2/2 Critical/High/actionable0을 통과했다.
+
+현재 아키텍처와 한 명령 배포·실패 복구 기준은 [배포 파이프라인](DEPLOYMENT_PIPELINE.md)에 있다. 로컬 경로는 실제 검증 완료이며 GitHub OIDC/main 통합·버튼 활성화는 별도 권한 승인 대기다. 하루 제한 해제를 무제한 AI비용/모든 단기 제한 해제로 설명하지 않는다. 이전 탭의429 대기 취소 UX, 새 백업 격리 복원, 단일 호스트 한계는 남아 있다.
 
 ### 최신 TD-56 — 라운드 구분·긴박감 운영 반영
 

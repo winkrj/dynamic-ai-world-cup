@@ -6,6 +6,8 @@
 
 배포는 기존 단일 호스트/DB/비밀설정/자원을 유지해 검증→immutable image→백업→SSM 교체→HTTPS 확인을 재사용 가능한 진입점으로 묶는다. DB 자동 복원·예산 초기화·다른 프로젝트 변경은 금지다. GitHub OIDC 역할과 기본 브랜치 반영/버튼 배포 활성화는 사용자 별도 답변을 기다린다. 해당 권한 대기와 독립적인 코드·테스트·기존 권한 로컬 배포는 진행한다. 실제 활성화/배포 성공 전 구성 파일 존재만으로 완료라 말하지 않는다.
 
+TD-57 실행 완료: 공통 로컬 명령으로 소스 `a08d5a3` 배포·HTTPS·공개파일 일치·실제 일일0/예산5를 확인했다. 같은 익명 actor의 DB preset16강3회 READY/AI0, 운영 장부15건/$0.74506260·snapshot5/hash 불변, S3백업71,555bytes/AES256/version 확인. 최종 리뷰2/2 Critical/High/actionable0. 원격 OIDC/main 활성화는 미승인·미실행이다. 배포 전 보충 질문의429 대기값이 저장된 기존 탭은 남을 수 있으며 임의로 진행 기록을 삭제하지 않는다. 새 시크릿 세션으로 시연 가능하고 상세 증거/한계는 docs/DEPLOYMENT_PIPELINE.md·VERIFICATION.md를 따른다.
+
 ## 후속 플레이 연출 — TD-56 (2026-09-20)
 
 소스 `521fbfe` 구현·최종 verify·합성 브라우저(8강28경기/16·32강184경기)·독립 리뷰1차 Critical/High/actionable0·기존 AWS 배포 완료. 공개 JS/CSS가 검증 파일과 바이트 일치하며 실제 공유16강의 직접7/timeout8·Champion저장·오류0을 확인했다. 운영 장부14건/$0.73137410·snapshot 전체 hash는 배포/플레이 전후 같고 추가AI0이다. 증거와 최신 digest는 docs/VERIFICATION.md, docs/V1_SUBMISSION.md를 따른다. 사진은 설계만이며 현재 카드 이미지가 구현됐다고 설명하지 않는다.

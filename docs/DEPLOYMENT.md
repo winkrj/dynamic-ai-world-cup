@@ -1,5 +1,19 @@
 # AWS 배포와 운영 검증
 
+## 최신 TD-57 — 심사 모드·공통 배포 실행 완료 (2026-09-20)
+
+소스 `a08d5a377bdae5f89c7b6bdb47c11a03dcd3f4cb`, linux/amd64 digest `sha256:4a6ad629146c9d19d2c0d606bff2a2fc5611f39181beef9a831ccb7af48e15aa`. 새 공통 로컬 명령으로 깨끗한 원격branch tip·계정/프로젝트호스트 확인→전체verify→이미지build/push→SSM백업/교체→read-only HTTPS smoke를 끝까지 실행했다. SSM `9ee61a83-5917-4a4f-b06f-925786ce9a04` Success, private release 기록은 `/opt/worldcup/releases/release-a08d5a37-KcAdgQ5w`다. 자동 재전송·수동 교체 우회는 없었다.
+
+- 실제 실행revision/digest/healthy·catalog·일일0·운영누적예산5 확인. runtime 디렉터리/쉘0755·nginx template0644를 확인했다. 비밀은 기존 호스트에 그대로 두고 GitHub에 전달하지 않았다.
+- 외부 HTTPS root/deep-link·assets·API/ready/404 smoke PASS. 공개 `index-Cvf931Db.css`, `index-ZDoiT6ot.js`는 최종 검증본과 바이트 일치한다.
+- 배포 전 backup `worldcup-20260920T092324Z-IWJ8WrBk.dump`, 71,555bytes/AES256/version 확인. 백업timer active. 새 백업의 격리 복원은 이번에 다시 실행하지 않았다.
+- 같은 새 anonymous actor의 DB preset16강3회가842/590/649ms에 READY. DB에서3건/actor1/catalog/hobby-basic과 이 job들의 provider0건을 대조했다. 운영 장부는 전후15건/$0.74506260/예약0, snapshot5와집계MD5 `505c0ea279c67af33e2f6196ab091e9c`가 같다. AI실험비 증가0.
+- tar가 macOS provenance 확장헤더를 무시한 경고는 있었고, checksum·파일권한·실제앱/HTTPS는 정상이다. 실제 장애를 일부러 주입하지 않았으며 rollback 근거는 합성 호스트 회귀다. 단일 서버 배포 중 짧은 중단과 수동 복원/용량 관리 한계는 유지한다.
+
+기존 CI만 있던 상태에서 **로컬 한 명령 배포는 실사용 검증 완료**, GitHub 수동 버튼은 파일/role template만 준비했다. OIDC 신규 권한·production 환경·오래된 main 통합은 사용자 별도 승인 대기로 실행하지 않았다. 현재 소스는 작업 브랜치에 있고 main과 같다고 설명하지 않는다. 상세 명령/경계/아키텍처는 [배포 파이프라인](DEPLOYMENT_PIPELINE.md)을 따른다.
+
+현재 사용자의 기존 보충 질문429 탭에는 이전 대기값이 남아 있음을 관측했다. 입력/진행을 임의 삭제하지 않았으며 즉시 시연은 새 시크릿 세션을 사용한다. 새 사용자 일일 제한 해제의 서버 검증과 기존 탭 대기 취소 UX의 잔여 한계를 구별한다.
+
 ## 최신 TD-56 — UI 후속 운영 적용 (2026-09-20)
 
 소스 `521fbfe341264f0042f372ac06439be6c3b8a78c`, 이미지 `release-521fbfe-app`, digest `sha256:efb46fcd3c31078bca86b318f96bb17dfa3298b38904c10223f4982c75b6619f`. 기존 서울 호스트에서 앱만 교체했고 catalog/30/prod,live,proxy/누적5·DB·nginx·비밀 설정·인프라는 유지했다. 배포 전 진행 중 생성0, S3백업69,205bytes/AES256/version 확인 후 교체했다. 이전 runtime metadata는 `/opt/worldcup/releases/521fbfe/runtime-before.env`에 보존했다.

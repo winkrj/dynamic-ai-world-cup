@@ -10,7 +10,15 @@
 - AWS 역할 템플릿 validate-template PASS(자원 생성 없음). 실제 GitHub OIDC subject는 immutable IDs 형식임을 읽기 전용으로 확인했다. 역할/Environment/main 통합/원격 배포 실행은 승인 대기다.
 - 배포 직전 운영 관측: 기존521fbfe, 일일2·누적예산5, active0/provider15/$0.74506260/reserved0, snapshot5·집계MD5 `505c0ea279c67af33e2f6196ab091e9c`, 백업timer active. TD-56 이후 운영 증가분은 이번 테스트 비용이 아니다. 이번 작업의 유료 AI 호출0, 실험장부$5.4206158/$6 불변.
 
-최종 권한 수정·재리뷰 이후 전체 `scripts/verify.sh`도 PASS: runtime22+AWS12+pipeline17+IAM2, frontend61·handoff6·release13·fixture5/HTTP166·9schemas·웹/두JAR. Java는 앞서 실행한458개의 UP-TO-DATE 결과다. 운영 적용과 전체 파이프라인 실제 실행 결과는 완료 후 별도 기록한다. 코드 테스트·역할 템플릿 존재를 운영 배포/OIDC 성공으로 일반화하지 않는다.
+최종 권한 수정·재리뷰 이후 전체 `scripts/verify.sh`도 PASS: runtime22+AWS12+pipeline17+IAM2, frontend61·handoff6·release13·fixture5/HTTP166·9schemas·웹/두JAR. Java는 앞서 실행한458개의 UP-TO-DATE 결과다. 이어 공통 배포 명령 안에서도 같은 verify가 PASS했다.
+
+TD-57 실제 운영: 소스 `a08d5a377bdae5f89c7b6bdb47c11a03dcd3f4cb`, digest `sha256:4a6ad629146c9d19d2c0d606bff2a2fc5611f39181beef9a831ccb7af48e15aa`의 전체 로컬 pipeline1회 성공. 공개 웹/API/자산/404·healthy·quota0/budget5·runtime권한을 확인했다. 공개 CSS/JS는 검증본과 바이트 동일하다. 백업71,555bytes/AES256/version·timer active, 새 백업 격리 복원은 미실행이다.
+
+별도 제한 점검은 고정 DB preset `취미 추천해줘`/16/ko-KR/Asia/Seoul, 새cookie 한 개로 순차3번만 수행했다. POST 재시도·재생성·선택이력 없음, preview까지842/590/649ms. DB에서 READY3·같은actor1·provider_version catalog/hobby-basic·해당 job의provider0을 확인했다. 기존 provider15/$0.74506260/예약0와snapshot5/집계hash가 배포·점검 전후 같다. 이 임시 점검은 local-dev smoke의 운영 차단을 변경하거나 우회하지 않았다. 사용자 실트래픽 전체의 성공률/32강 품질 증거로 일반화하지 않는다.
+
+브라우저 기존 탭은 이전 보충 질문429의 저장된 Retry-After가 남아 있어 대기가 표시됐다. 새로고침만으로 해결된다고 주장하지 않으며 입력·기록을 임의로 지우지 않았다. 새 시크릿 세션으로 즉시 시연할 수 있고 기존 탭 대기 취소 UX는 남은 한계다. 새 탭의 다중탭 잠금 관측을 신규 서버 생성 실패로 세지 않는다. GitHub OIDC/main/수동 버튼 실사용은 별도 승인 대기다.
+
+후속 커밋은 이 실제 결과·운영 한계의 문서 기록만 바꾸므로 추가 코드 Reviewer/전체 테스트를 반복하지 않는다. `git diff --check`로 문서 변경을 확인한다. 위 최종 코드 리뷰는2/2에서 종료했다.
 
 ## TD-56 라운드 구분·긴박감 — 2026-09-20
 
