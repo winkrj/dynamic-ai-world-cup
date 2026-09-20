@@ -1,6 +1,6 @@
 # 검증 기록
 
-## TD-59 다주제 후보 — 2026-09-20 (로컬 검증, 미배포)
+## TD-59 다주제 후보 — 2026-09-20 (로컬 검증·운영 배포 완료)
 
 - catalog v6-clear-subject: 활동의 핵심 경험과 작품의 식별을 분리하고 선택적 취향 미기재로 명확한 주제를 추가 질문하지 않도록 했다. 공개 DTO/DB/모델/예산/최대1호출/검색0/게임 불변. 오류 문구는 현재 순위·제공 여부까지 설명한다.
 - `verify.sh` 종료0: Java **469개 실행/유료2 제외/실패·오류0**, frontend70, handoff6/release13/배포53, fixture6/실제HTTP175·9schemas, TypeScript/Vite/bootJar/appJar PASS. Gradle 캐시 접근의 sandbox 거절은 허용된 실행 환경에서 해소했고 제품 실패로 세지 않았다.
@@ -8,7 +8,10 @@
 - 독립 read-only Reviewer 2/2 **Critical0/High0/actionable0**. v5 첫 실제 요청의 CLARIFICATION_REQUIRED 뒤 작은 분기 보완으로 v6를 만들었고, 관련 재테스트 및 두 번째 리뷰를 받았다. 이후 코드 변경 없음.
 - 실제 평가: v5곡16강 추가질문 실패 보존 → v6동일곡16강 READY/1회/9.064초/$0.020048 → SF영화16강 READY/1회/8.900초/$0.019950 → 현재차트8강 기대거절/1회/1.927초/$0.0135575. READY 두 건은 HTTP15경기·저장·동일snapshot공유·새세션까지 확인했다. 자세한 실패 비용/장부/원시 경로는 [엔진 기록](CATALOG_ENGINE.md) 참조.
 - 추가 총$0.0664585, 실험 누적$5.5110868/$6(기존미확인.50보존), 잔여$0.4889132<다음예약.50이므로 추가 평가 중지. 책/여행지/작품32강·모호한 필수 조건·제목/저자의 외부 대조는 미검증이다.
-- AWS 프로젝트 전용 배포 인증은 expired. 공개 운영은 아직 TD-58 소스348a850이며 이번 코드의 commit/push/이미지 업로드/배포 및 SVG 적용 없음. 로컬 검증으로 운영 반영을 주장하지 않는다.
+- 최초 AWS 인증 만료 뒤 사용자 배포 요청에 따라 기존 로그인만 갱신했다. 소스 `c24c80c58916e2c40afac9cb1548404b2018ff24`를 기존 작업 브랜치에 commit/push하고 공통 pipeline·quota keep으로 배포했다. pipeline 전체verify PASS(Java는 앞선469실행 결과 UP-TO-DATE), linux/amd64 digest `sha256:cf99b217a26054587f86147a8a7858db56a5600ae667b276e9e27ffc6f1e1efd`. SSM `eda89695-2abc-410f-94de-e4544b2153b6` Success, 호스트 기록 `/opt/worldcup/releases/release-c24c80c5-RIoyMPof`. macOS provenance 확장 헤더 무시 경고가 있었으나 추출/배포는 성공했고 런타임 내용 대조를 통과했다.
+- HTTPS read-only smoke PASS. 공개 JS `index-CJo3ZDGT.js`/CSS `index-Cvf931Db.css`가 로컬 검증본과 바이트 일치, 기존 EvDA 공유GET200, 실제 Chrome 공개 입력 화면/console warn·error0. 배포 후 유료 후보 생성은 실행하지 않았으며 로컬 실제 모델 관측과 구별한다. SVG 미적용.
+- 배포 전후 읽기 전용 SSM `31a014cd-52cf-4a51-a912-0e34ae825f50` / `cc96c880-ff6c-43eb-b1ab-63dcecba769b`: snapshot11·집계MD5 `5d1c1b80c95f76576818465fd64594e3`·provider28·운영$0.91049900·active0 동일. 배포 후 RESERVED0·실행catalog/일일0/누적예산5 확인. 추가 운영 AI0·실험 장부 변화0·DB migration/신규 자원/비밀설정 변경0.
+- S3 새 백업 `worldcup-20260920T131632Z-VSYLTSrG.dump` 98,695bytes/AES256/version 존재·timer active 확인. 백업 내용 다운로드/격리복원은 미실행. GitHub API에서 workflow 존재와 production Environment 미생성을 확인했으며 OIDC/main 활성화는 별도 승인 대기를 유지했다. 기록 전용 문서 갱신에는 behavior 변경이 없어 추가 Reviewer를 생략한다.
 
 ## TD-58 최종 기획·디자인 정합성 — 2026-09-20
 

@@ -2,9 +2,9 @@
 
 기준일 2026-09-20. 목표는 아침에 팀원이 직접 실행·시연할 수 있는 서비스다. 이 문서에서 구현, 관측, 운영 적용을 구분한다.
 
-후속 TD-59는 **로컬 수정·검증 완료, 미배포**다. 활동 외 작품 비교와 명확한 짧은 요청을 지원하는 compact v6를 구현했다. 실제곡/SF영화16강 생성·저장·공유 및 현재차트 기대거절, Java469/프론트70/최종독립리뷰를 통과했다. AWS 배포 인증이 만료돼 공개 사이트는 아래 TD-58 그대로다. 실험 누적$5.5110868/$6, 추가 유료 호출 중지. SVG도 별도 로컬 시안이며 미적용이다. [상세 검증](VERIFICATION.md), [추천 범위](CATALOG_ENGINE.md).
+최신 TD-59는 **개발·검증·AWS 배포 완료**다. 운영 소스 `c24c80c58916e2c40afac9cb1548404b2018ff24`의 compact v6는 활동 외 작품 비교와 명확한 짧은 요청을 지원한다. 로컬 실제곡/SF영화16강 생성·저장·공유 및 현재차트 기대거절, Java469/프론트70/최종독립리뷰를 통과했다. 배포 후 HTTPS·공개파일 일치·기존 공유·데이터 보존을 확인했고 추가 운영 AI 호출은 하지 않았다. 실험 누적$5.5110868/$6, 추가 유료 실험 중지. SVG는 별도 로컬 시안이며 미적용이다. [상세 검증](VERIFICATION.md), [추천 범위](CATALOG_ENGINE.md).
 
-현재 TD-58: **최종 코드·테스트·독립 검토·AWS 배포 완료.** 운영 소스는 `348a850649b65b06e410d5addcc3a6db93e98b31`이며 뒤의 기록 전용 커밋은 런타임을 바꾸지 않는다. 아래 이전 단계의 수치·한계는 당시 기록이다.
+이전 TD-58: **최종 코드·테스트·독립 검토·AWS 배포 완료.** 당시 소스는 `348a850649b65b06e410d5addcc3a6db93e98b31`이며 뒤의 기록 전용 커밋은 런타임을 바꾸지 않는다. 아래 이전 단계의 수치·한계는 당시 기록이다.
 
 ## 제출 기준
 
@@ -30,6 +30,12 @@
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
+
+### TD-59 — 일반 추천 범위 확대 (운영 배포 완료)
+
+2026-09-20 기존 AWS 인증을 갱신하고 공통 로컬 pipeline으로 소스 `c24c80c`를 배포했다. 실행 이미지 digest는 `sha256:cf99b217a26054587f86147a8a7858db56a5600ae667b276e9e27ffc6f1e1efd`다. HTTPS·공개 JS/CSS 바이트 일치·기존 공유200·실제 공개 입력 화면/console 오류0을 확인했다. 운영에서 후보 생성을 재실행한 증거와 구별한다.
+
+배포 전후 snapshot11개/전체hash·운영 provider28건/$0.91049900가 동일하다. 일일0/누적예산5/catalog·예약0·진행작업0, S3 백업98,695bytes/AES256/version·백업timer active를 확인했다. DB migration/신규 자원/예산 변경/추가 AI 호출은 없다. 새 백업의 격리복원은 미실행이다. GitHub workflow는 존재하지만 production Environment·AWS OIDC 역할·main 통합은 아직 미실행이므로 GitHub 버튼 배포가 활성화됐다고 설명하지 않는다.
 
 ### TD-58 — 최종 검토와 생성 복구 (운영 배포 완료)
 

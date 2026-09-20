@@ -4,6 +4,7 @@
 
 ## 현재 상태
 
+- 최신 TD-59 소스 `c24c80c`도 기존 로그인 갱신 후 같은 로컬 진입점으로 배포 완료했다. 검증→이미지→백업→교체→HTTPS가 자동 실행됐고 기존 데이터/예산을 보존했다. GitHub API에서 release/verify workflow는 확인했지만 Environment 목록은 비어 있었다. CI와 로컬 배포 자동화는 사용 가능하며 GitHub→AWS 원격 배포 연결은 아직 미완료다. 콘솔에서 수동으로 서버를 조작한 것이 아니라 로컬 배포 인증을 갱신한 것이다.
 - 심사용 일일 cap0를 운영에 적용했다. 같은 익명 사용자로 DB16강3회 READY·추가AI0을 확인했다. 일반 기본2·burst·예산은 유지한다.
 - 로컬 로그인과 GitHub OIDC가 같은 `scripts/release-aws.mjs` 진입점을 쓰도록 구현했다. 기존 AWS 로그인으로 소스 `a08d5a3`의 검증→빌드→백업→배포→HTTPS 확인을 실제 완료했다.
 - GitHub 원격 OIDC 역할·production Environment·main 통합·수동 버튼 활성화는 사용자 답변 대기다. GitHub에 운영 권한은 아직 부여하지 않았다.
