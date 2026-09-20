@@ -9,7 +9,11 @@
 - 라운드 브라우저:16/32×360/1280×기본/줄인움직임,184경기 PASS. 라운드경로·500ms·준비후7초·숨김/복귀·복원deadline·키보드·결승timeout 유지, 오류0. 모든 API는 합성으로 가로챘다.
 - 독립 read-only Reviewer **1/2**, Critical0/High0/actionable0. 관련 프론트56개를 별도 실행 PASS. 리뷰는 실제 모델/운영 배포/후작성 증거문서의 재실행을 대신하지 않는다.
 - 실제 모델 대조: 일반 데이트16강 READY·전체 연결3.542초/provider2.987초/$0.012422, 현재사실8강 기대거절 GROUNDING_REQUIRED·2.660초/provider2.430초/$0.0115905. 각각1회, 검색/Repair0. 실험누적$5.4446283/$6. 상세/한계는 [DB 엔진](CATALOG_ENGINE.md).
-- 빌드 산출물: JS `index-BrUdAseM.js`, CSS `index-Cvf931Db.css`. 최종 AWS 적용은 로그인 갱신 대기이며, 코드·로컬 검증 완료를 운영 반영으로 보고하지 않는다.
+- 소스 `348a850649b65b06e410d5addcc3a6db93e98b31`를 로그인 갱신 후 기존 공통 pipeline으로 배포 완료. pipeline 내 전체verify도 PASS(Java는 앞선461실행 결과 UP-TO-DATE), linux/amd64 digest `sha256:ac0902133fd6181e2021d6c6b9e20d21913d8f76de9c6b47bff3bcff6a56fede`. SSM `3d98dcd2-cbeb-4a52-8866-89f23a250329` Success, 호스트 기록 `/opt/worldcup/releases/release-348a8506-tQP8GOdf`.
+- 공개 JS `index-BrUdAseM.js`/CSS `index-Cvf931Db.css`가 로컬 검증본과 바이트 일치. HTTPS root/sharedeep-link/assets/health/ready·없는API/asset404 smoke PASS, 기존 EvDA 공유GET200/동일16강 snapshot 확인.
+- 실제 공개 브라우저에서 저장돼 있던429 대기를 복원하고 ‘고민 수정하기’를 눌러 원문·보충답변이 남은 입력 화면으로 복귀했다. 새 후보 요청은 보내지 않았다. 실제 모바일 Safari/스크린리더 검증은 미수행이다.
+- 배포 전후 readonly SSM `fb274993-08b0-4f3c-9407-84df26dbc718` / `f512dc4a-2952-4e32-952d-d50540bf9d46`: active0·provider16·운영$0.75603860·RESERVED0·snapshot5·집계MD5 `505c0ea279c67af33e2f6196ab091e9c` 동일. 실제catalog/일일0/예산5·backup timer active, DB/비밀설정/기존snapshot 변화없음.
+- 배포 백업 `backups/worldcup-20260920T105210Z-v60BPP3N.dump`,73,121bytes/AES256/version `56aiOY15Cd_161RDnMR8qznaFskD7buY` 확인. 새 백업의 격리복원은 재실행하지 않았다. 추가 운영AI0. GitHub OIDC/main 권한은 미변경이다.
 
 ## TD-57 심사 모드·배포 진입점 — 2026-09-20
 

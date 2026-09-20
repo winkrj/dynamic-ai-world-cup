@@ -2,7 +2,7 @@
 
 기준일 2026-09-20. 목표는 아침에 팀원이 직접 실행·시연할 수 있는 서비스다. 이 문서에서 구현, 관측, 운영 적용을 구분한다.
 
-현재 TD-58: **최종 코드·테스트·독립 검토 완료, AWS 로그인 갱신 후 배포 대기.** 운영은 아직 아래 TD-57 배포본이다. 새 수정이 공개 주소에 적용됐다고 가정하지 않는다.
+현재 TD-58: **최종 코드·테스트·독립 검토·AWS 배포 완료.** 운영 소스는 `348a850649b65b06e410d5addcc3a6db93e98b31`이며 뒤의 기록 전용 커밋은 런타임을 바꾸지 않는다. 아래 이전 단계의 수치·한계는 당시 기록이다.
 
 ## 제출 기준
 
@@ -23,19 +23,21 @@
 - 코드: [작업 브랜치](https://github.com/winkrj/dynamic-ai-world-cup/tree/feat/engine/context-feasibility). main과 배포 소스가 같다고 가정하지 않는다.
 - 설계/실측: [DB 우선 엔진](CATALOG_ENGINE.md), [화면 통합 Spec](INTEGRATION_SPEC.md), [공개 API](../contracts/openapi.json).
 
-온라인 데모는 공개 서비스에서 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 순서로 진행한다. 이 문구의 첫 생성은 개인 선택 이력이 없는 경우 DB preset이며, 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. **심사 중 일일 횟수 제한은 해제했으며 단기 actor/IP5회/10분과 누적 예산은 유지한다.** 이전429 대기화면이 저장된 브라우저는 새로고침만으로 초기화되지 않을 수 있으므로 즉시 시연은 새 시크릿 창을 사용한다. 생성 없이 바로 시연하려면 [새 버전 16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/EvDA3r6utnyXgg4YJWpk-9CKTXhmqaIM_BDV8tIoOo4)를 사용한다. 로컬18089는 개발 합성 서버이며 제출용 운영 주소가 아니다.
+온라인 데모는 공개 서비스에서 `취미 추천해줘` → 16강 → 전체 후보 확인 → 시작 → 우승 → 공유 순서로 진행한다. 이 문구의 첫 생성은 개인 선택 이력이 없는 경우 DB preset이며, 조건을 추가하면 AI 1회 선택 경로로 간다. 공유 플레이는 AI 비용이나 생성 횟수를 추가로 쓰지 않는다. **심사 중 일일 횟수 제한은 해제했으며 단기 actor/IP5회/10분과 누적 예산은 유지한다.** 이전429 대기화면이 보이면 새 버전으로 새로고침 후 ‘고민 수정하기’를 누르면 입력을 보존해 돌아온다. 입력 수정은 제한 해제가 아니며 실제 접수에는 서버 제한이 적용된다. 생성 없이 바로 시연하려면 [16강 공유 예시](https://dcti7vhb3wkpw.cloudfront.net/shares/EvDA3r6utnyXgg4YJWpk-9CKTXhmqaIM_BDV8tIoOo4)를 사용한다. 로컬18089는 개발 합성 서버이며 제출용 운영 주소가 아니다.
 
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
 
-### TD-58 — 최종 검토와 생성 복구 (코드 완료, 배포 대기)
+### TD-58 — 최종 검토와 생성 복구 (운영 배포 완료)
 
 기획·디자인 대조 후 A 상하/긴박감/라운드 연출을 유지하고 사진·이모지는 제외했다. 지역·요일 활동 요청의 과잉 거절 가능성을 줄이는 compact v4, 별도 사실확인 미지원 오류, 접수 전429의 입력 수정/수동 재시도 복구를 반영했다. 접수 여부가 불명확한 요청은 새 key로 버리지 않고 보존한다. DB/snapshot/모델/비용·게임 규칙 변경은 없다.
 
 전체 Java461·프론트70·HTTP175개·웹/서버빌드, 복구 브라우저8사례×2화면,16/32강184경기 PASS. 독립 리뷰1/2 Critical/High/actionable0. 실제 `서울 평일 데이트`16강은 AI1회2.987초/$0.012422·저장/공유까지3.542초, 실제영업/가격 대조는1회2.430초/$0.0115905로 기대한 GROUNDING_REQUIRED. 합계$0.0240125, 실험누적$5.4446283/$6. 소수 관측이므로 전 입력 품질/SLA를 보장하지 않는다.
 
-최종 빌드의 JS는 `index-BrUdAseM.js`, CSS는 기존 `index-Cvf931Db.css`다. 기존 AWS 배포 로그인 만료로 이 코드의 운영 적용은 아직 하지 않았다. 배포는 [공통 로컬 경로](DEPLOYMENT_PIPELINE.md)로 기존 일일0/예산5/DB를 유지하며 진행한다. GitHub OIDC/main 활성화는 별도 승인 대기이고 이번 완료 조건에 끼워 넣지 않는다.
+최종 빌드의 JS는 `index-BrUdAseM.js`, CSS는 기존 `index-Cvf931Db.css`다. AWS 로그인 갱신 후 [공통 로컬 경로](DEPLOYMENT_PIPELINE.md)로 배포했고 공개 파일과 로컬 검증본의 바이트 일치를 확인했다. 소스348a850·digest `sha256:ac0902133fd6181e2021d6c6b9e20d21913d8f76de9c6b47bff3bcff6a56fede`, HTTPS/ready·기존 공유200 PASS. 기존 브라우저의4시간대429 대기에서 ‘고민 수정하기’로 원문·추가답변을 보존한 입력 복귀를 실제 확인했다. 새 생성은 누르지 않았다.
+
+기존 snapshot5개/전체hash·운영 장부16건/$0.75603860·예약0, 일일0/예산5/catalog가 배포 전후 동일하다. 새 백업73,121bytes/AES256/version 확인, 매일백업timer active. 이번 배포의 추가 운영AI0, 새 백업 격리복원은 미실행이다. GitHub OIDC/main 활성화는 별도 승인 대기이며 최신 코드는 위 작업 브랜치에서 받는다.
 
 ### 최신 TD-57 — 심사 모드·배포 자동화
 
