@@ -199,6 +199,8 @@ function MatchView({ state, actions }: ViewProps) {
   const [leftReady, setLeftReady] = useState(false);
   const [rightReady, setRightReady] = useState(false);
   const [entered, setEntered] = useState(false);
+  // Only preparation can announce a round. Restoring an active match never covers or resets its deadline.
+  const [roundAnnounced, setRoundAnnounced] = useState(play.phase !== 'preparation' || match.roundMatch !== 1);
   const [visible, setVisible] = useState(document.visibilityState === 'visible');
   const leftSettled = useCallback(() => setLeftReady(true), []);
   const rightSettled = useCallback(() => setRightReady(true), []);
@@ -212,20 +214,37 @@ function MatchView({ state, actions }: ViewProps) {
     return () => { window.clearTimeout(timer); document.removeEventListener('visibilitychange', onVisibility); };
   }, []);
   useEffect(() => {
-    if (play.phase === 'preparation' && entered && leftReady && rightReady && visible && document.visibilityState === 'visible' && !state.locked && !state.storageBlocked) readyAction.current(match.sequence);
-  }, [entered, leftReady, rightReady, visible, play.phase, match.sequence, state.locked, state.storageBlocked]);
-  useEffect(() => { if (play.phase === 'active') firstCard.current?.focus({ preventScroll: true }); }, [play.phase]);
+    if (roundAnnounced || play.phase !== 'preparation' || !visible || state.locked || state.storageBlocked) return;
+    // An interrupted announcement restarts when visible/unlocked; no game time has begun yet.
+    const timer = window.setTimeout(() => setRoundAnnounced(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [roundAnnounced, play.phase, visible, state.locked, state.storageBlocked]);
+  useEffect(() => {
+    if (play.phase === 'preparation' && entered && roundAnnounced && leftReady && rightReady && visible && document.visibilityState === 'visible' && !state.locked && !state.storageBlocked) readyAction.current(match.sequence);
+  }, [entered, roundAnnounced, leftReady, rightReady, visible, play.phase, match.sequence, state.locked, state.storageBlocked]);
+  // A restored active match may mount before its tab lock is acquired; focus only once selectable.
+  useEffect(() => {
+    if (play.phase === 'active' && !state.locked && !state.storageBlocked) firstCard.current?.focus({ preventScroll: true });
+  }, [play.phase, state.locked, state.storageBlocked]);
   const duration = play.snapshot.rules.matchDurationMs;
   const remaining = play.phase === 'preparation' ? duration : play.phase === 'active' && play.deadline !== null ? Math.max(0, play.deadline - state.now) : 0;
   const lastEvent = play.phase === 'feedback' ? play.events.at(-1) : undefined;
-  const roundName = match.roundSize === 2 ? '결승' : match.roundSize === 4 ? '준결승' : `${match.roundSize}강`;
+  const roundName = match.roundSize === 2 ? '결승' : match.roundSize === 4 ? '4강 · 준결승' : `${match.roundSize}강`;
+  const showRoundAnnouncement = play.phase === 'preparation' && !roundAnnounced;
+  const urgent = play.phase === 'active' && remaining <= 3000;
+  const roundSteps = [32, 16, 8, 4, 2].filter(size => size <= play.snapshot.size);
   const canChoose = play.phase === 'active' && !state.locked && !state.storageBlocked;
   const total = play.snapshot.size - 1;
   const note = play.phase === 'preparation' ? '두 카드를 준비하고 있어요.' : lastEvent?.reason === 'TIMEOUT_RANDOM' ? '시간초과 · 랜덤 진출' : lastEvent ? '선택 확정' : '더 끌리는 하나를 골라요.';
-  return <section className={`play-page phase-${play.phase}`}>
+  return <section className={`play-page phase-${play.phase}${urgent ? ' is-urgent' : ''}${match.roundSize === 2 ? ' is-final' : ''}`}>
+    <ol className="round-route" aria-label="월드컵 라운드 진행">
+      {roundSteps.map(size => <li key={size} aria-current={size === match.roundSize ? 'step' : undefined} data-state={size > match.roundSize ? 'complete' : size === match.roundSize ? 'current' : 'upcoming'}>
+        <span>{size === 2 ? '결승' : `${size}강`}</span>{size === 4 && <small>준결승</small>}
+      </li>)}
+    </ol>
     <div className="match-heading"><Heading eyebrow={`MATCH ${twoDigits(match.sequence + 1)} / ${twoDigits(total)}`} subtitle={`${roundName} ${match.roundMatch} / ${match.roundTotal}`}>{roundName === '결승' ? '마지막, 하나.' : '지금 더 끌리는 건?'}</Heading><span className="round-badge">{roundName}</span></div>
-    <div className={`match-clock ${remaining <= 2000 && play.phase === 'active' ? 'is-urgent' : ''}`}>
-      <span className="tiny-label">ONE MATCH. SEVEN SECONDS.</span><span className="clock-value" aria-hidden="true">{(remaining / 1000).toFixed(1)}<small>s</small></span>
+    <div className={`match-clock ${urgent ? 'is-urgent' : ''}`}>
+      <span className="tiny-label">{urgent ? '마지막 3초 · 지금 골라요' : 'ONE MATCH. SEVEN SECONDS.'}</span><span className="clock-value" aria-hidden="true">{(remaining / 1000).toFixed(1)}<small>s</small></span>
       <span className="visually-hidden">각 경기의 제한시간은 7초입니다. 시간 초과 시 무작위로 선택됩니다.</span>
       <div className="clock-track" aria-hidden="true"><span style={{ transform: `scaleX(${remaining / duration})` }} /></div>
     </div>
@@ -234,12 +253,21 @@ function MatchView({ state, actions }: ViewProps) {
         const won = lastEvent?.winnerId === candidate.id;
         const lost = !!lastEvent && !won;
         return <button ref={index === 0 ? firstCard : undefined} key={candidate.id} data-testid="candidate-button" className={`battle-card ${index === 1 ? 'battle-card--bottom' : ''} ${won ? 'is-winner' : ''} ${lost ? 'is-loser' : ''}`} disabled={!canChoose} onClick={() => actions.choose(candidate.id)} aria-label={`${candidate.name} 선택`}>
+          <span className="battle-surface">
           <CandidateArt candidate={candidate} number={index === 0 ? 'A' : 'B'} onSettled={index === 0 ? leftSettled : rightSettled} />
           <span className="battle-copy"><span className="battle-choice">{index === 0 ? 'A' : 'B'} / YOUR PICK</span><strong>{candidate.name}</strong><Tags candidate={candidate} />{won && <span className="winner-stamp">{roundName === '결승' ? '우승' : '진출'} ↗</span>}</span>
           <span className="card-arrow" aria-hidden="true">↗</span>
+          </span>
         </button>;
       })}
-      <span className="match-divider" aria-hidden="true"><span className="match-spark" /><span className="versus"><span>VS</span></span></span>
+      <span className="match-divider" aria-hidden="true"><span className="match-spark" /><span className="versus"><span>VS</span></span>
+        {urgent && <span key={Math.ceil(remaining / 1000)} className="urgent-countdown">{Math.ceil(remaining / 1000)}</span>}
+      </span>
+      {showRoundAnnouncement && <div className="round-announcement" data-testid="round-announcement" role="status">
+        <span className="tiny-label">{match.sequence === 0 ? 'LET’S PLAY' : match.roundSize === 2 ? 'THE FINAL' : 'NEXT ROUND'}</span>
+        <strong>{roundName}{match.sequence === 0 ? ' 시작' : match.roundSize === 2 ? '' : ' 진출'}</strong>
+        <span>{match.roundSize === 2 ? '마지막 두 후보. 이제 하나만.' : `후보 ${match.roundSize}개 · 이번 라운드 ${match.roundTotal}번의 선택`}</span>
+      </div>}
     </div>
     <p className={`match-note ${lastEvent?.reason === 'TIMEOUT_RANDOM' ? 'match-note--timeout' : ''}`} role="status">{note}</p>
     <div className="match-progress" aria-label={`${play.events.length} / ${total} 경기 완료`}>

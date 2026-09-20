@@ -1,5 +1,17 @@
 # 검증 기록
 
+## TD-56 라운드 구분·긴박감 — 2026-09-20
+
+원본 HTML A와 대조해 고정 버튼 내부의 900ms 압박·VS, 250ms 승패 연출, 마지막 3→2→1 강조를 보강했다. 각 라운드 첫 준비에만 500ms 안내하며 상시 16→8→4→결승 경로를 표시한다. 실제 선택 7초와 피드백 280ms, 이미지 2초 fallback, 기존 active deadline은 유지한다. 사진은 [별도 설계](CANDIDATE_VISUALS.md)뿐이며 외부 이미지/AI 호출은 없다.
+
+- 최종 `scripts/verify.sh` PASS: frontend61, handoff6, release13, deployment32, fixture5/HTTP166·9schemas, TypeScript/Vite/두 JAR. Java test는 변경 없는 기존 결과의 `UP-TO-DATE`이며 새 452회 실행으로 세지 않는다. 유료 플래그는 모두 false다.
+- `browser-animations.mjs`: 8강 × 360/1280px × 일반/reduced-motion, 28경기·로딩2 PASS. 버튼 위치 고정, 내부 압박·VS900ms, 3/2/1, 7초, feedback280ms, 양방향 승패·키보드를 확인했다.
+- `browser-rounds.mjs`: 16/32강 × 360/1280px × 일반/reduced-motion, 184경기 PASS. 첫/다음 라운드500ms 동안 deadline없음·선택불가, 일반 경기350ms, 경로/준결승/결승 구분, 숨김 중 안내 종료 후 복귀500ms, active 새로고침의 동일 deadline·포커스, 결승 timeout/저장을 확인했다. 합성 API이며 실제 AI 호출은 0이다.
+- `browser-states.mjs`: 이미지2초 fallback·복원·키보드·360/1280px PASS. 각 브라우저 검사에서 console/page 오류0. 360px 긴박감/8강/준결승 일반·reduced-motion 스크린샷을 확인했다.
+- 새 테스트에서 발견한 active 복원 직후 잠금 때문에 포커스가 잡히지 않는 문제를 UI 효과의 잠금 해제 의존성으로 수정하고 재검증했다. 초기 테스트 fixture의 실제/가상 시계 불일치는 fixture 수정 후 재검증했고 제품 성공으로 덮지 않았다.
+- 독립 read-only 리뷰1차: Critical0 / High0 / actionable0. reviewer는 실제 controller/core 경로와 스크린샷을 읽었으며 브라우저 테스트를 독립 재실행한 것으로 주장하지 않는다.
+- 실제 모바일 Safari/스크린리더는 미검증이다. 이 절 작성 시 운영 반영은 대기이며, 기존 TD-55 운영 결과를 TD-56 배포 증거로 재사용하지 않는다.
+
 최신 2026-09-20 TD-55: 제출본 `fcb6a5f`의 전체 verify·독립리뷰(Critical0/High0)·합성 브라우저8/16/32와 **AWS 배포·실제 운영 연결 검증 완료**. Java452실행/유료2제외·프론트61·배포정적32는 같은 소스의 배포 전 결과다. [최신 제출 현황](V1_SUBMISSION.md)과 아래 운영 기록이 최신이며 과거 미배포/v2/숫자는 당시 기록이다.
 
 ## TD-55 공개 운영 검증 — 2026-09-20

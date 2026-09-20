@@ -14,6 +14,7 @@ await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL ?? 'chrome', headless: true });
 const errors = [];
 const results = [];
+const epoch = new Date('2026-09-20T00:00:00Z');
 const flow = page => page.evaluate(() => JSON.parse(localStorage.getItem('worldcup:flow:v1:/')).flow);
 const motion = locator => locator.evaluate(element => ({ name: getComputedStyle(element).animationName,
   duration: getComputedStyle(element).animationDuration, opacity: getComputedStyle(element).opacity }));
@@ -34,17 +35,20 @@ try {
           status: last.sequence === 6 ? 'COMPLETED' : 'PLAYING', championId: last.sequence === 6 ? last.winnerId : null }) });
       });
       await context.addInitScript(value => {
-        localStorage.setItem('worldcup:flow:v1:/', JSON.stringify({ version: 1, savedAt: Date.now(), flow: {
-          kind: 'play', acknowledged: 0, play: { formatVersion: 1, sessionId: 'animation-session', snapshot: value,
+        // Init scripts may run before Playwright installs its virtual Date.
+        localStorage.setItem('worldcup:flow:v1:/', JSON.stringify({ version: 1, savedAt: value.savedAt, flow: {
+          kind: 'play', acknowledged: 0, play: { formatVersion: 1, sessionId: 'animation-session', snapshot: value.snapshot,
             events: [], phase: 'preparation', startedAt: null, deadline: null },
         } }));
-      }, snapshot);
+      }, { snapshot, savedAt: epoch.getTime() });
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
-      const epoch = new Date('2026-09-20T00:00:00Z');
       await page.clock.install({ time: epoch });
-      await page.goto(base.href);
       await page.clock.pauseAt(new Date(epoch.getTime() + 1000));
+      await page.goto(base.href);
+      await page.getByTestId('round-announcement').waitFor();
+      await page.getByText('진행을 안전하게 열 수 없어요.').waitFor({ state: 'hidden' });
+      await page.clock.runFor(550);
       await page.waitForFunction(() => JSON.parse(localStorage.getItem('worldcup:flow:v1:/')).flow.play.phase === 'active');
       const first = page.getByTestId('candidate-button').first();
       const second = page.getByTestId('candidate-button').nth(1);
@@ -52,8 +56,11 @@ try {
       assert.equal(current.play.deadline - current.play.startedAt, 7000);
       assert.equal(await first.evaluate(element => element === document.activeElement), true);
       assert.equal((await motion(first)).name, 'none', 'Active click targets must stay still.');
+      assert.equal((await motion(first.locator('.battle-surface'))).name, reduce ? 'none' : 'card-pressure-top');
+      assert.equal((await motion(second.locator('.battle-surface'))).name, reduce ? 'none' : 'card-pressure-bottom');
       assert.equal((await motion(page.locator('.versus > span'))).name, reduce ? 'none' : 'versus-hit');
       assert.equal((await motion(page.locator('.match-spark'))).name, reduce ? 'none' : 'spark-hit');
+      if (!reduce) assert.equal((await motion(page.locator('.versus > span'))).duration, '0.9s');
       const a = await first.boundingBox(); const b = await second.boundingBox();
       assert(a && b && b.y >= a.y + a.height && a.height >= 44 && b.height >= 44);
       const versus = await page.locator('.versus').boundingBox();
@@ -86,7 +93,8 @@ try {
 
       async function nextMatch() {
         await page.clock.runFor(300);
-        await page.clock.runFor(400);
+        // A round's first pair also waits for its 500 ms announcement gate.
+        await page.clock.runFor(550);
         const next = await flow(page);
         assert.equal(next.play.phase, 'active');
         assert.equal(next.play.deadline - next.play.startedAt, 7000);
@@ -95,7 +103,21 @@ try {
       await second.click();
       assert.equal((await motion(page.locator('.is-loser'))).name, reduce ? 'none' : 'card-exit-top');
       await nextMatch();
-      await page.clock.fastForward(7000);
+      const third = await flow(page);
+      await page.clock.runFor(third.play.deadline - await page.evaluate(() => Date.now()) - 3050);
+      assert.equal(await page.locator('.play-page.is-urgent').count(), 0);
+      await page.clock.runFor(100);
+      assert.equal(await page.locator('.play-page.is-urgent').count(), 1);
+      assert.equal(await page.locator('.urgent-countdown').textContent(), '3');
+      assert.equal((await motion(page.locator('.urgent-countdown'))).name, reduce ? 'none' : 'countdown-hit');
+      if (!reduce) assert.equal((await motion(page.locator('.urgent-countdown'))).duration, '1s');
+      await page.clock.runFor(1000);
+      assert.equal(await page.locator('.urgent-countdown').textContent(), '2');
+      await page.clock.runFor(1000);
+      assert.equal(await page.locator('.urgent-countdown').count(), 1);
+      assert.equal(await page.locator('.urgent-countdown').textContent(), '1');
+      await page.screenshot({ path: `${directory}/animation-urgent-${width}-${reducedMotion}.png`, fullPage: true });
+      await page.clock.runFor(1000);
       assert.equal((await flow(page)).play.events.at(-1).reason, 'TIMEOUT_RANDOM');
       assert.match(await page.locator('.match-note').textContent(), /시간초과 · 랜덤 진출/);
       for (let sequence = 3; sequence < 7; sequence++) {
@@ -143,5 +165,6 @@ try {
   }
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ results, loadingShimmer: true, stationaryClickTargets: true, keyboardSelection: true,
-    loserBothDirections: true, timeoutAndFinalUnchanged: true, reducedMotionLegible: true, browserErrors: 0, mockedApiOnly: true }));
+    loserBothDirections: true, threeSecondUrgency: true, timeoutAndFinalUnchanged: true,
+    reducedMotionLegible: true, browserErrors: 0, mockedApiOnly: true }));
 } finally { await browser.close(); }
