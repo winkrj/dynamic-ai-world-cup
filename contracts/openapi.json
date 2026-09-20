@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Dynamic AI World Cup API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Backend endpoints are implemented on the server/engine branches; main may lag until integration. See docs/API_CONTRACT.md for ownership, idempotency and cross-field invariants, and docs/INTEGRATION_SPEC.md for UI integration. Endpoint implementation does not imply candidate-quality or frontend completion."
   },
   "servers": [
@@ -796,6 +796,7 @@
               "ALREADY_FROZEN",
               "QUALITY_GATE_FAILED",
               "CLARIFICATION_REQUIRED",
+              "GROUNDING_REQUIRED",
               "UNSUPPORTED_REQUEST",
               "RATE_LIMITED",
               "PROVIDER_UNAVAILABLE",

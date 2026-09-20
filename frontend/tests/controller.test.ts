@@ -153,7 +153,7 @@ test('generation error copy does not invent a semantic cause or imply current fa
     h.controller.editPrompt(input.prompt); h.controller.next(); await h.controller.generate();
     const detail = h.controller.getSnapshot().error?.detail ?? '';
     assert.doesNotMatch(detail, /후보가 부족|조건을 지키면서|대상을 정하지 못/);
-    if (code === 'CLARIFICATION_REQUIRED') assert.match(detail, /최신 장소·가격 확인이 필요한 추천은 지원하지 않아요/);
+    if (code === 'CLARIFICATION_REQUIRED') assert.match(detail, /무엇을 비교해서 고르고 싶은지/);
     else assert.match(detail, /이번 요청의 후보를 완성하지 못했어요/);
   }
 });
@@ -216,6 +216,132 @@ test('Retry-After blocks early retry and only explicit retry at deadline repeats
   await h.controller.retry();
   assert.deepEqual(keys, [keys[0], keys[0]]);
   assert.equal(h.controller.getSnapshot().screen, 'preview');
+});
+
+test('initial 429 survives reload and expiry without POST, then edit preserves prompt and size without a request', async t => {
+  const storage = memory();
+  let posts = 0;
+  const api = client({ createGeneration: async () => {
+    posts++; throw new ApiFailure('RATE_LIMITED', { status: 429, retryAt: 5000 });
+  } });
+  const first = harness(t, { storage, api }).controller;
+  first.editPrompt(input.prompt); first.next(); first.chooseSize(32); await first.generate();
+  assert.equal(first.getSnapshot().canEdit, true);
+  assert.equal(first.getSnapshot().busy, false);
+  first.dispose();
+  const restored = harness(t, { storage, api });
+  assert.equal(restored.controller.getSnapshot().error?.retryAt, 5000);
+  await restored.controller.resume(); await restored.controller.retry();
+  restored.setTime(5000); restored.controller.tick(); await restored.controller.resume();
+  assert.equal(posts, 1);
+  assert.equal(restored.controller.getSnapshot().canEdit, true);
+  restored.controller.editInput();
+  assert.equal(restored.controller.getSnapshot().screen, 'input');
+  assert.equal(restored.controller.getSnapshot().prompt, input.prompt);
+  assert.equal(restored.controller.getSnapshot().size, 32);
+  assert.equal(posts, 1);
+});
+
+test('legacy clarified 429 checkpoint can edit while waiting without losing its appended answer', async t => {
+  const body = { ...input, prompt: clarifiedPrompt(input.prompt, '추가 합성 조건'), size: 32 as const };
+  const h = harness(t, {}, { kind: 'generation', input: body, key: 'legacy', clarificationUsed: true,
+    manualRetry: true, retryAt: 5000 });
+  await h.controller.resume();
+  assert.equal(h.controller.getSnapshot().canEdit, true);
+  h.controller.editInput();
+  assert.deepEqual(h.controller.getFlow(), { kind: 'input', prompt: body.prompt, size: 32, clarificationUsed: true });
+});
+
+test('429 without Retry-After is manual and editable after reload without inventing a deadline', async t => {
+  const storage = memory();
+  let posts = 0;
+  const api = client({ createGeneration: async () => { posts++; throw new ApiFailure('RATE_LIMITED', { status: 429 }); } });
+  const first = harness(t, { storage, api }).controller;
+  first.editPrompt(input.prompt); first.next(); await first.generate(); first.dispose();
+  const restored = harness(t, { storage, api }).controller;
+  await restored.resume();
+  assert.equal(posts, 1);
+  assert.equal(restored.getSnapshot().error?.retryAt, undefined);
+  assert.equal(restored.getSnapshot().canEdit, true);
+  assert.equal(restored.getSnapshot().canRetry, true);
+  assert.match(restored.getSnapshot().error!.title, /잠시 쉬었다/);
+  restored.editInput(); assert.equal(posts, 1);
+});
+
+test('retrying a rejected create clears editable rejection before POST and an ambiguous outcome remains locked to the same operation', async t => {
+  const storage = memory({ kind: 'generation', input, key: 'original', manualRetry: true, rejection: 'RATE_LIMITED', retryAt: 1000 });
+  const attempts: unknown[] = [];
+  const pending = deferred<never>();
+  const api = client({ createGeneration: async (body, key) => {
+    const durable = JSON.parse(storage.getItem(storageKey)!).flow;
+    assert.equal(durable.rejection, undefined);
+    assert.equal(durable.retryAt, undefined);
+    attempts.push([body, key]);
+    if (attempts.length === 1) return pending.promise;
+    throw new ApiFailure('NETWORK_ERROR');
+  } });
+  const first = harness(t, { storage, api }).controller;
+  const retry = first.retry();
+  assert.equal(first.getSnapshot().canEdit, false);
+  first.editInput(); assert.equal(first.getFlow().kind, 'generation');
+  pending.reject(new ApiFailure('NETWORK_ERROR')); await retry;
+  assert.equal(first.getSnapshot().canEdit, false);
+  first.dispose();
+  const restored = harness(t, { storage, api }).controller;
+  await restored.resume(); restored.editInput(); restored.newCup();
+  assert.equal(restored.getFlow().kind, 'generation');
+  assert.equal(restored.getSnapshot().canEdit, false);
+  assert.equal(attempts.length, 1);
+  await restored.retry();
+  assert.deepEqual(attempts, [[input, 'original'], [input, 'original']]);
+});
+
+test('an accepted job returning 429 cannot be edited or resubmitted as a new generation', async t => {
+  let gets = 0;
+  const h = harness(t, { api: client({ getJob: async () => {
+    gets++; throw new ApiFailure('RATE_LIMITED', { status: 429, retryAt: 5000 });
+  } }) }, { kind: 'generation', input, key: 'original', jobId: 'accepted' });
+  await h.controller.resume();
+  assert.equal(h.controller.getSnapshot().canEdit, false);
+  h.controller.editInput(); h.controller.newCup(); await h.controller.generate();
+  assert.equal(h.controller.getFlow().kind, 'generation');
+  assert.equal(gets, 1);
+});
+
+test('grounding failure is terminal rather than clarification and retains the support boundary after reload', async t => {
+  const storage = memory();
+  let posts = 0;
+  const api = client({ createGeneration: async () => {
+    posts++; return { jobId: 'grounding', status: 'QUEUED', draftId: null, error: null };
+  }, getJob: async () => ({ jobId: 'grounding', status: 'FAILED', draftId: null,
+    error: { code: 'GROUNDING_REQUIRED', message: 'Private detail must not be shown', requestId: 'grounding', retryable: false } }) });
+  const first = harness(t, { storage, api }).controller;
+  first.editPrompt(input.prompt); first.next(); await first.generate();
+  assert.equal(first.getSnapshot().screen, 'generating');
+  assert.equal(first.getSnapshot().canRetry, false);
+  assert.equal(first.getSnapshot().canEdit, true);
+  assert.match(first.getSnapshot().error!.detail, /현재 가격, 영업 여부나 예약 가능 여부는 확인하지 못해요/);
+  first.dispose();
+  const restored = harness(t, { storage, api }).controller;
+  await restored.resume(); await restored.retry();
+  assert.equal(posts, 1);
+  assert.match(restored.getSnapshot().error!.title, /최신 장소 정보는 확인할 수 없어요/);
+  assert.doesNotMatch(storage.getItem(storageKey)!, /Private detail/);
+  restored.editInput(); assert.equal(restored.getSnapshot().prompt, input.prompt);
+});
+
+test('grounding failure during regeneration keeps the complete prior preview and its replacement allowance', async t => {
+  const original = preview(16);
+  const h = harness(t, { api: client({ regenerate: async () => ({ jobId: 'regen', status: 'QUEUED', draftId: null, error: null }),
+    getJob: async () => ({ jobId: 'regen', status: 'FAILED', draftId: null,
+      error: { code: 'GROUNDING_REQUIRED', message: 'private', requestId: 'regen', retryable: false } }) }) },
+  { kind: 'preview', input: { ...input, size: 16 }, preview: original });
+  await h.controller.regenerate();
+  assert.equal(h.controller.getSnapshot().screen, 'preview');
+  assert.deepEqual(h.controller.getSnapshot().preview, original);
+  assert.equal(h.controller.getSnapshot().previewLocked, false);
+  assert.equal(h.controller.getSnapshot().preview!.regenerationsRemaining, 1);
+  assert.match(h.controller.getSnapshot().error!.title, /최신 장소 정보/);
 });
 
 test('failed regeneration preserves original full preview and remaining successful regeneration', async t => {

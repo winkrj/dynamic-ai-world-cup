@@ -67,10 +67,10 @@ public final class FastCandidateEngine implements CandidateEngine {
                     context.previousCandidateNames(), new CallContext(context.jobId(), context.attempt(), "COMPOSE", deadline));
             if (composed == null || composed.selection() == null || blank(composed.version())) throw new InvalidModelOutput();
             var selection = composed.selection();
-            if (selection.decision() == CatalogComposer.Decision.CLARIFICATION_REQUIRED
-                    || selection.decision() == CatalogComposer.Decision.GROUNDING_REQUIRED) {
+            if (selection.decision() == CatalogComposer.Decision.CLARIFICATION_REQUIRED) {
                 throw Failure.of(Failure.Code.CLARIFICATION_REQUIRED);
             }
+            if (selection.decision() == CatalogComposer.Decision.GROUNDING_REQUIRED) throw Failure.of(Failure.Code.GROUNDING_REQUIRED);
             if (selection.decision() == CatalogComposer.Decision.UNSUPPORTED_REQUEST) throw Failure.of(Failure.Code.UNSUPPORTED_REQUEST);
             if (selection.decision() != CatalogComposer.Decision.READY || selection.selectedIds().size() > input.size()
                     || selection.additions().size() > input.size()) throw new InvalidModelOutput();

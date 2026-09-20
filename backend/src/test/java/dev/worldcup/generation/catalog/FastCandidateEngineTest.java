@@ -179,7 +179,7 @@ class FastCandidateEngineTest {
     @ParameterizedTest @ValueSource(strings = {"CLARIFICATION_REQUIRED", "GROUNDING_REQUIRED", "UNSUPPORTED_REQUEST"})
     void ambiguousUnsupportedOrLiveFactRequestsAreNotReplacedWithGenericIdeas(String decision) {
         composer.result = new Selection(Decision.valueOf(decision), "", List.of(), List.of(), List.of());
-        var expected = "UNSUPPORTED_REQUEST".equals(decision) ? Failure.Code.UNSUPPORTED_REQUEST : Failure.Code.CLARIFICATION_REQUIRED;
+        var expected = Failure.Code.valueOf(decision);
         fails(expected, () -> engine.generate(new GenerationInput("오늘 영업하는 서울 데이트 장소", 8, "ko-KR", "Asia/Seoul"), context()));
         assertThat(composer.calls).isEqualTo(1);
     }

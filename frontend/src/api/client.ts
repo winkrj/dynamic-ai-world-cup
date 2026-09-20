@@ -14,6 +14,7 @@ const messages: Record<FailureCode, string> = {
   ALREADY_FROZEN: '이미 시작한 월드컵이에요. 저장된 경기를 이어가 주세요.',
   QUALITY_GATE_FAILED: '조건에 맞는 후보를 충분히 준비하지 못했어요. 고민을 조금 더 구체적으로 적어 주세요.',
   CLARIFICATION_REQUIRED: '비교할 대상을 더 구체적으로 알려 주세요.',
+  GROUNDING_REQUIRED: '특정 장소·상품의 최신 정보는 확인할 수 없어요. 활동이나 음식 종류를 고르는 요청으로 수정해 주세요.',
   UNSUPPORTED_REQUEST: '이 조건으로 월드컵을 만들기 어려워요. 다른 고민을 입력해 주세요.',
   RATE_LIMITED: '잠시 쉬었다가 다시 만들어 주세요.',
   PROVIDER_UNAVAILABLE: '지금은 후보를 만들 수 없어요. 잠시 후 다시 시도해 주세요.',
@@ -121,13 +122,13 @@ export function createApiClient(fetchImpl: typeof fetch = globalThis.fetch.bind(
       let value: unknown;
       try { value = await response.json(); } catch {
         if (controller.signal.aborted) throw new ApiFailure(timedOut ? 'REQUEST_TIMEOUT' : 'ABORTED', { retryable: timedOut });
-        throw new ApiFailure(response.ok ? 'INVALID_RESPONSE' : 'INTERNAL_ERROR', {
+        throw new ApiFailure(response.ok ? 'INVALID_RESPONSE' : response.status === 429 ? 'RATE_LIMITED' : 'INTERNAL_ERROR', {
           status: response.status, requestId, retryable: response.status >= 500 || response.status === 429,
           retryAt: retryAt(response.headers.get('Retry-After'), now()),
         });
       }
       if (!response.ok) {
-        throw new ApiFailure(isApiError(value) ? value.code : 'INTERNAL_ERROR', {
+        throw new ApiFailure(isApiError(value) ? value.code : response.status === 429 ? 'RATE_LIMITED' : 'INTERNAL_ERROR', {
           status: response.status, requestId: isApiError(value) ? value.requestId : requestId,
           retryable: isApiError(value) ? value.retryable : response.status >= 500 || response.status === 429,
           retryAt: retryAt(response.headers.get('Retry-After'), now()),

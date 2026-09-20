@@ -95,6 +95,28 @@ test('bodyless/unstructured server failure is safe; HTTP-date Retry-After uses r
   });
 });
 
+test('unstructured HTTP 429 remains a known rate rejection even without a valid Retry-After header', async () => {
+  for (const body of ['<html>private proxy detail</html>', '{"unexpected":"private detail"}']) {
+    const client = createApiClient((async () => new Response(body, { status: 429, headers: { 'Retry-After': 'invalid' } })) as typeof fetch);
+    await assert.rejects(client.createGeneration(input, 'same-key'), failure => {
+      assert.ok(failure instanceof ApiFailure);
+      assert.equal(failure.code, 'RATE_LIMITED'); assert.equal(failure.status, 429);
+      assert.equal(failure.retryAt, null); assert.equal(failure.retryable, true);
+      assert.doesNotMatch(failure.message, /private/);
+      return true;
+    });
+  }
+});
+
+test('GROUNDING_REQUIRED job error is recognized with safe local copy, not treated as an invalid response', async () => {
+  const error = { code: 'GROUNDING_REQUIRED', message: 'Private model detail', requestId: 'grounding', retryable: false } as const;
+  const client = createApiClient((async () => json({ jobId: 'job', status: 'FAILED', draftId: null, error })) as typeof fetch);
+  const result = await client.getJob('job');
+  assert.equal(result.status, 'FAILED');
+  assert.match(errorFromJob(result.error!).message, /최신 정보는 확인할 수 없어요/);
+  assert.doesNotMatch(errorFromJob(result.error!).message, /Private/);
+});
+
 test('network timeout and caller abort are distinct; pre-abort makes no request', async () => {
   let count = 0;
   const waiting = (async (_path, options) => {

@@ -1,5 +1,7 @@
 # B — 후보 품질과 서버
 
+TD-58 현재 제출 수정: 운영 catalog의 compact v4-activity-context는 지역·요일 활동 아이디어와 실제 장소/최신 사실을 구별한다. 후자는 별도 GROUNDING_REQUIRED이며 DB·HTTP에 그대로 보존한다. 공개 오류 enum 추가 외 요청/DB/모델/호출/예산은 불변이다. 최신 관측과 배포 상태는 docs/V1_SUBMISSION.md를 따르며 아래 staged 미배포 표시는 당시 기록이다.
+
 TD-55 제출 준비(2026-09-20): catalog 운영 적용을 준비하며 compact prompt `ce003-v3-core-experience`를 사용한다. 새32강2관측/추가$0.032856 뒤 최신 실험 누적$5.4206158/$6, 잔여$0.5793842(미확인.50보존). 실제 연결은 통과했지만32강의 의미 유사 후보는 남았으며 품질PASS로 기록하지 않는다. 루트 TD-55와 docs/V1_SUBMISSION.md/CATALOG_ENGINE.md가 최신. 과거 TD-54의7회·v2수치는 당시기록이다.
 
 TD-54 로컬 구현·검증 완료: 실제 8개 실험/유료 7회, 추가 $0.09224, 누적 **$5.3877598/$6**(미확인 .50 포함), 잔여 $0.6122402. 최종 compact prompt `ce003-v2-visible-choice`; 식사 조건의 보이지 않는 변형 문제를 1회 수정/재비교했다. 전체 verify Java451 실행·유료2 제외·최종 독립 리뷰 Critical/High/actionable0. 운영 기본 staged/미배포. 상세 관측·한계는 docs/CATALOG_ENGINE.md.

@@ -10,6 +10,7 @@ export type GenerationFlow = {
   kind: 'generation'; input: GenerationRequest; key: string; jobId?: string;
   previous?: Preview; failed?: boolean; status?: 'QUEUED' | 'RUNNING';
   clarificationUsed?: true; manualRetry?: true; retryAt?: number;
+  rejection?: 'RATE_LIMITED'; failedCode?: 'GROUNDING_REQUIRED';
 };
 export type PreviewFlow = { kind: 'preview'; input: GenerationRequest; preview: Preview; startKey?: string; clarificationUsed?: true };
 export type PlayFlow = {
@@ -47,6 +48,8 @@ export function restoreFlow(raw: string | null, now: number): { flow?: Flow; war
       && (value.jobId === undefined || text(value.jobId)) && (value.previous === undefined || preview(value.previous))
       && (value.failed === undefined || typeof value.failed === 'boolean')
       && (value.manualRetry === undefined || value.manualRetry === true)
+      && (value.rejection === undefined || (value.rejection === 'RATE_LIMITED' && value.manualRetry === true && value.jobId === undefined && value.previous === undefined))
+      && (value.failedCode === undefined || (value.failedCode === 'GROUNDING_REQUIRED' && value.failed === true))
       && (value.retryAt === undefined || (typeof value.retryAt === 'number' && Number.isFinite(value.retryAt) && value.retryAt >= 0))
       && (value.status === undefined || value.status === 'QUEUED' || value.status === 'RUNNING')) return { flow: value as GenerationFlow };
     if (value.kind === 'preview' && input(value.input) && preview(value.preview)

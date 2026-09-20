@@ -216,6 +216,21 @@ class WorldcupHttpTest extends PostgresSupport {
         assertThat(replacement.get("regenerationsRemaining").asInt()).isZero();
         rejected(browser.post("/drafts/" + draft + "/regenerations", Map.of("expectedVersion", 2)), 409, "REGENERATION_EXHAUSTED");
     }
+    @ParameterizedTest @ValueSource(strings = {"CLARIFICATION_REQUIRED", "GROUNDING_REQUIRED", "UNSUPPORTED_REQUEST"})
+    void generationRefusalsRetainTheirMeaningAcrossDatabaseAndHttp(String code) throws Exception {
+        var browser = new Browser();
+        engine.failNext = Failure.Code.valueOf(code);
+        var queued = accepted(browser.post("/generation-jobs", input(16)), 202, "GenerationJob");
+        assertThat(worker.runOne()).isTrue();
+        String path = "/generation-jobs/" + queued.path("jobId").asString();
+        var failed = accepted(browser.get(path), 200, "GenerationJob");
+        assertThat(failed.path("status").asString()).isEqualTo("FAILED");
+        assertThat(failed.path("draftId").isNull()).isTrue();
+        assertThat(failed.path("error").path("code").asString()).isEqualTo(code);
+        assertThat(failed.path("error").path("retryable").asBoolean()).isFalse();
+        assertThat(accepted(browser.get(path), 200, "GenerationJob")).isEqualTo(failed);
+        assertThat(ApiErrors.status(Failure.Code.valueOf(code))).isEqualTo(422);
+    }
     @Test void strictInputRejectsUnknownFieldsMissingFieldsNullsCoercionAndInvalidTimezones() throws Exception {
         var browser = new Browser();
         var changes = List.<Map<String, Object>>of(Map.of("size", "8"), Map.of("size", 8.1), Map.of("size", 4), Map.of("timezone", "+09:00"),

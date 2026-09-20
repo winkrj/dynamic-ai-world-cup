@@ -1,6 +1,8 @@
 # 프론트엔드 시작 안내
 
-> 기준일 2026-09-18. 현재 통합 작업 브랜치는 `feat/engine/context-feasibility`다. 사용자가 프론트도 맡았으며 시안 4/A 상하 카드 기반 입력·미리보기·게임·Champion·공유 화면과 기존 API 연결이 구현돼 있다. 새 프론트를 다시 만들거나 기존 작업을 덮어쓰지 말고 루트/frontend AGENTS와 [제품 통합 Spec](INTEGRATION_SPEC.md)을 따른다. 실제 AI 품질 승인과 공개 배포는 아직 완료되지 않았다.
+> 기준일 2026-09-20. 현재 통합 작업 브랜치는 `feat/engine/context-feasibility`다. 시안 4/A 상하 카드 기반 입력·미리보기·게임·Champion·공유와 catalog 엔진을 AWS에 공개 배포했다. 새 프론트를 다시 만들거나 기존 작업을 덮어쓰지 말고 루트/frontend AGENTS와 [제품 통합 Spec](INTEGRATION_SPEC.md)을 따른다. 최신 제출 수정·검증·배포는 [제출본](V1_SUBMISSION.md)을 확인한다. 일반 후보 품질의 보편적 PASS를 뜻하지 않는다.
+
+TD-58 API v1.1: 생성 실패 `GROUNDING_REQUIRED`는 실명 장소/현재 사실 미지원 안내와 입력 수정으로 종료한다. 모호한 요청에만 보충 질문1회를 사용한다. 최초 POST의 확정429는 수동 재시도/입력 수정이 가능하되 reload/만료 자동POST는 없다. 응답 유실·접수 job은 임의 이탈하지 않는다. 새 enum/타입/프론트는 함께 배포한다.
 
 이 문서는 현재 코드로 실행·유지보수할 때의 안내입니다. A는 `frontend/**`의 플레이 경험, B는 후보 품질과 서버를 담당합니다. [FE-001](tickets/FE-001.md)은 초기 착수 범위이고 현재 완료/잔여 상태는 [프로젝트 컨텍스트](../PROJECT_CONTEXT.md)와 [검증 기록](VERIFICATION.md)을 확인합니다.
 

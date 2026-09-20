@@ -1,4 +1,6 @@
-# API contract v1.0
+# API contract v1.1
+
+TD-58: `ApiError.code`에 `GROUNDING_REQUIRED`를 추가한다. 실명 장소·최신 사실 확인 미지원이며 retryable=false, 직접 오류 시422, 비동기 job은 GET200/FAILED/error로 반환한다. `CLARIFICATION_REQUIRED`(비교 대상 모호)와 달리 보충 질문을 유도하지 않는다. endpoint/요청 본문/DB schema는 그대로이며 이전 실패는 재분류하지 않는다. 신규 enum을 인식하는 프론트와 함께 배포한다.
 
 `contracts/openapi.json`이 DTO source of truth다. 아래 endpoint의 서버·저장 경로를 구현했다. 현재 엔진 브랜치에는 실제 AI adapter도 연결되어 있으며 `live`는 명시적 키·예산이 필요하다. `dev`는 합성 provider, 기본 profile은 fail-closed다. 실제 연결과 운영 품질 승인은 별개이며 `CANDIDATE_ENGINE.md`를 따른다. 시안과 API의 조정 기준은 [제품 통합 Spec](INTEGRATION_SPEC.md), 서버 구현/검증 경계는 `BACKEND_DESIGN.md`와 `VERIFICATION.md`를 함께 읽는다.
 
@@ -14,7 +16,7 @@
 - JSON의 알 수 없는 필드, 문자열→숫자/소수→정수 변환, 필수 필드 누락/null은 거절한다. 본문 최대 64 KiB, body가 있으면 application/json. 너무 큰 본문 413, 지원하지 않는 content type 415, 지원하지 않는 HTTP method 405도 같은 오류 형식이다.
 - mutation은 Idempotency-Key 필수이며 브라우저 Origin은 설정된 PUBLIC_ORIGIN과 정확히 같아야 한다. 임의 CORS를 열지 않는다. Origin이 없는 비브라우저 클라이언트는 사용할 수 있다. 요청 ID는 응답 X-Request-Id에도 있다.
 - 202 생성 응답은 Location(조회 경로), Retry-After: 1을 포함한다. 새 생성/재생성 접수는 익명 actor별 서울 날짜 기준 하루 2회(접수 후 FAILED 포함), actor/IP 각각 5회/최근 10분이다. 초과 접수는 429 `RATE_LIMITED`, 해제까지 올림한 초 단위 `Retry-After`를 반환한다. 일일·단기 제한이 겹치면 가장 늦은 해제 시각을 따른다. 재전송은 기존 응답을 재현하고, 접수 실패는 횟수를 차감하지 않는다. 공유 플레이는 생성 횟수를 쓰지 않는다.
-- `RATE_LIMITED`는 전체 provider 예산 부족도 표현한다. 해제 시각을 모르면 `Retry-After`를 발명하지 않는다. job FAILED의 Error에도 대기 시각 필드는 없으므로 고정 600초/자정을 표시하거나 자동 생성 POST를 반복하지 않는다. Error DTO/공개 enum은 변경하지 않는다.
+- `RATE_LIMITED`는 전체 provider 예산 부족도 표현한다. 해제 시각을 모르면 `Retry-After`를 발명하지 않는다. job FAILED의 Error에도 대기 시각 필드는 없으므로 고정 600초/자정을 표시하거나 자동 생성 POST를 반복하지 않는다. Error DTO 필드는 그대로다. 일일 기본2와 달리 심사 설정0은 일일 cap만 해제한다(TD-57).
 
 | 경로 | 의미 |
 | --- | --- |

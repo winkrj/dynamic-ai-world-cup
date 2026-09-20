@@ -10,6 +10,8 @@ TD-54(2026-09-19) 예외 범위: 아래 AC-03의 사전 quota 승인, AC-04/06�
 | AC-22 | 일반 요청의 DB ID 선택·부족분 보충은 provider 최대 1회. 검색/reviewer/Repair/느린 엔진 자동 fallback 없음. 실제 공급 ID만 허용, 알려진 이름/family 중복·N·단위·필드 검사 |
 | AC-23 | FAST_BEST_EFFORT와 validatorVersion 구별, 독립 certificate 없음, 공용 승인 세트로 자동 승격 안 함. 프롬프트 의미 정확도/목표 속도를 실측 완료로 위장하지 않음 |
 | AC-24 | V4 편집 후보의 provenance/time-independent/active를 확인. 새 private 생성 원문/결과 자동 공용화 없음. DB preset 생성·재생성·freeze·완주·동일 공유 연결에서 추가 AI 0회 |
+| AC-25 | 지역·요일·동행 맥락만으로 일반 활동 요청을 사실 확인으로 거절하지 않도록 지시. 실명 장소/최신 사실 미지원은 GROUNDING_REQUIRED, 모호한 단위는 CLARIFICATION_REQUIRED로 구별해 DB·HTTP·화면에 보존. 실제 성공/거절 관측은 의미 정확도 보장과 구별 |
+| AC-26 | 접수 전 확정429는 최초/보충 모두 수동 대기 저장, reload/만료 자동 POST0. 과거 대기 복원·수정 시 원문/강수 보존. 접수된 job/응답 유실은 이탈 금지, 재시도는 같은 key/body. 다시 접수 시 기존 서버 제한 유지 |
 
 | ID | 완료 기준 | 티켓 / 검증 |
 | --- | --- | --- |

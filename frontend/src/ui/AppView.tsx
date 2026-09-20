@@ -130,10 +130,10 @@ function SizeScreen({ state, actions }: ViewProps) {
 }
 
 function GeneratingScreen({ state }: ViewProps) {
-  const terminalFailure = !!state.error && state.canEdit;
+  const terminalFailure = !!state.error && state.canEdit && !state.canRetry;
   const paused = !!state.error && !terminalFailure;
   return <section className="flow-page generating-page" aria-busy={!state.error}>
-    <Heading eyebrow="03 / FINDING POSSIBILITIES" subtitle={terminalFailure ? '조건을 확인한 뒤 고민을 수정해 다시 시작할 수 있어요.' : paused ? '연결을 다시 확인해 같은 요청을 이어갈 수 있어요.' : '고민과 조건에 맞는 후보를 만들고 확인하고 있어요.'}>
+    <Heading eyebrow="03 / FINDING POSSIBILITIES" subtitle={terminalFailure ? '조건을 확인한 뒤 고민을 수정해 다시 시작할 수 있어요.' : paused ? '안내를 확인한 뒤 같은 요청을 다시 시도할 수 있어요.' : '고민과 조건에 맞는 후보를 만들고 확인하고 있어요.'}>
       {terminalFailure ? <>후보를<br /><span className="accent-text">준비하지 못했어요.</span></> : paused ? <>진행 상황을<br /><span className="accent-text">확인해 주세요.</span></> : <>고를 만한 후보를<br /><span className="accent-text">준비하는 중.</span></>}
     </Heading>
     {!state.error && <><div className="loading-deck" aria-hidden="true"><span className="loading-card">?</span><span className="loading-card">?</span><span className="loading-card">?</span></div>
@@ -149,7 +149,7 @@ function ClarificationScreen({ state, actions }: ViewProps) {
   const validation = clarificationProblem(state.prompt, answer);
   const count = promptLength(clarifiedPrompt(state.prompt, answer));
   return <section className="flow-page clarification-page">
-    <Heading eyebrow="ONE QUICK QUESTION" subtitle="지금은 이 요청의 후보를 준비하기 어려워요. 비교할 대상과 조건을 확인해 주세요. 최신 장소·가격 확인이 필요한 추천은 지원하지 않아요. 처음 적은 조건은 함께 보낼게요.">어떤 대상을<br /><span className="accent-text">고르고 싶나요?</span></Heading>
+    <Heading eyebrow="ONE QUICK QUESTION" subtitle="무엇을 비교해서 고르고 싶은지 알려 주세요. 처음 적은 조건은 함께 보낼게요.">어떤 대상을<br /><span className="accent-text">고르고 싶나요?</span></Heading>
     <p className="tiny-label">처음 적은 고민 · {state.size}강</p>
     <blockquote className="prompt-quote clarification-original">{state.prompt}</blockquote>
     <form className="prompt-panel" onSubmit={event => { event.preventDefault(); actions.submitClarification(); }}>

@@ -18,9 +18,10 @@ function problem(error: unknown): UserProblem {
   const failure = error instanceof ApiFailure ? error : undefined;
   const messages: Record<string, [string, string]> = {
     QUALITY_GATE_FAILED: ['후보를 충분히 준비하지 못했어요', '이번 요청의 후보를 완성하지 못했어요. 고민과 조건을 확인한 뒤 다시 만들어 주세요.'],
-    CLARIFICATION_REQUIRED: ['요청을 조금 더 확인해 주세요', '비교할 대상과 조건을 확인해 주세요. 최신 장소·가격 확인이 필요한 추천은 지원하지 않아요.'],
+    CLARIFICATION_REQUIRED: ['요청을 조금 더 확인해 주세요', '무엇을 비교해서 고르고 싶은지, 대상과 조건을 확인해 주세요.'],
+    GROUNDING_REQUIRED: ['최신 장소 정보는 확인할 수 없어요', '특정 장소·상품의 현재 가격, 영업 여부나 예약 가능 여부는 확인하지 못해요. 장소 이름 대신 함께할 활동이나 음식 종류를 고르는 요청으로 수정해 주세요.'],
     UNSUPPORTED_REQUEST: ['이 고민은 지금 준비하기 어려워요', '비교해서 고를 수 있는 대상과 조건으로 다시 적어 주세요.'],
-    RATE_LIMITED: ['잠시 쉬었다 다시 시도해 주세요', '지금은 새로운 후보를 만들 수 없어요. 대기 후 직접 다시 시도해 주세요.'],
+    RATE_LIMITED: ['잠시 쉬었다 다시 시도해 주세요', '지금은 새로운 후보를 만들 수 없어요. 잠시 후 직접 다시 시도해 주세요. 고민을 수정해도 요청 제한은 그대로 적용돼요.'],
     NOT_FOUND: ['정보를 찾을 수 없어요', '주소가 잘못됐거나 저장 기간이 지났을 수 있어요. 쿠키를 지웠다면 이전의 비공개 진행을 찾을 수 없습니다.'],
     VERSION_CONFLICT: ['후보가 다른 화면에서 바뀌었어요', '최신 후보 전체를 확인한 뒤 다시 시작해 주세요.'],
     REGENERATION_EXHAUSTED: ['전체 다시 만들기를 모두 사용했어요', '현재 후보를 확인하고 시작해 주세요.'],
@@ -30,6 +31,12 @@ function problem(error: unknown): UserProblem {
   };
   const [title, detail] = messages[failure?.code ?? ''] ?? ['연결을 확인해 주세요', '진행은 이 기기에 보관했어요. 다시 시도해도 같은 요청과 선택 기록을 사용합니다.'];
   return { title, detail, requestId: failure?.requestId ?? undefined, retryAt: failure?.retryAt ?? undefined };
+}
+
+function rejectedCreate(flow: Flow): boolean {
+  // Old clarified-request checkpoints persisted only manualRetry + retryAt for a known 429.
+  return flow.kind === 'generation' && !flow.jobId && !flow.previous
+    && (flow.rejection === 'RATE_LIMITED' || (!!flow.manualRetry && flow.retryAt !== undefined));
 }
 
 export class AppController {
@@ -70,14 +77,14 @@ export class AppController {
       if (restored.flow) this.flow = restored.flow;
       if (restored.warning) this.notice = restored.warning;
       if (this.flow.kind === 'generation' && this.flow.failed) {
-        this.error = {
+        this.error = this.flow.failedCode ? problem(new ApiFailure(this.flow.failedCode)) : {
           title: '후보를 준비하지 못했어요',
           detail: '이전 생성 요청이 실패했어요. 고민을 수정한 뒤 다시 만들어 주세요. 새로고침만으로 후보를 다시 생성하지는 않습니다.',
         };
       } else if (this.flow.kind === 'generation' && !this.flow.jobId && this.flow.manualRetry) {
-        this.error = this.flow.retryAt
+        this.error = rejectedCreate(this.flow)
           ? { ...problem(new ApiFailure('RATE_LIMITED')), retryAt: this.flow.retryAt }
-          : { title: '답변 요청을 다시 확인해 주세요', detail: '보내려던 답변은 보관했어요. 직접 다시 시도하면 같은 요청을 확인합니다. 새로고침만으로 전송하지 않아요.' };
+          : { title: '요청을 다시 확인해 주세요', detail: '보내려던 고민은 보관했어요. 직접 다시 시도하면 같은 요청을 확인합니다. 새로고침만으로 전송하지 않아요.' };
       }
       // Verify storage before the first mutation: no paid request may precede durable operation state.
       options.storage.setItem(this.storageKey, this.raw ?? encodeFlow(this.flow, this.now()));
@@ -132,7 +139,7 @@ export class AppController {
       canRetry: !!this.error && !this.busy && !this.saving && this.allowed()
         && (f.kind === 'play' || f.kind === 'share' || (f.kind === 'generation' && !f.failed)
           || (f.kind === 'preview' && !!f.startKey)),
-      canEdit: f.kind === 'clarification' || (f.kind === 'generation' && !!f.failed) || (f.kind === 'preview' && !f.startKey),
+      canEdit: f.kind === 'clarification' || (f.kind === 'generation' && !!f.failed) || rejectedCreate(f) || (f.kind === 'preview' && !f.startKey),
       storageBlocked: this.storageBlocked, locked: this.locked,
       synthetic: candidates?.some(c => c.name.startsWith('[개발용]')) ?? false,
       homeReturnsToExisting: (this.options.path ?? '/') !== '/',
@@ -203,10 +210,16 @@ export class AppController {
     try {
       let f: GenerationFlow = this.flow;
       if (!f.jobId) {
+        // Once another POST is attempted, its outcome is unknown until a response arrives.
+        // Clear the earlier rejection durably so a reload cannot abandon an accepted retry.
+        if (rejectedCreate(f)) {
+          f = { ...f, rejection: undefined, retryAt: undefined };
+          if (!this.persist(f)) return;
+        }
         const result = f.previous
           ? await this.options.api.regenerate(f.previous.draftId, f.previous.version, f.key, this.request.signal)
           : await this.options.api.createGeneration(f.input, f.key, this.request.signal);
-        f = { ...f, jobId: result.jobId, manualRetry: undefined, retryAt: undefined };
+        f = { ...f, jobId: result.jobId, manualRetry: undefined, retryAt: undefined, rejection: undefined };
         if (!this.persist(f)) return;
       }
       const job = await this.options.api.getJob(f.jobId!, this.request.signal);
@@ -219,14 +232,14 @@ export class AppController {
         else if (job.error?.code === 'CLARIFICATION_REQUIRED' && !f.clarificationUsed) {
           this.error = null;
           this.persist({ kind: 'clarification', input: f.input, answer: '' });
-        } else this.persist({ ...f, failed: true });
+        } else this.persist({ ...f, failed: true, failedCode: job.error?.code === 'GROUNDING_REQUIRED' ? 'GROUNDING_REQUIRED' : undefined });
       } else {
         this.persist({ ...f, status: job.status === 'RUNNING' ? 'RUNNING' : 'QUEUED' });
         this.timer = setTimeout(() => { void this.runGeneration(); }, this.options.pollMs ?? 1000);
       }
     } catch (error) {
       if (!this.stopped) this.error = problem(error);
-      if (error instanceof ApiFailure && ['VERSION_CONFLICT', 'REGENERATION_EXHAUSTED', 'INVALID_INPUT', 'NOT_FOUND', 'RATE_LIMITED'].includes(error.code)
+      if (error instanceof ApiFailure && ['VERSION_CONFLICT', 'REGENERATION_EXHAUSTED', 'INVALID_INPUT', 'NOT_FOUND', 'RATE_LIMITED', 'GROUNDING_REQUIRED'].includes(error.code)
         && this.flow.kind === 'generation' && !this.flow.jobId) {
         const f = this.flow;
         if (f.previous) {
@@ -234,8 +247,8 @@ export class AppController {
             const preview = await this.options.api.getPreview(f.previous.draftId);
             this.persist({ kind: 'preview', input: f.input, preview, clarificationUsed: f.clarificationUsed });
           } catch { this.persist({ kind: 'preview', input: f.input, preview: f.previous, clarificationUsed: f.clarificationUsed }); }
-        } else if (error.code !== 'RATE_LIMITED') this.persist({ ...f, failed: true });
-        else if (f.clarificationUsed) this.persist({ ...f, manualRetry: true, retryAt: error.retryAt ?? undefined });
+        } else if (error.code !== 'RATE_LIMITED') this.persist({ ...f, failed: true, failedCode: error.code === 'GROUNDING_REQUIRED' ? 'GROUNDING_REQUIRED' : undefined });
+        else this.persist({ ...f, manualRetry: true, rejection: 'RATE_LIMITED', retryAt: error.retryAt ?? undefined });
       } else if (error instanceof ApiFailure && error.code === 'NOT_FOUND' && this.flow.kind === 'generation') {
         this.persist({ ...this.flow, failed: true });
       }
@@ -369,7 +382,7 @@ export class AppController {
     else await this.resume();
   }
   editInput(): void {
-    if (!this.view.canEdit || !('input' in this.flow)) return;
+    if (!this.allowed() || this.busy || this.saving || !this.view.canEdit || !('input' in this.flow)) return;
     clearTimeout(this.timer); this.error = null;
     const clarificationUsed = this.flow.kind === 'clarification' ? true : this.flow.clarificationUsed;
     this.persist({ kind: 'input', prompt: this.flow.input.prompt, size: this.flow.input.size, clarificationUsed });

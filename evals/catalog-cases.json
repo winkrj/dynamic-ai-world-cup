@@ -1,10 +1,11 @@
 {
-  "datasetVersion": "catalog-speed-v1",
+  "datasetVersion": "catalog-speed-v2-context",
   "provenance": "Fixed synthetic cases for the TD-54 DB-first latency/quality tradeoff; not human approval or a representative traffic sample.",
   "cases": [
     {"id":"catalog-preset", "prompt":"취미 추천해줘", "purpose":"Exact curated preset, zero AI calls"},
     {"id":"catalog-hobby", "prompt":"혼자 하는 걸 좋아하고 운동은 싫어. 한 달에 10만원 이하로 할 취미를 찾고 있어.", "purpose":"Same hobby-solo request as prior staged baseline; select DB candidates and supplement only if necessary"},
     {"id":"catalog-date", "prompt":"주말에 서울에서 둘이 할 데이트 활동 아이디어를 추천해줘. 특정 가게 이름이나 영업정보는 필요 없어.", "purpose":"Generic activities with context, not a substitute for actual venue availability"},
+    {"id":"catalog-date-context", "prompt":"서울 평일 데이트", "purpose":"Short activity context without instructing the model to ignore venue facts; expected general activities, not named places"},
     {"id":"catalog-dinner", "prompt":"고기 없이 먹을 저녁 메뉴를 추천해줘. 매운 음식은 싫어.", "purpose":"Partial suitable catalog; exclusions and compact supplementation"},
     {"id":"catalog-empty", "prompt":"새 판타지 소설 주인공의 마법 능력을 고르고 싶어. 공격보다 일상에 도움 되는 능력으로 추천해줘.", "purpose":"Out-of-catalog fictional ideas; one-shot full generation without real-world factual claims"},
     {"id":"catalog-facts", "prompt":"이번 토요일 서울에서 실제 영업하는 식당 이름과 현재 가격을 알려줘.", "purpose":"No invented live facts; explicit fast-path refusal"}

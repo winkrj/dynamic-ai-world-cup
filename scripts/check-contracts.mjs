@@ -14,7 +14,7 @@ assert.equal(existing.slice(existing.indexOf('export interface paths')), generat
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 ajv.addSchema({ $id: 'https://worldcup.local/contract', ...spec });
-const cases = [['preview-8.json', 'Preview'], ['preview-image-8.json', 'Preview'], ['snapshot-8.json', 'Snapshot'], ['job-ready.json', 'GenerationJob'], ['error-quality.json', 'ApiError']];
+const cases = [['preview-8.json', 'Preview'], ['preview-image-8.json', 'Preview'], ['snapshot-8.json', 'Snapshot'], ['job-ready.json', 'GenerationJob'], ['error-quality.json', 'ApiError'], ['error-grounding.json', 'ApiError']];
 for (const [file, schema] of cases) {
   const data = JSON.parse(await readFile(new URL(`contracts/fixtures/${file}`, root), 'utf8'));
   const validate = ajv.getSchema(`https://worldcup.local/contract#/components/schemas/${schema}`);

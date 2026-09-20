@@ -86,6 +86,9 @@ class OpenAiCatalogComposerTest {
                 "같은 활동을 쪼개지", "취미를 일회성 집안일", "오븐 구입", "스스로 마련하기 어려운 외부 환경",
                 "GROUNDING_REQUIRED", "실제 장소 요청을 일반 활동으로 몰래 바꾸지", "같은 전체 후보 세트를 다시 내지",
                 "후보명과 태그만", "숨은 준비", "채소 쌀국수(채수)", "보이지 않는 설명으로 부적합한 기본 후보를 구제하지");
+        assertThat(prompt).contains("그 자체로 사실 확인 요청이 아니다", "지역·시간 조건을 버리지 말고",
+                "서울 평일 데이트", "부산에서 비 오는 날 둘이 할 것", "오늘 문 연 서울 식당 이름과 가격",
+                "부산 데이트 가게 이름 16곳", "지명만 있다는 이유로 추가 질문하거나 사실 확인 요청으로 분류하지");
     }
 
     @Test void promptKeepsLargeBracketsFromPaddingSubactivitiesOrInventingEnvironmentAccess() {

@@ -24,7 +24,7 @@ public class ApiErrors {
             case INVALID_INPUT -> 400;
             case NOT_FOUND -> 404;
             case VERSION_CONFLICT, IDEMPOTENCY_CONFLICT, OPERATION_IN_PROGRESS, REGENERATION_EXHAUSTED, ALREADY_FROZEN, SESSION_NOT_COMPLETED -> 409;
-            case QUALITY_GATE_FAILED, CLARIFICATION_REQUIRED, UNSUPPORTED_REQUEST, INVALID_SELECTION -> 422;
+            case QUALITY_GATE_FAILED, CLARIFICATION_REQUIRED, GROUNDING_REQUIRED, UNSUPPORTED_REQUEST, INVALID_SELECTION -> 422;
             case RATE_LIMITED -> 429;
             case PROVIDER_UNAVAILABLE -> 503;
             case INTERNAL_ERROR -> 500;
@@ -41,6 +41,7 @@ public class ApiErrors {
             case ALREADY_FROZEN -> "This bracket has already started and cannot be changed.";
             case QUALITY_GATE_FAILED -> "No candidate set passed validation. Revise the request or try again.";
             case CLARIFICATION_REQUIRED -> "Clarify the concern before generating candidates.";
+            case GROUNDING_REQUIRED -> "Named places and current facts are not supported. Request general activity ideas instead.";
             case UNSUPPORTED_REQUEST -> "This request cannot be handled safely.";
             case RATE_LIMITED -> "The generation allowance is currently exhausted. Try later.";
             case PROVIDER_UNAVAILABLE -> "Candidate generation is unavailable. Try later.";

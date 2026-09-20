@@ -99,7 +99,7 @@ class LiveEngineHttpTest extends PostgresSupport {
     static boolean assertExpectedTerminal(String caseId, JsonNode response) {
         if ("catalog-facts".equals(caseId)) {
             assertThat(response.path("status").asString()).isEqualTo("FAILED");
-            assertThat(response.path("error").path("code").asString()).isEqualTo("CLARIFICATION_REQUIRED");
+            assertThat(response.path("error").path("code").asString()).isEqualTo("GROUNDING_REQUIRED");
             assertThat(response.has("draftId")).isTrue();
             assertThat(response.path("draftId").isNull()).isTrue();
             return true;

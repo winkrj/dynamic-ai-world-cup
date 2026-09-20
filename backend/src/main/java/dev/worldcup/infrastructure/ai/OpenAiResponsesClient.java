@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Fixed official endpoint, no redirects/tools except explicit search, no automatic retries. */
 public final class OpenAiResponsesClient {
     public static final String PROMPT_VERSION = "ce002-v23-generate-review-repair";
-    public static final String COMPACT_PROMPT_VERSION = "ce003-v3-core-experience";
+    public static final String COMPACT_PROMPT_VERSION = "ce003-v4-activity-context";
     private static final Set<String> MODELS = Set.of("gpt-5.6-terra", "gpt-5.6-luna");
     private static final int MAX_OUTPUT = 8192;
     private static final int MAX_SEARCH_CALLS = 4;

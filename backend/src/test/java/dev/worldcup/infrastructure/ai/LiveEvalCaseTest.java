@@ -26,7 +26,7 @@ class LiveEvalCaseTest {
     }
     @Test void catalogFactExperimentRequiresRefusalRatherThanRewardingInventedReady() {
         var json = new JsonMapper();
-        var refused = json.readTree("{\"status\":\"FAILED\",\"draftId\":null,\"error\":{\"code\":\"CLARIFICATION_REQUIRED\"}}");
+        var refused = json.readTree("{\"status\":\"FAILED\",\"draftId\":null,\"error\":{\"code\":\"GROUNDING_REQUIRED\"}}");
         var ready = json.readTree("{\"status\":\"READY\",\"draftId\":\"invented\",\"error\":null}");
         assertThat(LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", refused)).isTrue();
         assertThatThrownBy(() -> LiveEngineHttpTest.assertExpectedTerminal("catalog-facts", ready)).isInstanceOf(AssertionError.class);

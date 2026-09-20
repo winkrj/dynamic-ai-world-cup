@@ -1,5 +1,16 @@
 # 검증 기록
 
+## TD-58 최종 기획·디자인 정합성 — 2026-09-20
+
+- 소스 기준 기획/디자인 감사: A 상하·500ms 라운드 안내·마지막3초·7초·timeout·freeze·공유는 현재 Spec과 일치. 제출 영향 있는 결함은 일반429의 reload 자동 POST, 기존 보충429의 수정 이탈 부재, 지역 맥락/실제 사실의 모호한 실패 안내였다. 사진/이모지·새 연출은 추가하지 않았다.
+- API v1.1: GROUNDING_REQUIRED 오류만 추가, DTO 필드/요청/DB migration 없음. 격리 DB→FAILED job→HTTP 재조회에서 CLARIFICATION_REQUIRED/UNSUPPORTED_REQUEST와 구별, retryable=false·draft 없음 확인. 새fixture·생성타입·실제HTTP에 포함했다.
+- 전체 `verify.sh` 종료0: Java **461개 실행/유료2 제외/실패·오류0**, 프론트70, handoff6·release13·배포구성53, 계약fixture6·실제HTTP175개/9schemas, 웹/bootJar/appJar PASS. Java는 실제 재실행했다. 실제AI 플래그2개 false.
+- 복구 브라우저: 8사례를360/1280에서 확인. 과거/최초/보충429·Retry-After없음·reload/만료 자동POST0·수정 원문/강수보존·재시도 응답유실 이탈금지·grounding실패복원 PASS. 기존 clarification/generation-policy PASS, 브라우저오류0. 초기 sandbox 브라우저 실행 실패 후 허용된 실행 환경으로 검사했고 제품 오류로 세지 않았다.
+- 라운드 브라우저:16/32×360/1280×기본/줄인움직임,184경기 PASS. 라운드경로·500ms·준비후7초·숨김/복귀·복원deadline·키보드·결승timeout 유지, 오류0. 모든 API는 합성으로 가로챘다.
+- 독립 read-only Reviewer **1/2**, Critical0/High0/actionable0. 관련 프론트56개를 별도 실행 PASS. 리뷰는 실제 모델/운영 배포/후작성 증거문서의 재실행을 대신하지 않는다.
+- 실제 모델 대조: 일반 데이트16강 READY·전체 연결3.542초/provider2.987초/$0.012422, 현재사실8강 기대거절 GROUNDING_REQUIRED·2.660초/provider2.430초/$0.0115905. 각각1회, 검색/Repair0. 실험누적$5.4446283/$6. 상세/한계는 [DB 엔진](CATALOG_ENGINE.md).
+- 빌드 산출물: JS `index-BrUdAseM.js`, CSS `index-Cvf931Db.css`. 최종 AWS 적용은 로그인 갱신 대기이며, 코드·로컬 검증 완료를 운영 반영으로 보고하지 않는다.
+
 ## TD-57 심사 모드·배포 진입점 — 2026-09-20
 
 - 일일2회/해제0의 실제 PostgreSQL 테스트18개 PASS. 기본2·actor/IP burst·동시 요청·idempotency·접수 실패/rollback·0→2 복귀 시 기존 기록 보존을 확인했다. Java 전체458개 실행, 유료2개 제외·실패/오류0.

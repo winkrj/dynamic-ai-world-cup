@@ -1,0 +1,6 @@
+{
+  "code": "GROUNDING_REQUIRED",
+  "message": "Named places and current facts are not supported. Request general activity ideas instead.",
+  "requestId": "synthetic-grounding-request",
+  "retryable": false
+}
