@@ -2,7 +2,7 @@
 
 ## 후속 플레이 연출 — TD-56 (2026-09-20)
 
-로컬 구현·최종 verify·합성 브라우저(8강28경기/16·32강184경기)·독립 리뷰1차 Critical/High/actionable0 완료. 운영 반영은 아직 대기다. 증거는 docs/VERIFICATION.md, 다음 상태는 docs/V1_SUBMISSION.md를 따른다. 사진은 설계만이며 현재 카드 이미지가 구현됐다고 설명하지 않는다.
+소스 `521fbfe` 구현·최종 verify·합성 브라우저(8강28경기/16·32강184경기)·독립 리뷰1차 Critical/High/actionable0·기존 AWS 배포 완료. 공개 JS/CSS가 검증 파일과 바이트 일치하며 실제 공유16강의 직접7/timeout8·Champion저장·오류0을 확인했다. 운영 장부14건/$0.73137410·snapshot 전체 hash는 배포/플레이 전후 같고 추가AI0이다. 증거와 최신 digest는 docs/VERIFICATION.md, docs/V1_SUBMISSION.md를 따른다. 사진은 설계만이며 현재 카드 이미지가 구현됐다고 설명하지 않는다.
 
 사용자는 HTML 시안과의 연출 차이 확인, 더 긴박한 선택, 라운드 전환 인지를 요청했다. 변경은 UI와 합성 브라우저 검증에 한정한다. 라운드 첫 preparation500ms 안내·상시 강수 경로·고정 button 내부900ms 압박·마지막3초 강조를 추가하되 실제7초/feedback280ms/이미지2초fallback/기존deadline복원/숨김·잠금 보호를 유지한다. reduced-motion은 정적인 같은 안내다. 사진은 docs/CANDIDATE_VISUALS.md의 별도 설계만 작성하며 수집/생성/API가입/새과금/계약변경은 이번에 하지 않는다. 엔진·DB·예산·핵심게임은 변경하지 않는다. 코드검증과 실제 배포는 구분한다.
 

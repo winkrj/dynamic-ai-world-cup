@@ -1,5 +1,13 @@
 # AWS 배포와 운영 검증
 
+## 최신 TD-56 — UI 후속 운영 적용 (2026-09-20)
+
+소스 `521fbfe341264f0042f372ac06439be6c3b8a78c`, 이미지 `release-521fbfe-app`, digest `sha256:efb46fcd3c31078bca86b318f96bb17dfa3298b38904c10223f4982c75b6619f`. 기존 서울 호스트에서 앱만 교체했고 catalog/30/prod,live,proxy/누적5·DB·nginx·비밀 설정·인프라는 유지했다. 배포 전 진행 중 생성0, S3백업69,205bytes/AES256/version 확인 후 교체했다. 이전 runtime metadata는 `/opt/worldcup/releases/521fbfe/runtime-before.env`에 보존했다.
+
+실행 digest/revision/healthy·HTTPS smoke·공개 JS/CSS의 로컬 검증본 바이트 일치 PASS. snapshot5개의 집계hash `505c0ea279c67af33e2f6196ab091e9c`와 catalog64·운영provider14건/$0.73137410/예약0는 배포 및 공유플레이 전후 같았다. 기존공유16강의 직접7/timeout8·Champion 저장·console오류0도 확인했다. 추가AI0이며 실험장부 변경은 없다. 백업timer는 active지만 이 새백업의 격리복원은 수행하지 않았다.
+
+첫 원격 실행은 백업만 끝나고 교체 부분이 실행되지 않았다. 정상 종료 코드만 믿지 않고 기존 이미지가 그대로임을 확인한 뒤, 명령 본문을 컨테이너 stdin과 분리해 남은 교체만 실행했다. 이 운영 입력 보완은 제품 코드 변경이 아니며 기존 첫 관측을 성공 교체로 기록하지 않는다. 상세 검증/한계와 팀원 전달은 [최신 제출본](V1_SUBMISSION.md)을 따른다. 아래 TD-55 이하는 당시 기록이다.
+
 최신 2026-09-20: **catalog 엔진·애니메이션 제출본 `fcb6a5f`의 AWS 배포 완료.** 실제 설정/V4/HTTPS·생성·저장·공유를 확인했다. 팀원 안내는 [1차 제출본](V1_SUBMISSION.md)을 따른다. 아래 9월19일 staged와 재로그인 대기는 당시 기록이다.
 
 ## TD-55 운영 적용 완료 — 2026-09-20

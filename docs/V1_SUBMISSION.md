@@ -10,7 +10,7 @@
 | 속도 | 정확 preset은 AI 0회, 그 외 최대 1회. DB ≤2초/일반 16강 약10초 목표, AI 호출 제한30초 | 목표는 SLA/p95가 아님. 네트워크·대기열에 따라 지연 가능 |
 | 품질 | 조건 우선·서버 구조/중복 검사·전체 미리보기. 평범함/호불호는 허용 | 의미 조건/유사성은 best-effort. 모든 입력의 완벽한 후보 보장 안 함 |
 | 비용 | 일반 생성 건당 $0.05 이하 관측 목표. 운영 누적$5, 실험 누적$6, 자동충전 OFF, 익명 하루2회 | 목표와 비용 예약은 최종 청구 hard cap이 아님. 쿠키 제한은 정확한 사람당 식별이 아님 |
-| 화면 | A 상하 카드, 진입·승패·진출·우승·로딩 연출 | B 좌우 카드/실시간 그룹방은 미포함 |
+| 화면 | A 상하 카드, 진입·승패·진출·우승·로딩, 마지막3초·라운드 첫500ms 안내·상시 강수 경로 | B 좌우 카드/실시간 그룹방은 미포함. 사진은 별도 설계만 |
 | 게임 | 8/16/32, 16기본, 준비 후7초, timeout 균등랜덤, Undo없음, 동일 snapshot 공유 | 공유는 동일 대진의 새 세션이며 공동 투표가 아님 |
 
 현재 장소·가격·영업 확인이 필요한 요청은 지원 범위가 아니다. 모델이 이를 인식하면 후보를 꾸며내지 않고 입력 수정 안내로 종료한다. 그 판단도 모델 기반이므로 실제 영업정보를 검증하는 검색 서비스로 소개하지 않는다. 생성 결과를 공개 공용 DB로 자동 학습하지 않는다.
@@ -26,6 +26,16 @@
 로컬 개발에는 Node24·Java21·Docker가 필요하다. `git clone --branch feat/engine/context-feasibility https://github.com/winkrj/dynamic-ai-world-cup.git`로 최신 작업 브랜치를 받는다. 저장소 루트에서 `npm ci`, `docker compose up -d --wait postgres`, 백엔드 폴더에서 `./gradlew bootRun --args='--spring.profiles.active=dev'`, 별도 터미널 루트에서 `npm run dev:web`을 실행한다. dev 후보에는 개발용 표시가 붙고 실제 AI를 호출하지 않는다. 로컬 실행의 자세한 기준은 [프론트 연결 안내](FRONTEND_HANDOFF.md)를 따른다. 운영 키/환경 파일은 Git에 없으며 팀원에게 채팅으로 보내지 않는다.
 
 ## 완료 기록
+
+### 최신 TD-56 — 라운드 구분·긴박감 운영 반영
+
+2026-09-20 소스 `521fbfe341264f0042f372ac06439be6c3b8a78c`를 기존 AWS에 배포했다. 이미지 `release-521fbfe-app`, linux/amd64 digest `sha256:efb46fcd3c31078bca86b318f96bb17dfa3298b38904c10223f4982c75b6619f`. GitHub 작업 브랜치에 반영됐으며 이후 기록 전용 커밋은 런타임을 바꾸지 않는다.
+
+원본 HTML A와 재대조한 내부 압박/VS·승패, 마지막3초, 16→8→4→결승 안내를 추가했다. 실제7초·feedback280ms·이미지2초fallback·기존active deadline은 유지한다. 전체 verify(변경 없는 Java test는 up-to-date), 합성8강28경기/16·32강184경기, 독립 리뷰 Critical/High/actionable0. 공개 파일이 검증본과 바이트 일치하고 HTTPS smoke와 실제 공유16강 직접7/timeout8·Champion저장·console오류0을 확인했다.
+
+앱만 교체했으며 DB/비밀설정/엔진/예산/인프라는 그대로다. 전후snapshot 전체hash·운영provider14건/$0.73137410·예약0가 동일하고 이번 추가AI0. 백업69,205bytes/AES256/version·timer active 확인, 새 백업 격리 복원은 미실행이다. 실제 모바일 Safari/스크린리더는 미검증이다. 상세는 [검증 기록](VERIFICATION.md), 사진은 수집·구현하지 않은 [별도 설계 제안](CANDIDATE_VISUALS.md)을 따른다.
+
+### 이전 TD-55 — catalog 1차 제출
 
 **2026-09-20 1차 제출본 개발·검증·AWS 배포 완료. 공개 서비스는 catalog 엔진과 새 애니메이션을 사용한다.**
 
